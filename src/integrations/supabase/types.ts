@@ -14,6 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      anamnesi: {
+        Row: {
+          abitudini: Json
+          allergologica: Json
+          compilata_da: string | null
+          created_at: string
+          estetica: Json
+          farmacologica: Json
+          generale: Json
+          id: string
+          note_libere: string | null
+          ostetrica: Json
+          patologica: Json
+          paziente_id: string
+          updated_at: string
+        }
+        Insert: {
+          abitudini?: Json
+          allergologica?: Json
+          compilata_da?: string | null
+          created_at?: string
+          estetica?: Json
+          farmacologica?: Json
+          generale?: Json
+          id?: string
+          note_libere?: string | null
+          ostetrica?: Json
+          patologica?: Json
+          paziente_id: string
+          updated_at?: string
+        }
+        Update: {
+          abitudini?: Json
+          allergologica?: Json
+          compilata_da?: string | null
+          created_at?: string
+          estetica?: Json
+          farmacologica?: Json
+          generale?: Json
+          id?: string
+          note_libere?: string | null
+          ostetrica?: Json
+          patologica?: Json
+          paziente_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnesi_paziente_id_fkey"
+            columns: ["paziente_id"]
+            isOneToOne: true
+            referencedRelation: "pazienti"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anamnesi_flag_rischio: {
+        Row: {
+          codice: string
+          created_at: string
+          etichetta: string
+          id: string
+          origine: string
+          paziente_id: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+        }
+        Insert: {
+          codice: string
+          created_at?: string
+          etichetta: string
+          id?: string
+          origine?: string
+          paziente_id: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Update: {
+          codice?: string
+          created_at?: string
+          etichetta?: string
+          id?: string
+          origine?: string
+          paziente_id?: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnesi_flag_rischio_paziente_id_fkey"
+            columns: ["paziente_id"]
+            isOneToOne: false
+            referencedRelation: "pazienti"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -41,6 +135,145 @@ export type Database = {
           id?: string
           metadata?: Json | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      paziente_access_log: {
+        Row: {
+          azione: string
+          created_at: string
+          id: string
+          paziente_id: string
+          user_id: string | null
+        }
+        Insert: {
+          azione: string
+          created_at?: string
+          id?: string
+          paziente_id: string
+          user_id?: string | null
+        }
+        Update: {
+          azione?: string
+          created_at?: string
+          id?: string
+          paziente_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paziente_access_log_paziente_id_fkey"
+            columns: ["paziente_id"]
+            isOneToOne: false
+            referencedRelation: "pazienti"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paziente_alert: {
+        Row: {
+          attivo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          paziente_id: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+          testo: string
+        }
+        Insert: {
+          attivo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          paziente_id: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+          testo: string
+        }
+        Update: {
+          attivo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          paziente_id?: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+          testo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paziente_alert_paziente_id_fkey"
+            columns: ["paziente_id"]
+            isOneToOne: false
+            referencedRelation: "pazienti"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pazienti: {
+        Row: {
+          cap: string | null
+          citta: string | null
+          codice_fiscale: string | null
+          cognome: string
+          created_at: string
+          created_by: string | null
+          data_nascita: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          email: string | null
+          id: string
+          indirizzo: string | null
+          luogo_nascita: string | null
+          nome: string
+          note: string | null
+          professione: string | null
+          provincia: string | null
+          sesso: Database["public"]["Enums"]["sesso"] | null
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          cap?: string | null
+          citta?: string | null
+          codice_fiscale?: string | null
+          cognome: string
+          created_at?: string
+          created_by?: string | null
+          data_nascita?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          email?: string | null
+          id?: string
+          indirizzo?: string | null
+          luogo_nascita?: string | null
+          nome: string
+          note?: string | null
+          professione?: string | null
+          provincia?: string | null
+          sesso?: Database["public"]["Enums"]["sesso"] | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cap?: string | null
+          citta?: string | null
+          codice_fiscale?: string | null
+          cognome?: string
+          created_at?: string
+          created_by?: string | null
+          data_nascita?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          email?: string | null
+          id?: string
+          indirizzo?: string | null
+          luogo_nascita?: string | null
+          nome?: string
+          note?: string | null
+          professione?: string | null
+          provincia?: string | null
+          sesso?: Database["public"]["Enums"]["sesso"] | null
+          telefono?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -116,9 +349,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_operator: { Args: { _user_id: string }; Returns: boolean }
+      is_valid_cf: { Args: { _cf: string }; Returns: boolean }
     }
     Enums: {
+      alert_severity: "info" | "attenzione" | "critico"
       app_role: "medico" | "collaboratore"
+      sesso: "M" | "F" | "altro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -246,7 +483,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_severity: ["info", "attenzione", "critico"],
       app_role: ["medico", "collaboratore"],
+      sesso: ["M", "F", "altro"],
     },
   },
 } as const
