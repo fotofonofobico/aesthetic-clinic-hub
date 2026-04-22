@@ -338,13 +338,13 @@ function AnamnesiPanel({
     const { error } = await supabase
       .from("anamnesi")
       .update({
-        generale: data.generale,
-        patologica: data.patologica,
-        farmacologica: data.farmacologica,
-        allergologica: data.allergologica,
-        ostetrica: data.ostetrica,
-        abitudini: data.abitudini,
-        estetica: data.estetica,
+        generale: data.generale as never,
+        patologica: data.patologica as never,
+        farmacologica: data.farmacologica as never,
+        allergologica: data.allergologica as never,
+        ostetrica: data.ostetrica as never,
+        abitudini: data.abitudini as never,
+        estetica: data.estetica as never,
         note_libere: data.note_libere,
       })
       .eq("id", data.id);

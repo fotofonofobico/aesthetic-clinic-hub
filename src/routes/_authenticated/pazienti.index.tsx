@@ -89,7 +89,7 @@ function PazientiListPage() {
             {pazienti.length} {pazienti.length === 1 ? "paziente" : "pazienti"} in archivio
           </p>
         </div>
-        <Button onClick={() => navigate({ to: "/pazienti/nuovo" })}>
+        <Button onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id: "new" } })}>
           <Plus className="h-4 w-4" />
           Nuovo paziente
         </Button>
