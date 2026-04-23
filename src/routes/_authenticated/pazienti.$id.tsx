@@ -26,6 +26,8 @@ import type {
   AlertSeverity,
 } from "@/types/clinico";
 import { computeAutoFlags, type AnamnesiPayload } from "@/lib/flag-rischio";
+import { ConsensiPanel } from "@/components/paziente/consensi-panel";
+import { PianiPanel } from "@/components/paziente/piani-panel";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -204,6 +206,8 @@ function PazienteDetailPage() {
         <TabsList>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
+          <TabsTrigger value="piani">Piani</TabsTrigger>
+          <TabsTrigger value="consensi">Consensi</TabsTrigger>
           <TabsTrigger value="alert">Alert ({alerts.length})</TabsTrigger>
         </TabsList>
 
@@ -221,6 +225,14 @@ function PazienteDetailPage() {
           ) : (
             <p className="text-sm text-muted-foreground">Anamnesi non disponibile.</p>
           )}
+        </TabsContent>
+
+        <TabsContent value="piani">
+          <PianiPanel pazienteId={id} />
+        </TabsContent>
+
+        <TabsContent value="consensi">
+          <ConsensiPanel pazienteId={id} />
         </TabsContent>
 
         <TabsContent value="alert">

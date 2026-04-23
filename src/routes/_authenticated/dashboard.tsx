@@ -45,14 +45,14 @@ function DashboardPage() {
           <ModuleCard
             icon={<FileSignature className="h-5 w-5" />}
             title="Consensi"
-            description="Firma grafometrica su tablet, archivio storico, collegabili a piano o seduta."
-            status="next"
+            description="Firma grafometrica su tablet, archivio storico immutabile con hash di integrità."
+            status="ready"
           />
           <ModuleCard
             icon={<Syringe className="h-5 w-5" />}
             title="Trattamenti & Piani"
-            description="Catalogo, piani con sedute, ritocchi, follow-up clinici."
-            status="next"
+            description="Catalogo trattamenti, piani con sedute progressive e stato clinico."
+            status="ready"
           />
           <ModuleCard
             icon={<ShieldCheck className="h-5 w-5" />}
