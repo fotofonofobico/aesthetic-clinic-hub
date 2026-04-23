@@ -26,9 +26,9 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { to: "/pazienti", label: "Pazienti", icon: <Users className="h-4 w-4" /> },
+  { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" /> },
+  { to: "/consensi", label: "Consensi", icon: <FileSignature className="h-4 w-4" /> },
   { to: "/anamnesi", label: "Anamnesi", icon: <ClipboardList className="h-4 w-4" />, comingSoon: true },
-  { to: "/consensi", label: "Consensi", icon: <FileSignature className="h-4 w-4" />, comingSoon: true },
-  { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" />, comingSoon: true },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
