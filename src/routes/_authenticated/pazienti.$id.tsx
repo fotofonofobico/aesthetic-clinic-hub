@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useMatches } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -103,10 +103,14 @@ interface AnamnesiData {
   note_libere: string | null;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function PazienteDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const matches = useMatches();
+  const isChildRoute = matches.some((m) => m.routeId !== Route.id && m.routeId.startsWith(Route.id));
   const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
@@ -114,8 +118,17 @@ function PazienteDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isChildRoute) {
+      setLoading(false);
+      return;
+    }
+    if (!UUID_RE.test(id)) {
+      toast.error("Paziente non trovato");
+      void navigate({ to: "/pazienti" });
+      return;
+    }
     void load();
-  }, [id]);
+  }, [id, isChildRoute]);
 
   async function load() {
     setLoading(true);
@@ -155,6 +168,10 @@ function PazienteDetailPage() {
     }
 
     setLoading(false);
+  }
+
+  if (isChildRoute) {
+    return <Outlet />;
   }
 
   if (loading || !paziente) {
