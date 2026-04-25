@@ -304,14 +304,19 @@ function PazienteDetailPage() {
       {/* Banner flag/alert critici sempre in evidenza */}
       <FlagBanner flags={flags} alerts={alerts} />
 
-      <Tabs defaultValue="anagrafica" className="space-y-4">
+      <Tabs defaultValue="diario" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="diario">Diario</TabsTrigger>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
           <TabsTrigger value="piani">Piani</TabsTrigger>
           <TabsTrigger value="consensi">Consensi</TabsTrigger>
           <TabsTrigger value="alert">Alert ({alerts.length})</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="diario">
+          <DiarioPanel pazienteId={id} />
+        </TabsContent>
 
         <TabsContent value="anagrafica">
           <AnagraficaPanel paziente={paziente} />
@@ -386,6 +391,10 @@ function FlagBanner({ flags, alerts }: { flags: FlagRischio[]; alerts: PazienteA
 }
 
 function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
+  const bmi =
+    paziente.peso_kg && paziente.altezza_cm && paziente.altezza_cm > 0
+      ? (paziente.peso_kg / Math.pow(paziente.altezza_cm / 100, 2)).toFixed(1)
+      : null;
   return (
     <Card>
       <CardContent className="grid gap-4 p-6 md:grid-cols-2">
@@ -406,6 +415,15 @@ function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
         <Info label="Luogo di nascita" value={paziente.luogo_nascita} />
         <Info label="Professione" value={paziente.professione} />
         <Info label="Codice fiscale" value={paziente.codice_fiscale} mono />
+        <Info label="Identità di genere" value={formatGenere(paziente.identita_genere)} />
+        <Info
+          label="Peso / Altezza"
+          value={
+            paziente.peso_kg || paziente.altezza_cm
+              ? `${paziente.peso_kg ?? "—"} kg · ${paziente.altezza_cm ?? "—"} cm${bmi ? ` · BMI ${bmi}` : ""}`
+              : null
+          }
+        />
         {paziente.note ? (
           <div className="md:col-span-2">
             <Info label="Note" value={paziente.note} />
@@ -414,6 +432,18 @@ function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
       </CardContent>
     </Card>
   );
+}
+
+function formatGenere(v: string | null): string | null {
+  if (!v) return null;
+  const map: Record<string, string> = {
+    donna: "Donna",
+    uomo: "Uomo",
+    non_binario: "Non binario",
+    non_dichiarata: "Non dichiarata",
+    altro: "Altro",
+  };
+  return map[v] ?? v;
 }
 
 function Info({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
