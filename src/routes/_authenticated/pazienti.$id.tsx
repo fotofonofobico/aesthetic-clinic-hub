@@ -559,11 +559,14 @@ function AnamnesiPanel({
                   <div key={c.k} className="space-y-2">
                     <Label className="text-sm">{c.l}</Label>
                     <Select
-                      value={(sec[c.k] as string) ?? ""}
+                      value={((sec[c.k] as string) || "") || "_none"}
                       onValueChange={(v) =>
                         setData((d) => ({
                           ...d,
-                          [sez.key]: { ...(d[sez.key] as object), [c.k]: v },
+                          [sez.key]: {
+                            ...(d[sez.key] as object),
+                            [c.k]: v === "_none" ? "" : v,
+                          },
                         }))
                       }
                     >
@@ -572,7 +575,7 @@ function AnamnesiPanel({
                       </SelectTrigger>
                       <SelectContent>
                         {(c.options ?? []).map((o) => (
-                          <SelectItem key={o.value || "_empty"} value={o.value || "_none"}>
+                          <SelectItem key={o.value || "_none"} value={o.value || "_none"}>
                             {o.label}
                           </SelectItem>
                         ))}
