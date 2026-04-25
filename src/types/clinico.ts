@@ -1,5 +1,6 @@
 export type AlertSeverity = "info" | "attenzione" | "critico";
 export type Sesso = "M" | "F" | "altro";
+export type NotaTipo = "clinica" | "telefonata" | "promemoria" | "altro";
 
 export interface Paziente {
   id: string;
@@ -17,6 +18,9 @@ export interface Paziente {
   provincia: string | null;
   professione: string | null;
   note: string | null;
+  identita_genere: string | null;
+  peso_kg: number | null;
+  altezza_cm: number | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -39,4 +43,15 @@ export interface FlagRischio {
   severity: AlertSeverity;
   origine: string;
   created_at: string;
+}
+
+export interface PazienteNota {
+  id: string;
+  paziente_id: string;
+  tipo: NotaTipo;
+  testo: string;
+  data_evento: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }

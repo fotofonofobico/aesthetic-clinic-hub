@@ -378,8 +378,42 @@ export type Database = {
           },
         ]
       }
+      paziente_nota: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_evento: string
+          id: string
+          paziente_id: string
+          testo: string
+          tipo: Database["public"]["Enums"]["nota_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_evento?: string
+          id?: string
+          paziente_id: string
+          testo: string
+          tipo?: Database["public"]["Enums"]["nota_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_evento?: string
+          id?: string
+          paziente_id?: string
+          testo?: string
+          tipo?: Database["public"]["Enums"]["nota_tipo"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pazienti: {
         Row: {
+          altezza_cm: number | null
           cap: string | null
           citta: string | null
           codice_fiscale: string | null
@@ -391,10 +425,12 @@ export type Database = {
           deleted_by: string | null
           email: string | null
           id: string
+          identita_genere: string | null
           indirizzo: string | null
           luogo_nascita: string | null
           nome: string
           note: string | null
+          peso_kg: number | null
           professione: string | null
           provincia: string | null
           sesso: Database["public"]["Enums"]["sesso"] | null
@@ -402,6 +438,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          altezza_cm?: number | null
           cap?: string | null
           citta?: string | null
           codice_fiscale?: string | null
@@ -413,10 +450,12 @@ export type Database = {
           deleted_by?: string | null
           email?: string | null
           id?: string
+          identita_genere?: string | null
           indirizzo?: string | null
           luogo_nascita?: string | null
           nome: string
           note?: string | null
+          peso_kg?: number | null
           professione?: string | null
           provincia?: string | null
           sesso?: Database["public"]["Enums"]["sesso"] | null
@@ -424,6 +463,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          altezza_cm?: number | null
           cap?: string | null
           citta?: string | null
           codice_fiscale?: string | null
@@ -435,10 +475,12 @@ export type Database = {
           deleted_by?: string | null
           email?: string | null
           id?: string
+          identita_genere?: string | null
           indirizzo?: string | null
           luogo_nascita?: string | null
           nome?: string
           note?: string | null
+          peso_kg?: number | null
           professione?: string | null
           provincia?: string | null
           sesso?: Database["public"]["Enums"]["sesso"] | null
@@ -681,6 +723,7 @@ export type Database = {
     Enums: {
       alert_severity: "info" | "attenzione" | "critico"
       app_role: "medico" | "collaboratore"
+      nota_tipo: "clinica" | "telefonata" | "promemoria" | "altro"
       piano_stato: "attivo" | "completato" | "sospeso" | "annullato"
       sesso: "M" | "F" | "altro"
     }
@@ -812,6 +855,7 @@ export const Constants = {
     Enums: {
       alert_severity: ["info", "attenzione", "critico"],
       app_role: ["medico", "collaboratore"],
+      nota_tipo: ["clinica", "telefonata", "promemoria", "altro"],
       piano_stato: ["attivo", "completato", "sospeso", "annullato"],
       sesso: ["M", "F", "altro"],
     },
