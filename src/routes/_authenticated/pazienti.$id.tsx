@@ -28,10 +28,20 @@ import type {
 import { computeAutoFlags, type AnamnesiPayload } from "@/lib/flag-rischio";
 import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
+import { DiarioPanel } from "@/components/paziente/diario-panel";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
 });
+
+type CampoTipo = "bool" | "ternary" | "text" | "select";
+
+interface AnamnesiCampo {
+  k: string;
+  l: string;
+  tipo?: CampoTipo;
+  options?: { value: string; label: string }[];
+}
 
 const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: AnamnesiCampo[] }[] = [
   {
@@ -40,7 +50,9 @@ const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: Anamnes
     campi: [
       { k: "gravidanza", l: "In gravidanza" },
       { k: "allattamento", l: "In allattamento" },
+      { k: "menopausa", l: "Menopausa" },
       { k: "portatore_pacemaker", l: "Portatore pacemaker / dispositivo elettronico" },
+      { k: "vaccinazione_recente", l: "Vaccinazione negli ultimi 14 giorni" },
     ],
   },
   {
@@ -48,13 +60,23 @@ const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: Anamnes
     label: "Patologica",
     campi: [
       { k: "diabete", l: "Diabete" },
+      { k: "tiroide", l: "Patologia tiroidea" },
       { k: "cardiopatia", l: "Cardiopatia" },
       { k: "ipertensione", l: "Ipertensione arteriosa" },
+      { k: "varici", l: "Varici" },
+      { k: "coagulopatia", l: "Coagulopatia / patologia ematologica" },
+      { k: "asma_bpco", l: "Asma / BPCO" },
       { k: "epilessia", l: "Epilessia" },
+      { k: "cefalea_cronica", l: "Cefalea cronica / emicrania" },
+      { k: "psichiatrico", l: "Disturbo psichiatrico" },
       { k: "tumori_attivi", l: "Patologia oncologica attiva" },
+      { k: "tumori_pregressi", l: "Neoplasia pregressa" },
       { k: "malattie_autoimmuni", l: "Malattie autoimmuni" },
       { k: "cheloidi", l: "Tendenza alla formazione di cheloidi" },
       { k: "herpes_recidivante", l: "Herpes labiale recidivante" },
+      { k: "dermatologica_attiva", l: "Dermatopatia attiva (acne/psoriasi/dermatite)" },
+      { k: "infettiva_hbv_hcv_hiv", l: "Patologia infettiva (HBV/HCV/HIV)" },
+      { k: "interventi_viso", l: "Interventi chirurgici / traumi al viso" },
     ],
   },
   {
@@ -65,6 +87,12 @@ const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: Anamnes
       { k: "cortisonici", l: "Terapia cortisonica in corso" },
       { k: "isotretinoina_recente", l: "Isotretinoina ultimi 6 mesi" },
       { k: "immunosoppressori", l: "Terapia immunosoppressiva" },
+      { k: "integratori", l: "Integratori / omeopatici (verificare interazioni)" },
+      {
+        k: "terapie_in_corso",
+        l: "Terapie farmacologiche in corso (specificare)",
+        tipo: "text",
+      },
     ],
   },
   {
@@ -72,23 +100,80 @@ const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: Anamnes
     label: "Allergie",
     campi: [
       { k: "lattice", l: "Allergia al lattice" },
-      { k: "anestetici_locali", l: "Allergia anestetici locali" },
+      { k: "anestetici_locali", l: "Allergia anestetici locali / lidocaina" },
+      { k: "farmaci", l: "Allergia a farmaci" },
+      { k: "alimentari_ambientali", l: "Allergie alimentari / ambientali" },
+      { k: "anafilassi_pregressa", l: "Reazione anafilattica pregressa" },
     ],
   },
   {
     key: "abitudini",
-    label: "Abitudini",
+    label: "Stile di vita",
     campi: [
-      { k: "fuma", l: "Fumatore" },
-      { k: "alcol_eccesso", l: "Consumo eccessivo di alcol" },
+      {
+        k: "fumo",
+        l: "Fumo",
+        tipo: "ternary",
+      },
+      { k: "alcol", l: "Alcol", tipo: "ternary" },
+      { k: "sostanze", l: "Sostanze stupefacenti", tipo: "ternary" },
+      { k: "sport", l: "Attività sportiva regolare" },
+      {
+        k: "alimentazione",
+        l: "Alimentazione",
+        tipo: "select",
+        options: [
+          { value: "", label: "—" },
+          { value: "sana", label: "Sana ed equilibrata" },
+          { value: "abbastanza", label: "Abbastanza equilibrata" },
+          { value: "disequilibrata", label: "Disequilibrata" },
+        ],
+      },
+    ],
+  },
+  {
+    key: "estetica",
+    label: "Estetica",
+    campi: [
+      {
+        k: "fototipo",
+        l: "Fototipo Fitzpatrick",
+        tipo: "select",
+        options: [
+          { value: "", label: "—" },
+          { value: "I", label: "I" },
+          { value: "II", label: "II" },
+          { value: "III", label: "III" },
+          { value: "IV", label: "IV" },
+          { value: "V", label: "V" },
+          { value: "VI", label: "VI" },
+        ],
+      },
+      {
+        k: "texture",
+        l: "Texture cutanea",
+        tipo: "select",
+        options: [
+          { value: "", label: "—" },
+          { value: "omogenea", label: "Omogenea" },
+          { value: "parziale", label: "Parziale" },
+          { value: "disomogenea", label: "Disomogenea" },
+        ],
+      },
+      { k: "abbronzatura", l: "Abbronzatura attuale" },
+      { k: "elastosi", l: "Elastosi" },
+      { k: "spf_uso", l: "Uso abituale di SPF" },
+      { k: "esposizione_prevista_4w", l: "Esposizione solare prevista nelle prossime 4 settimane" },
+      { k: "filler_permanenti", l: "Filler permanenti / semipermanenti pregressi" },
+      { k: "reazioni_pregresse", l: "Reazioni / complicanze a trattamenti estetici pregressi" },
+      {
+        k: "trattamenti_pregressi_note",
+        l: "Trattamenti estetici pregressi (botox, filler, peeling, laser, ecc.)",
+        tipo: "text",
+      },
     ],
   },
 ];
-
-interface AnamnesiCampo {
-  k: string;
-  l: string;
-}
 
 interface AnamnesiData {
   id: string;
