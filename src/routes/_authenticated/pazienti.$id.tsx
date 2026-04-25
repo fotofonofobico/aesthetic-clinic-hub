@@ -534,6 +534,88 @@ function AnamnesiPanel({
           <CardContent className="grid gap-2 md:grid-cols-2">
             {sez.campi.map((c) => {
               const sec = (data[sez.key] as Record<string, unknown>) ?? {};
+              const tipo = c.tipo ?? "bool";
+
+              if (tipo === "text") {
+                return (
+                  <div key={c.k} className="md:col-span-2 space-y-2">
+                    <Label className="text-sm">{c.l}</Label>
+                    <Textarea
+                      rows={2}
+                      value={(sec[c.k] as string) ?? ""}
+                      onChange={(e) =>
+                        setData((d) => ({
+                          ...d,
+                          [sez.key]: { ...(d[sez.key] as object), [c.k]: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                );
+              }
+
+              if (tipo === "select") {
+                return (
+                  <div key={c.k} className="space-y-2">
+                    <Label className="text-sm">{c.l}</Label>
+                    <Select
+                      value={(sec[c.k] as string) ?? ""}
+                      onValueChange={(v) =>
+                        setData((d) => ({
+                          ...d,
+                          [sez.key]: { ...(d[sez.key] as object), [c.k]: v },
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="—" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(c.options ?? []).map((o) => (
+                          <SelectItem key={o.value || "_empty"} value={o.value || "_none"}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              }
+
+              if (tipo === "ternary") {
+                const val = ((sec[c.k] as string) ?? "") || "";
+                const setVal = (v: string) =>
+                  setData((d) => ({
+                    ...d,
+                    [sez.key]: { ...(d[sez.key] as object), [c.k]: v },
+                  }));
+                return (
+                  <div
+                    key={c.k}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
+                  >
+                    <span className="text-sm">{c.l}</span>
+                    <div className="flex gap-1">
+                      {[
+                        { v: "no", l: "No" },
+                        { v: "occasionale", l: "Occas." },
+                        { v: "si", l: "Sì" },
+                      ].map((o) => (
+                        <Button
+                          key={o.v}
+                          type="button"
+                          size="sm"
+                          variant={val === o.v ? "default" : "outline"}
+                          onClick={() => setVal(val === o.v ? "" : o.v)}
+                        >
+                          {o.l}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               const checked = !!sec[c.k];
               return (
                 <label
