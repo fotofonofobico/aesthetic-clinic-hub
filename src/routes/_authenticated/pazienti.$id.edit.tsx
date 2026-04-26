@@ -46,9 +46,6 @@ function PazienteEditPage() {
     provincia: "",
     professione: "",
     note: "",
-    identita_genere: "",
-    peso_kg: null,
-    altezza_cm: null,
   });
 
   useEffect(() => {
@@ -110,9 +107,6 @@ function PazienteEditPage() {
       provincia: form.provincia?.trim().toUpperCase() || null,
       professione: form.professione?.trim() || null,
       note: form.note?.trim() || null,
-      identita_genere: form.identita_genere?.trim() || null,
-      peso_kg: form.peso_kg ?? null,
-      altezza_cm: form.altezza_cm ?? null,
     };
 
     if (isNew) {
