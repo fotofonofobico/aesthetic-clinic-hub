@@ -136,7 +136,10 @@ function PazientiListPage() {
                   onClick={() => navigate({ to: "/pazienti/$id", params: { id: p.id } })}
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium">
+                    <div className="flex items-center gap-2 font-medium">
+                      {p.max_severity === "critico" && (
+                        <ShieldAlert className="h-4 w-4 shrink-0 text-destructive" />
+                      )}
                       {p.cognome} {p.nome}
                     </div>
                     <div className="text-xs text-muted-foreground">

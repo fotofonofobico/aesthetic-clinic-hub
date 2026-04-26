@@ -1,4 +1,3 @@
-import * as React from "react";
 import { createFileRoute, Outlet, useNavigate, useMatches } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,174 +17,15 @@ import {
 import { ArrowLeft, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
-import type {
-  Paziente,
-  PazienteAlert,
-  FlagRischio,
-  AlertSeverity,
-} from "@/types/clinico";
-import { computeAutoFlags, type AnamnesiPayload } from "@/lib/flag-rischio";
+import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
 import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
+import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
 });
-
-type CampoTipo = "bool" | "ternary" | "text" | "select";
-
-interface AnamnesiCampo {
-  k: string;
-  l: string;
-  tipo?: CampoTipo;
-  options?: { value: string; label: string }[];
-}
-
-const SEZIONI_ANAMNESI: { key: keyof AnamnesiData; label: string; campi: AnamnesiCampo[] }[] = [
-  {
-    key: "generale",
-    label: "Generale",
-    campi: [
-      { k: "gravidanza", l: "In gravidanza" },
-      { k: "allattamento", l: "In allattamento" },
-      { k: "menopausa", l: "Menopausa" },
-      { k: "portatore_pacemaker", l: "Portatore pacemaker / dispositivo elettronico" },
-      { k: "vaccinazione_recente", l: "Vaccinazione negli ultimi 14 giorni" },
-    ],
-  },
-  {
-    key: "patologica",
-    label: "Patologica",
-    campi: [
-      { k: "diabete", l: "Diabete" },
-      { k: "tiroide", l: "Patologia tiroidea" },
-      { k: "cardiopatia", l: "Cardiopatia" },
-      { k: "ipertensione", l: "Ipertensione arteriosa" },
-      { k: "varici", l: "Varici" },
-      { k: "coagulopatia", l: "Coagulopatia / patologia ematologica" },
-      { k: "asma_bpco", l: "Asma / BPCO" },
-      { k: "epilessia", l: "Epilessia" },
-      { k: "cefalea_cronica", l: "Cefalea cronica / emicrania" },
-      { k: "psichiatrico", l: "Disturbo psichiatrico" },
-      { k: "tumori_attivi", l: "Patologia oncologica attiva" },
-      { k: "tumori_pregressi", l: "Neoplasia pregressa" },
-      { k: "malattie_autoimmuni", l: "Malattie autoimmuni" },
-      { k: "cheloidi", l: "Tendenza alla formazione di cheloidi" },
-      { k: "herpes_recidivante", l: "Herpes labiale recidivante" },
-      { k: "dermatologica_attiva", l: "Dermatopatia attiva (acne/psoriasi/dermatite)" },
-      { k: "infettiva_hbv_hcv_hiv", l: "Patologia infettiva (HBV/HCV/HIV)" },
-      { k: "interventi_viso", l: "Interventi chirurgici / traumi al viso" },
-    ],
-  },
-  {
-    key: "farmacologica",
-    label: "Farmaci",
-    campi: [
-      { k: "anticoagulanti", l: "Terapia anticoagulante / antiaggregante" },
-      { k: "cortisonici", l: "Terapia cortisonica in corso" },
-      { k: "isotretinoina_recente", l: "Isotretinoina ultimi 6 mesi" },
-      { k: "immunosoppressori", l: "Terapia immunosoppressiva" },
-      { k: "integratori", l: "Integratori / omeopatici (verificare interazioni)" },
-      {
-        k: "terapie_in_corso",
-        l: "Terapie farmacologiche in corso (specificare)",
-        tipo: "text",
-      },
-    ],
-  },
-  {
-    key: "allergologica",
-    label: "Allergie",
-    campi: [
-      { k: "lattice", l: "Allergia al lattice" },
-      { k: "anestetici_locali", l: "Allergia anestetici locali / lidocaina" },
-      { k: "farmaci", l: "Allergia a farmaci" },
-      { k: "alimentari_ambientali", l: "Allergie alimentari / ambientali" },
-      { k: "anafilassi_pregressa", l: "Reazione anafilattica pregressa" },
-    ],
-  },
-  {
-    key: "abitudini",
-    label: "Stile di vita",
-    campi: [
-      {
-        k: "fumo",
-        l: "Fumo",
-        tipo: "ternary",
-      },
-      { k: "alcol", l: "Alcol", tipo: "ternary" },
-      { k: "sostanze", l: "Sostanze stupefacenti", tipo: "ternary" },
-      { k: "sport", l: "Attività sportiva regolare" },
-      {
-        k: "alimentazione",
-        l: "Alimentazione",
-        tipo: "select",
-        options: [
-          { value: "", label: "—" },
-          { value: "sana", label: "Sana ed equilibrata" },
-          { value: "abbastanza", label: "Abbastanza equilibrata" },
-          { value: "disequilibrata", label: "Disequilibrata" },
-        ],
-      },
-    ],
-  },
-  {
-    key: "estetica",
-    label: "Estetica",
-    campi: [
-      {
-        k: "fototipo",
-        l: "Fototipo Fitzpatrick",
-        tipo: "select",
-        options: [
-          { value: "", label: "—" },
-          { value: "I", label: "I" },
-          { value: "II", label: "II" },
-          { value: "III", label: "III" },
-          { value: "IV", label: "IV" },
-          { value: "V", label: "V" },
-          { value: "VI", label: "VI" },
-        ],
-      },
-      {
-        k: "texture",
-        l: "Texture cutanea",
-        tipo: "select",
-        options: [
-          { value: "", label: "—" },
-          { value: "omogenea", label: "Omogenea" },
-          { value: "parziale", label: "Parziale" },
-          { value: "disomogenea", label: "Disomogenea" },
-        ],
-      },
-      { k: "abbronzatura", l: "Abbronzatura attuale" },
-      { k: "elastosi", l: "Elastosi" },
-      { k: "spf_uso", l: "Uso abituale di SPF" },
-      { k: "esposizione_prevista_4w", l: "Esposizione solare prevista nelle prossime 4 settimane" },
-      { k: "filler_permanenti", l: "Filler permanenti / semipermanenti pregressi" },
-      { k: "reazioni_pregresse", l: "Reazioni / complicanze a trattamenti estetici pregressi" },
-      {
-        k: "trattamenti_pregressi_note",
-        l: "Trattamenti estetici pregressi (botox, filler, peeling, laser, ecc.)",
-        tipo: "text",
-      },
-    ],
-  },
-];
-
-interface AnamnesiData {
-  id: string;
-  paziente_id: string;
-  generale: Record<string, boolean>;
-  patologica: Record<string, boolean>;
-  farmacologica: Record<string, boolean>;
-  allergologica: Record<string, boolean | string>;
-  ostetrica: Record<string, unknown>;
-  abitudini: Record<string, boolean>;
-  estetica: Record<string, unknown>;
-  note_libere: string | null;
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -195,11 +34,13 @@ function PazienteDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const matches = useMatches();
-  const isChildRoute = matches.some((m) => m.routeId !== Route.id && m.routeId.startsWith(Route.id));
+  const isChildRoute = matches.some(
+    (m) => m.routeId !== Route.id && m.routeId.startsWith(Route.id),
+  );
+
   const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
-  const [anamnesi, setAnamnesi] = useState<AnamnesiData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -217,7 +58,7 @@ function PazienteDetailPage() {
 
   async function load() {
     setLoading(true);
-    const [pRes, aRes, fRes, anRes] = await Promise.all([
+    const [pRes, aRes, fRes] = await Promise.all([
       supabase.from("pazienti").select("*").eq("id", id).maybeSingle(),
       supabase
         .from("paziente_alert")
@@ -230,7 +71,6 @@ function PazienteDetailPage() {
         .select("*")
         .eq("paziente_id", id)
         .order("severity", { ascending: false }),
-      supabase.from("anamnesi").select("*").eq("paziente_id", id).maybeSingle(),
     ]);
 
     if (pRes.error || !pRes.data) {
@@ -241,11 +81,7 @@ function PazienteDetailPage() {
     setPaziente(pRes.data as Paziente);
     setAlerts((aRes.data ?? []) as PazienteAlert[]);
     setFlags((fRes.data ?? []) as FlagRischio[]);
-    setAnamnesi(
-      (anRes.data ?? null) as AnamnesiData | null,
-    );
 
-    // log accesso (best-effort, non bloccante)
     if (user?.id) {
       void supabase
         .from("paziente_access_log")
@@ -255,10 +91,7 @@ function PazienteDetailPage() {
     setLoading(false);
   }
 
-  if (isChildRoute) {
-    return <Outlet />;
-  }
-
+  if (isChildRoute) return <Outlet />;
   if (loading || !paziente) {
     return <p className="text-sm text-muted-foreground">Caricamento…</p>;
   }
@@ -302,7 +135,7 @@ function PazienteDetailPage() {
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
-      <FlagBanner flags={flags} alerts={alerts} />
+      <CriticalBanner flags={flags} alerts={alerts} />
 
       <Tabs defaultValue="diario" className="space-y-4">
         <TabsList>
@@ -323,15 +156,11 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="anamnesi">
-          {anamnesi ? (
-            <AnamnesiPanel
-              anamnesi={anamnesi}
-              pazienteId={id}
-              onSaved={() => void load()}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">Anamnesi non disponibile.</p>
-          )}
+          <AnamnesiPanel
+            pazienteId={id}
+            sesso={paziente.sesso}
+            onSaved={() => void load()}
+          />
         </TabsContent>
 
         <TabsContent value="piani">
@@ -343,58 +172,38 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="alert">
-          <AlertPanel
-            pazienteId={id}
-            alerts={alerts}
-            onChanged={() => void load()}
-          />
+          <AlertPanel pazienteId={id} alerts={alerts} onChanged={() => void load()} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function FlagBanner({ flags, alerts }: { flags: FlagRischio[]; alerts: PazienteAlert[] }) {
+function CriticalBanner({
+  flags,
+  alerts,
+}: {
+  flags: FlagRischio[];
+  alerts: PazienteAlert[];
+}) {
   const critici = [
     ...flags.filter((f) => f.severity === "critico").map((f) => f.etichetta),
     ...alerts.filter((a) => a.severity === "critico").map((a) => a.testo),
   ];
-  const attenzione = [
-    ...flags.filter((f) => f.severity === "attenzione").map((f) => f.etichetta),
-    ...alerts.filter((a) => a.severity === "attenzione").map((a) => a.testo),
-  ];
-
-  if (critici.length === 0 && attenzione.length === 0) return null;
+  if (critici.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      {critici.length > 0 && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          <div>
-            <div className="font-medium text-destructive">Attenzione clinica</div>
-            <div className="text-foreground">{critici.join(" · ")}</div>
-          </div>
-        </div>
-      )}
-      {attenzione.length > 0 && (
-        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" />
-          <div>
-            <div className="font-medium">Da considerare</div>
-            <div>{attenzione.join(" · ")}</div>
-          </div>
-        </div>
-      )}
+    <div className="flex items-start gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-4 text-sm shadow-sm">
+      <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+      <div>
+        <div className="font-semibold text-destructive">Attenzione clinica</div>
+        <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
+      </div>
     </div>
   );
 }
 
 function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
-  const bmi =
-    paziente.peso_kg && paziente.altezza_cm && paziente.altezza_cm > 0
-      ? (paziente.peso_kg / Math.pow(paziente.altezza_cm / 100, 2)).toFixed(1)
-      : null;
   return (
     <Card>
       <CardContent className="grid gap-4 p-6 md:grid-cols-2">
@@ -415,15 +224,6 @@ function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
         <Info label="Luogo di nascita" value={paziente.luogo_nascita} />
         <Info label="Professione" value={paziente.professione} />
         <Info label="Codice fiscale" value={paziente.codice_fiscale} mono />
-        <Info label="Identità di genere" value={formatGenere(paziente.identita_genere)} />
-        <Info
-          label="Peso / Altezza"
-          value={
-            paziente.peso_kg || paziente.altezza_cm
-              ? `${paziente.peso_kg ?? "—"} kg · ${paziente.altezza_cm ?? "—"} cm${bmi ? ` · BMI ${bmi}` : ""}`
-              : null
-          }
-        />
         {paziente.note ? (
           <div className="md:col-span-2">
             <Info label="Note" value={paziente.note} />
@@ -434,230 +234,19 @@ function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
   );
 }
 
-function formatGenere(v: string | null): string | null {
-  if (!v) return null;
-  const map: Record<string, string> = {
-    donna: "Donna",
-    uomo: "Uomo",
-    non_binario: "Non binario",
-    non_dichiarata: "Non dichiarata",
-    altro: "Altro",
-  };
-  return map[v] ?? v;
-}
-
-function Info({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
+function Info({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string | null;
+  mono?: boolean;
+}) {
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`mt-1 ${mono ? "font-mono" : ""}`}>{value ?? "—"}</div>
-    </div>
-  );
-}
-
-function AnamnesiPanel({
-  anamnesi,
-  pazienteId,
-  onSaved,
-}: {
-  anamnesi: AnamnesiData;
-  pazienteId: string;
-  onSaved: () => void;
-}) {
-  const [data, setData] = useState<AnamnesiData>(anamnesi);
-  const [saving, setSaving] = useState(false);
-
-  function toggle(sezione: keyof AnamnesiData, campo: string) {
-    setData((d) => {
-      const sec = (d[sezione] as Record<string, unknown>) ?? {};
-      return {
-        ...d,
-        [sezione]: { ...sec, [campo]: !sec[campo] },
-      };
-    });
-  }
-
-  async function save() {
-    setSaving(true);
-    const { error } = await supabase
-      .from("anamnesi")
-      .update({
-        generale: data.generale as never,
-        patologica: data.patologica as never,
-        farmacologica: data.farmacologica as never,
-        allergologica: data.allergologica as never,
-        ostetrica: data.ostetrica as never,
-        abitudini: data.abitudini as never,
-        estetica: data.estetica as never,
-        note_libere: data.note_libere,
-      })
-      .eq("id", data.id);
-
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
-      setSaving(false);
-      return;
-    }
-
-    // ricalcola flag automatici e sincronizza
-    const computed = computeAutoFlags(data as unknown as AnamnesiPayload);
-    // elimina flag auto esistenti
-    await supabase
-      .from("anamnesi_flag_rischio")
-      .delete()
-      .eq("paziente_id", pazienteId)
-      .eq("origine", "auto");
-    if (computed.length > 0) {
-      await supabase.from("anamnesi_flag_rischio").insert(
-        computed.map((f) => ({
-          paziente_id: pazienteId,
-          codice: f.codice,
-          etichetta: f.etichetta,
-          severity: f.severity,
-          origine: "auto",
-        })),
-      );
-    }
-
-    toast.success("Anamnesi salvata");
-    setSaving(false);
-    onSaved();
-  }
-
-  return (
-    <div className="space-y-4">
-      {SEZIONI_ANAMNESI.map((sez) => (
-        <Card key={sez.key}>
-          <CardHeader>
-            <CardTitle className="font-display text-base">{sez.label}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 md:grid-cols-2">
-            {sez.campi.map((c) => {
-              const sec = (data[sez.key] as Record<string, unknown>) ?? {};
-              const tipo = c.tipo ?? "bool";
-
-              if (tipo === "text") {
-                return (
-                  <div key={c.k} className="md:col-span-2 space-y-2">
-                    <Label className="text-sm">{c.l}</Label>
-                    <Textarea
-                      rows={2}
-                      value={(sec[c.k] as string) ?? ""}
-                      onChange={(e) =>
-                        setData((d) => ({
-                          ...d,
-                          [sez.key]: { ...(d[sez.key] as object), [c.k]: e.target.value },
-                        }))
-                      }
-                    />
-                  </div>
-                );
-              }
-
-              if (tipo === "select") {
-                return (
-                  <div key={c.k} className="space-y-2">
-                    <Label className="text-sm">{c.l}</Label>
-                    <Select
-                      value={((sec[c.k] as string) || "") || "_none"}
-                      onValueChange={(v) =>
-                        setData((d) => ({
-                          ...d,
-                          [sez.key]: {
-                            ...(d[sez.key] as object),
-                            [c.k]: v === "_none" ? "" : v,
-                          },
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="—" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(c.options ?? []).map((o) => (
-                          <SelectItem key={o.value || "_none"} value={o.value || "_none"}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              }
-
-              if (tipo === "ternary") {
-                const val = ((sec[c.k] as string) ?? "") || "";
-                const setVal = (v: string) =>
-                  setData((d) => ({
-                    ...d,
-                    [sez.key]: { ...(d[sez.key] as object), [c.k]: v },
-                  }));
-                return (
-                  <div
-                    key={c.k}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
-                  >
-                    <span className="text-sm">{c.l}</span>
-                    <div className="flex gap-1">
-                      {[
-                        { v: "no", l: "No" },
-                        { v: "occasionale", l: "Occas." },
-                        { v: "si", l: "Sì" },
-                      ].map((o) => (
-                        <Button
-                          key={o.v}
-                          type="button"
-                          size="sm"
-                          variant={val === o.v ? "default" : "outline"}
-                          onClick={() => setVal(val === o.v ? "" : o.v)}
-                        >
-                          {o.l}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-
-              const checked = !!sec[c.k];
-              return (
-                <label
-                  key={c.k}
-                  className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 hover:bg-accent/40"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(sez.key, c.k)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span className="text-sm">{c.l}</span>
-                </label>
-              );
-            })}
-          </CardContent>
-        </Card>
-      ))}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-base">Note libere</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            rows={4}
-            value={data.note_libere ?? ""}
-            onChange={(e) => setData((d) => ({ ...d, note_libere: e.target.value }))}
-            placeholder="Annotazioni anamnestiche aggiuntive…"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button onClick={save} disabled={saving}>
-          {saving ? "Salvataggio…" : "Salva anamnesi"}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -776,6 +365,3 @@ function AlertPanel({
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("it-IT");
 }
-
-// Evita errori di unused
-void React;

@@ -18,6 +18,7 @@ export interface Paziente {
   provincia: string | null;
   professione: string | null;
   note: string | null;
+  // Campi non più usati nel form attuale ma presenti a DB:
   identita_genere: string | null;
   peso_kg: number | null;
   altezza_cm: number | null;
@@ -54,4 +55,13 @@ export interface PazienteNota {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AnamnesiVersione {
+  id: string;
+  anamnesi_id: string;
+  paziente_id: string;
+  snapshot: unknown;
+  created_at: string;
+  created_by: string | null;
 }
