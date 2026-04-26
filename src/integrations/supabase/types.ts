@@ -16,8 +16,6 @@ export type Database = {
     Tables: {
       anamnesi: {
         Row: {
-          abitudini: Json
-          allergologica: Json
           compilata_da: string | null
           created_at: string
           estetica: Json
@@ -25,14 +23,11 @@ export type Database = {
           generale: Json
           id: string
           note_libere: string | null
-          ostetrica: Json
           patologica: Json
           paziente_id: string
           updated_at: string
         }
         Insert: {
-          abitudini?: Json
-          allergologica?: Json
           compilata_da?: string | null
           created_at?: string
           estetica?: Json
@@ -40,14 +35,11 @@ export type Database = {
           generale?: Json
           id?: string
           note_libere?: string | null
-          ostetrica?: Json
           patologica?: Json
           paziente_id: string
           updated_at?: string
         }
         Update: {
-          abitudini?: Json
-          allergologica?: Json
           compilata_da?: string | null
           created_at?: string
           estetica?: Json
@@ -55,7 +47,6 @@ export type Database = {
           generale?: Json
           id?: string
           note_libere?: string | null
-          ostetrica?: Json
           patologica?: Json
           paziente_id?: string
           updated_at?: string
@@ -107,6 +98,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      anamnesi_versione: {
+        Row: {
+          anamnesi_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          paziente_id: string
+          snapshot: Json
+        }
+        Insert: {
+          anamnesi_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          paziente_id: string
+          snapshot: Json
+        }
+        Update: {
+          anamnesi_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          paziente_id?: string
+          snapshot?: Json
+        }
+        Relationships: []
       }
       audit_log: {
         Row: {
