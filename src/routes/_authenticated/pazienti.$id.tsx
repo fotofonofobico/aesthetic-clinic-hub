@@ -259,10 +259,12 @@ function Info({
 function AlertPanel({
   pazienteId,
   alerts,
+  flags,
   onChanged,
 }: {
   pazienteId: string;
   alerts: PazienteAlert[];
+  flags: FlagRischio[];
   onChanged: () => void;
 }) {
   const { user } = useAuth();
