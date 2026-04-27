@@ -558,26 +558,29 @@ function YesNoRow({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const reactId = useId();
-  const idSi = `${reactId}-si`;
-  const idNo = `${reactId}-no`;
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
       <span className="text-sm">{label}</span>
-      <RadioGroup
-        value={value ? "si" : "no"}
-        onValueChange={(v) => onChange(v === "si")}
-        className="flex gap-3"
-      >
-        <div className="flex items-center gap-1.5">
-          <RadioGroupItem value="si" id={idSi} />
-          <label htmlFor={idSi} className="cursor-pointer text-sm leading-none">Sì</label>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <RadioGroupItem value="no" id={idNo} />
-          <label htmlFor={idNo} className="cursor-pointer text-sm leading-none">No</label>
-        </div>
-      </RadioGroup>
+      <div className="flex gap-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={value === false ? "default" : "outline"}
+          onClick={() => onChange(false)}
+          className="min-w-[64px]"
+        >
+          No
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={value === true ? "default" : "outline"}
+          onClick={() => onChange(true)}
+          className="min-w-[64px]"
+        >
+          Sì
+        </Button>
+      </div>
     </div>
   );
 }
