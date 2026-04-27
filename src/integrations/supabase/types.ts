@@ -158,51 +158,72 @@ export type Database = {
       }
       consenso_firmato: {
         Row: {
+          categoria_snapshot: Database["public"]["Enums"]["consenso_categoria"]
           created_at: string
-          firma_immagine: string
+          firma_immagine: string | null
           firmato_il: string
           hash_integrita: string | null
           id: string
           ip_dispositivo: string | null
+          modalita_firma: Database["public"]["Enums"]["consenso_modalita_firma"]
           note: string | null
           operatore_testimone: string | null
           paziente_id: string
+          pdf_url: string | null
+          revocato_da: string | null
+          revocato_il: string | null
           template_id: string | null
           testo_snapshot: string
           titolo_snapshot: string
           user_agent: string | null
+          validita_mesi_snapshot: number | null
+          valido_fino_a: string | null
           versione_snapshot: string
         }
         Insert: {
+          categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
-          firma_immagine: string
+          firma_immagine?: string | null
           firmato_il?: string
           hash_integrita?: string | null
           id?: string
           ip_dispositivo?: string | null
+          modalita_firma?: Database["public"]["Enums"]["consenso_modalita_firma"]
           note?: string | null
           operatore_testimone?: string | null
           paziente_id: string
+          pdf_url?: string | null
+          revocato_da?: string | null
+          revocato_il?: string | null
           template_id?: string | null
           testo_snapshot: string
           titolo_snapshot: string
           user_agent?: string | null
+          validita_mesi_snapshot?: number | null
+          valido_fino_a?: string | null
           versione_snapshot: string
         }
         Update: {
+          categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
-          firma_immagine?: string
+          firma_immagine?: string | null
           firmato_il?: string
           hash_integrita?: string | null
           id?: string
           ip_dispositivo?: string | null
+          modalita_firma?: Database["public"]["Enums"]["consenso_modalita_firma"]
           note?: string | null
           operatore_testimone?: string | null
           paziente_id?: string
+          pdf_url?: string | null
+          revocato_da?: string | null
+          revocato_il?: string | null
           template_id?: string | null
           testo_snapshot?: string
           titolo_snapshot?: string
           user_agent?: string | null
+          validita_mesi_snapshot?: number | null
+          valido_fino_a?: string | null
           versione_snapshot?: string
         }
         Relationships: [
@@ -225,35 +246,44 @@ export type Database = {
       consenso_template: {
         Row: {
           attivo: boolean
+          categoria: Database["public"]["Enums"]["consenso_categoria"]
           created_at: string
           created_by: string | null
+          descrizione: string | null
           id: string
           testo: string
           titolo: string
           trattamento_id: string | null
           updated_at: string
+          validita_mesi: number | null
           versione: string
         }
         Insert: {
           attivo?: boolean
+          categoria?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
           created_by?: string | null
+          descrizione?: string | null
           id?: string
           testo: string
           titolo: string
           trattamento_id?: string | null
           updated_at?: string
+          validita_mesi?: number | null
           versione?: string
         }
         Update: {
           attivo?: boolean
+          categoria?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
           created_by?: string | null
+          descrizione?: string | null
           id?: string
           testo?: string
           titolo?: string
           trattamento_id?: string | null
           updated_at?: string
+          validita_mesi?: number | null
           versione?: string
         }
         Relationships: [
@@ -728,6 +758,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_consenso_valido: {
+        Args: { _paziente_id: string; _template_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -737,10 +771,29 @@ export type Database = {
       }
       is_active_operator: { Args: { _user_id: string }; Returns: boolean }
       is_valid_cf: { Args: { _cf: string }; Returns: boolean }
+      paziente_consensi_stato: {
+        Args: { _paziente_id: string }
+        Returns: {
+          categoria: Database["public"]["Enums"]["consenso_categoria"]
+          consenso_id: string
+          firmato_il: string
+          stato: string
+          template_id: string
+          titolo: string
+          valido_fino_a: string
+          versione: string
+        }[]
+      }
     }
     Enums: {
       alert_severity: "info" | "attenzione" | "critico"
       app_role: "medico" | "collaboratore"
+      consenso_categoria:
+        | "gdpr_generale"
+        | "trattamento_singolo"
+        | "trattamento_continuativo"
+        | "altro"
+      consenso_modalita_firma: "tablet" | "pdf_caricato"
       nota_tipo: "clinica" | "telefonata" | "promemoria" | "altro"
       piano_stato: "attivo" | "completato" | "sospeso" | "annullato"
       sesso: "M" | "F" | "altro"
@@ -873,6 +926,13 @@ export const Constants = {
     Enums: {
       alert_severity: ["info", "attenzione", "critico"],
       app_role: ["medico", "collaboratore"],
+      consenso_categoria: [
+        "gdpr_generale",
+        "trattamento_singolo",
+        "trattamento_continuativo",
+        "altro",
+      ],
+      consenso_modalita_firma: ["tablet", "pdf_caricato"],
       nota_tipo: ["clinica", "telefonata", "promemoria", "altro"],
       piano_stato: ["attivo", "completato", "sospeso", "annullato"],
       sesso: ["M", "F", "altro"],
