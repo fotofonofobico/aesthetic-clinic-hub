@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -367,11 +367,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
             value={p.interventi ?? false}
             onChange={(v) => patch("patologica", { interventi: v })}
           >
-            <FieldNote
-              label="Note interventi/traumi"
-              value={p.interventi_note ?? ""}
-              onChange={(v) => patch("patologica", { interventi_note: v })}
-            />
+            <InterventiBlock p={p} patch={(obj) => patch("patologica", obj)} />
           </YesNoConditional>
         </CardContent>
       </Card>
@@ -562,23 +558,74 @@ function YesNoRow({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const reactId = useId();
+  const idSi = `${reactId}-si`;
+  const idNo = `${reactId}-no`;
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
       <span className="text-sm">{label}</span>
       <RadioGroup
         value={value ? "si" : "no"}
         onValueChange={(v) => onChange(v === "si")}
-        className="flex gap-2"
+        className="flex gap-3"
       >
-        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
-          <RadioGroupItem value="si" />
-          Sì
-        </label>
-        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
-          <RadioGroupItem value="no" />
-          No
-        </label>
+        <div className="flex items-center gap-1.5">
+          <RadioGroupItem value="si" id={idSi} />
+          <label htmlFor={idSi} className="cursor-pointer text-sm leading-none">Sì</label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <RadioGroupItem value="no" id={idNo} />
+          <label htmlFor={idNo} className="cursor-pointer text-sm leading-none">No</label>
+        </div>
       </RadioGroup>
+    </div>
+  );
+}
+
+const INTERVENTI_TIPI = [
+  { k: "maggiore", l: "Chirurgia maggiore (addominale / tiroidea / bariatrica)" },
+  { k: "traumi", l: "Traumi / fratture" },
+  { k: "estetica", l: "Chirurgia estetica" },
+  { k: "dermatologica", l: "Chirurgia dermatologica / cutanea" },
+  { k: "altro", l: "Altro" },
+] as const;
+
+function InterventiBlock({
+  p,
+  patch,
+}: {
+  p: AnamnesiPatologica;
+  patch: (obj: Partial<AnamnesiPatologica>) => void;
+}) {
+  const tipi = p.interventi_tipi ?? {};
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+      <Label className="text-sm">Tipologia (selezione multipla)</Label>
+      <div className="grid gap-2 md:grid-cols-2">
+        {INTERVENTI_TIPI.map((it) => (
+          <label
+            key={it.k}
+            className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card p-2"
+          >
+            <Checkbox
+              checked={!!(tipi as Record<string, unknown>)[it.k]}
+              onCheckedChange={(v) =>
+                patch({
+                  interventi_tipi: { ...tipi, [it.k]: !!v },
+                })
+              }
+            />
+            <span className="text-sm">{it.l}</span>
+          </label>
+        ))}
+      </div>
+      {tipi.altro && (
+        <FieldNote
+          label="Specifica (altro)"
+          value={p.interventi_altro_note ?? ""}
+          onChange={(v) => patch({ interventi_altro_note: v })}
+        />
+      )}
     </div>
   );
 }
@@ -592,7 +639,7 @@ function YesNoConditional({
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="space-y-2">

@@ -1,8 +1,40 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { routeTree } from "./routeTree.gen";
+
+const CHUNK_RELOAD_KEY = "__chunk_reload_attempt__";
+
+function isChunkLoadError(err: Error): boolean {
+  const msg = (err?.message || "").toLowerCase();
+  const name = (err?.name || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch dynamically imported module") ||
+    msg.includes("importing a module script failed") ||
+    msg.includes("error loading dynamically imported module") ||
+    msg.includes("unable to preload css") ||
+    name === "chunkloaderror"
+  );
+}
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isChunkLoadError(error)) return;
+    const already = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+    if (already) return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+    window.location.reload();
+  }, [error]);
+
+  // Reset il flag se l'errore non è chunk-load (utente ha navigato OK dopo)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isChunkLoadError(error)) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }
+  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

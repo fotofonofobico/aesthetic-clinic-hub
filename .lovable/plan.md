@@ -1,155 +1,62 @@
 
-## Obiettivo
-Ristrutturare anagrafica e anamnesi secondo le tue specifiche, semplificare gli alert automatici, aggiungere il versioning e ripulire i dati esistenti.
+# Piano interventi anamnesi + fix UI
 
----
+## 1. Bug "null is not an object (useMemo)" + "Something went wrong" su Trattamenti/Consensi
 
-## 1. Anagrafica — semplificazione
+**Causa**: errore "Importing a module script failed" nei console log → il browser sta caricando un **chunk JS vecchio** che non esiste più dopo un nuovo deploy. Quando l'import dinamico fallisce, React monta `null` e l'hook `useMemo` esplode. È lo stesso motivo per cui Trattamenti/Consensi vanno in "Something went wrong".
 
-**Form `pazienti.$id.edit.tsx`:**
-- Rimuovo dal form: `identita_genere`, `peso_kg`, `altezza_cm` (e relativo BMI).
-- Campi visibili: nome, cognome, sesso, data nascita, luogo nascita, codice fiscale, email, telefono, indirizzo, città, CAP, provincia, professione, note.
+**Soluzione**:
+- Aggiungere un **error boundary globale** sul router (`defaultErrorComponent`) che, se rileva un errore di tipo "Failed to fetch dynamically imported module" / "Importing a module script failed", esegue un **reload automatico della pagina** (una sola volta, con flag in sessionStorage per evitare loop).
+- Per gli altri errori, mostrare un messaggio pulito con bottone "Ricarica".
+- Questo risolve sia l'anamnesi che trattamenti/consensi quando il preview si aggiorna.
 
-**Scheda `pazienti.$id.tsx`:** rimuovo la card "Parametri corporei/BMI".
+**Workaround immediato per te ora**: fai un hard reload (Cmd+Shift+R) sulla preview.
 
-**DB:** le colonne `identita_genere`, `peso_kg`, `altezza_cm` restano nello schema (le riuseremo per Criolipolisi). Non vengono più scritte/lette dall'UI attuale.
+## 2. Pallino "Sì/No" non centrato
 
----
+Nel componente `YesNoRow` il `RadioGroupItem` è dentro una `<label>` ma non è verticalmente allineato. Sistemo aggiungendo `items-center` corretti e usando `htmlFor`/`id` per coppia label↔radio, così il click funziona ovunque e il pallino è centrato.
 
-## 2. Anamnesi — nuova struttura
+## 3. Interventi chirurgici → multi-select strutturata
 
-Riscrivo completamente il form anamnesi e il payload JSONB. Nuova struttura:
+Sostituisco la singola textarea "Note interventi" con:
 
-### `generale` (jsonb)
-- `allergie`: bool + `allergie_note` (string)
-- `lidocaina_sensibile`: bool
-- `fumo`: "si" | "no" | "occasionale"
-- `alcol`: "si" | "no" | "occasionale"
-- `caffe`: "si" | "no" | "occasionale"
-- `sport`: bool + `sport_note`
-- `alimentazione`: "sana" | "abbastanza" | "disequilibrata" | ""
-- `acqua_litri`: number | null
-- `condizioni_ormonali`: "nessuna" | "gravidanza" | "allattamento" | "menopausa" *(visibile solo se sesso = F)*
-- `vaccino_recente`: bool + `vaccino_note`
+Quando flaggo "Sì" su **Interventi chirurgici / traumi**, appare un blocco con checkbox multi-select:
+- Chirurgia maggiore (addominale / tiroidea / bariatrica)
+- Traumi / fratture
+- Chirurgia estetica
+- Chirurgia dermatologica / cutanea
+- Altro → se selezionato, apre textarea "Specifica"
 
-### `patologica` (jsonb)
-- `presenti`: bool
-- Multi-select (visibile se `presenti`):
-  - `diabete`, `ipertensione`, `tiroide`, `cardiopatia`, `varici`, `coagulopatia`, `asma_bpco`, `oncologico_attivo`, `neoplasia_pregressa`, `autoimmune`, `cheloidi`, `dermatopatie`, `hsv`, `altro`
-- `altro_note` (visibile se `altro`)
-- `interventi`: bool + `interventi_note`
-
-### `farmacologica` (jsonb)
-- `presenti`: bool
-- Multi-select (visibile se `presenti`):
-  - `anticoagulanti`, `cortisonici`, `isotretinoina`, `immunosoppressori`, `integratori`, `altro`
-- `altro_note` (visibile se `altro`)
-- *(rimuovo il campo "note terapie" generico)*
-
-### `estetica` (jsonb)
-- `fototipo`: I-VI
-- `texture`: omogenea/parziale/disomogenea
-- `abbronzatura`, `elastosi`, `spf_uso`: bool
-- `trattamenti_pregressi`: bool + `trattamenti_pregressi_note`
-- `reazioni_pregresse`: bool + `reazioni_pregresse_note`
-
-### `note_libere` (text)
-Invariato.
-
-### Sezioni rimosse dal DB
-Le colonne JSONB `abitudini`, `ostetrica`, `allergologica` vengono **droppate** (i loro contenuti si fondono in `generale`).
-
----
-
-## 3. Alert automatici — semplificazione
-
-Riscrivo `src/lib/flag-rischio.ts`. Solo questi 8 trigger, **tutti severity = "critico"**:
-
-| Codice | Origine campo |
-|---|---|
-| `ALLERGIE` | `generale.allergie` |
-| `LIDOCAINA` | `generale.lidocaina_sensibile` |
-| `GRAVIDANZA` | `generale.condizioni_ormonali = "gravidanza"` |
-| `ALLATTAMENTO` | `generale.condizioni_ormonali = "allattamento"` |
-| `HSV` | `patologica` multi-select contiene `hsv` |
-| `ANTICOAGULANTI` | `farmacologica` contiene `anticoagulanti` |
-| `CORTISONICI` | `farmacologica` contiene `cortisonici` |
-| `ISOTRETINOINA` | `farmacologica` contiene `isotretinoina` |
-| `IMMUNOSOPPRESSORI` | `farmacologica` contiene `immunosoppressori` |
-
-### Visibilità alert
-- **Lista pazienti** (`pazienti.index.tsx`): icona ⚠️ rossa accanto al nome se il paziente ha ≥1 flag critico.
-- **Scheda paziente** (`pazienti.$id.tsx`): banner rosso fisso in cima con elenco etichette flag critici, sempre visibile sopra ogni tab.
-- **Tab Alert**: invariato (mostra già `anamnesi_flag_rischio` + `paziente_alert`).
-
----
-
-## 4. Versioning anamnesi (Opzione A)
-
-### Nuova tabella `anamnesi_versione`
+Schema JSONB aggiornato:
 ```
-id uuid pk
-anamnesi_id uuid not null
-paziente_id uuid not null
-snapshot jsonb not null     -- copia integrale: generale/patologica/farmacologica/estetica/note_libere
-created_at timestamptz default now()
-created_by uuid             -- auth.uid() al momento del salvataggio
+patologica.interventi: boolean
+patologica.interventi_tipi: { maggiore, traumi, estetica, dermatologica, altro: bool }
+patologica.interventi_altro_note: string
 ```
 
-**RLS:**
-- SELECT: operatori attivi
-- INSERT: operatori attivi (write-only, automatico al salvataggio)
-- UPDATE/DELETE: nessuno (immutabile)
+## 4. Tab "Alert" — chiarimento e fix
 
-**Logica:** ad ogni `UPDATE` su `anamnesi`, prima di scrivere salvo lo stato precedente in `anamnesi_versione`. Implemento via **trigger DB** `BEFORE UPDATE` su `anamnesi` così è atomico e non bypassabile dal client.
+**Stato attuale**:
+- `paziente_alert` = alert **manuali** scritti a mano dall'operatore (es. "non usare prodotti al nichel")
+- `anamnesi_flag_rischio` = flag **automatici** generati dall'anamnesi (allergie, gravidanza, HSV, ecc.)
+- Il banner rosso in alto unisce entrambi, **ma il tab "Alert" mostra solo i manuali** → da qui la confusione.
 
-### UI: pannello "Cronologia anamnesi"
-Nuovo componente `src/components/paziente/anamnesi-cronologia.tsx`, visibile come sotto-sezione del tab Anamnesi:
-- Lista versioni (data/ora + nome operatore)
-- Click su una riga → dialog read-only con il contenuto della versione
-- Confronto fianco-a-fianco: NON in questa iterazione (nice-to-have futura)
+**Fix proposto**: il tab "Alert" diventa **unificato** con due sezioni:
+- **Flag automatici da anamnesi** (sola lettura, badge severity, indica "generato da anamnesi")
+- **Alert manuali** (form di aggiunta + lista, come ora)
 
----
+Il contatore nel tab `Alert (N)` somma entrambi.
 
-## 5. Pulizia dati esistenti
+## 5. Procediamo poi
 
-Cancellazione completa dei dati clinici (resta solo te come paziente di prova, ma anche quello viene resettato così riparti pulito):
+Una volta confermato e implementato questo blocco, passiamo alle prossime sezioni del modulo Paziente (parametri corporei per criolipolisi, foto, sedute, piani, ecc.) come da tua roadmap.
 
-```sql
-DELETE FROM anamnesi_flag_rischio;
-DELETE FROM paziente_alert;
-DELETE FROM paziente_nota;
-DELETE FROM followup;
-DELETE FROM seduta;
-DELETE FROM piano_trattamento;
-DELETE FROM consenso_firmato;
-DELETE FROM anamnesi;
-DELETE FROM pazienti;
-```
+## Dettagli tecnici
 
-*(profili operatori, ruoli, trattamenti e template consenso restano intatti)*
-
----
-
-## 6. File toccati
-
-**Nuovi:**
-- `src/components/paziente/anamnesi-cronologia.tsx`
-- migrazione SQL (drop colonne JSONB obsolete + nuova tabella `anamnesi_versione` + trigger versioning + delete dati)
-
-**Modificati:**
-- `src/types/clinico.ts` — nuovi tipi `AnamnesiPayload`, `AnamnesiVersione`, rimozione `Sesso` indipendente non necessaria
-- `src/lib/flag-rischio.ts` — riscritto, solo 8 flag critici
-- `src/components/paziente/anamnesi-panel.tsx` (o equivalente nel form edit) — UI rifatta con sezioni 1-4 + logiche condizionali
-- `src/routes/_authenticated/pazienti.$id.tsx` — banner alert critici in cima + tab cronologia
-- `src/routes/_authenticated/pazienti.$id.edit.tsx` — rimozione campi anagrafica
-- `src/routes/_authenticated/pazienti.index.tsx` — icona ⚠️ accanto al nome
-- `src/components/paziente/diario-panel.tsx` — adattamento eventi (le voci flag rischio cambiano)
-
----
-
-## Conferma finale prima di procedere
-Confermi tutto come sopra? In particolare:
-1. **Pulizia totale dati** (compreso te come paziente test) ✅?
-2. **Trigger DB** per versioning (più sicuro, automatico) invece che logica lato client ✅?
-3. Drop colonne `abitudini` / `ostetrica` / `allergologica` da `anamnesi` ✅?
+- `src/router.tsx`: aggiungo `defaultErrorComponent` con detect del messaggio chunk-load + `window.location.reload()` one-shot.
+- `src/components/paziente/anamnesi-panel.tsx`: 
+  - fix `YesNoRow` (allineamento radio)
+  - blocco multi-select interventi con checkbox + condizionale "Altro"
+- `src/lib/flag-rischio.ts`: tipi `interventi_tipi` aggiunti (nessun nuovo flag critico, solo storage)
+- `src/routes/_authenticated/pazienti.$id.tsx`: `AlertPanel` riceve anche `flags`, mostra sezione "Da anamnesi" sopra gli alert manuali; contatore tab = `flags.length + alerts.length`.
+- Nessuna migrazione DB necessaria (i nuovi campi vivono nel JSONB `patologica`).
