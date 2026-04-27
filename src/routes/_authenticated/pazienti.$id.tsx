@@ -144,7 +144,7 @@ function PazienteDetailPage() {
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
           <TabsTrigger value="piani">Piani</TabsTrigger>
           <TabsTrigger value="consensi">Consensi</TabsTrigger>
-          <TabsTrigger value="alert">Alert ({alerts.length})</TabsTrigger>
+          <TabsTrigger value="alert">Alert ({flags.length + alerts.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="diario">
