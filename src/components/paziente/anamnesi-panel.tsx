@@ -367,11 +367,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
             value={p.interventi ?? false}
             onChange={(v) => patch("patologica", { interventi: v })}
           >
-            <FieldNote
-              label="Note interventi/traumi"
-              value={p.interventi_note ?? ""}
-              onChange={(v) => patch("patologica", { interventi_note: v })}
-            />
+            <InterventiBlock p={p} patch={(obj) => patch("patologica", obj)} />
           </YesNoConditional>
         </CardContent>
       </Card>
