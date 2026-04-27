@@ -303,6 +303,37 @@ function AlertPanel({
 
   return (
     <div className="space-y-4">
+      {/* Flag automatici da anamnesi (sola lettura) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-base">
+            Flag automatici da anamnesi ({flags.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {flags.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nessun flag automatico. Vengono generati compilando l'anamnesi.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {flags.map((f) => (
+                <div
+                  key={f.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <SeverityBadge severity={f.severity} />
+                    <span className="text-sm">{f.etichetta}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">da anamnesi</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="font-display text-base">Aggiungi alert manuale</CardTitle>
