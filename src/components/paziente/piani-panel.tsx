@@ -131,6 +131,31 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
   }
 
   async function aggiungiSeduta(p: PianoTrattamento) {
+    // Verifica consensi obbligatori: template attivi collegati al trattamento del piano
+    if (p.trattamento_id) {
+      const { data: tpls } = await supabase
+        .from("consenso_template")
+        .select("id, titolo")
+        .eq("trattamento_id", p.trattamento_id)
+        .eq("attivo", true);
+      const richiesti = (tpls ?? []) as Array<{ id: string; titolo: string }>;
+      const mancanti: string[] = [];
+      for (const t of richiesti) {
+        const { data: ok } = await supabase.rpc("has_consenso_valido", {
+          _paziente_id: pazienteId,
+          _template_id: t.id,
+        });
+        if (!ok) mancanti.push(t.titolo);
+      }
+      if (mancanti.length > 0) {
+        toast.error(
+          `Consenso mancante o non valido: ${mancanti.join(", ")}. Vai alla scheda Consensi per firmare.`,
+          { duration: 6000 },
+        );
+        return;
+      }
+    }
+
     const sedute = sedutePerPiano[p.id] ?? [];
     const numero = (sedute.at(-1)?.numero_seduta ?? 0) + 1;
     const { error } = await supabase.from("seduta").insert({
