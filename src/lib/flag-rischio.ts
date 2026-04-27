@@ -48,6 +48,15 @@ export interface AnamnesiPatologica {
   altro?: boolean;
   altro_note?: string;
   interventi?: boolean;
+  interventi_tipi?: {
+    maggiore?: boolean;
+    traumi?: boolean;
+    estetica?: boolean;
+    dermatologica?: boolean;
+    altro?: boolean;
+  };
+  interventi_altro_note?: string;
+  // legacy (mantenuto per compat con dati pregressi)
   interventi_note?: string;
 }
 
