@@ -172,7 +172,12 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="alert">
-          <AlertPanel pazienteId={id} alerts={alerts} onChanged={() => void load()} />
+          <AlertPanel
+            pazienteId={id}
+            alerts={alerts}
+            flags={flags}
+            onChanged={() => void load()}
+          />
         </TabsContent>
       </Tabs>
     </div>
