@@ -1,62 +1,33 @@
 
-# Piano interventi anamnesi + fix UI
+# Fix definitivo Sì/No + prossima sezione: Consensi
 
-## 1. Bug "null is not an object (useMemo)" + "Something went wrong" su Trattamenti/Consensi
+## 1. Sì/No: passo da radio a segmented buttons
 
-**Causa**: errore "Importing a module script failed" nei console log → il browser sta caricando un **chunk JS vecchio** che non esiste più dopo un nuovo deploy. Quando l'import dinamico fallisce, React monta `null` e l'hook `useMemo` esplode. È lo stesso motivo per cui Trattamenti/Consensi vanno in "Something went wrong".
+I cerchietti dei radio shadcn hanno il pallino interno (`Circle` SVG) che a volte risulta decentrato per via del rendering vettoriale a dimensioni piccole + `leading-none` sulla label. Invece di rincorrere il pixel-perfect, sostituisco il radio con **due pulsanti segmented** (stessa logica di TernaryRow per Fumo/Alcol/Caffè), che sono già visivamente coerenti nel resto dell'anamnesi.
 
-**Soluzione**:
-- Aggiungere un **error boundary globale** sul router (`defaultErrorComponent`) che, se rileva un errore di tipo "Failed to fetch dynamically imported module" / "Importing a module script failed", esegue un **reload automatico della pagina** (una sola volta, con flag in sessionStorage per evitare loop).
-- Per gli altri errori, mostrare un messaggio pulito con bottone "Ricarica".
-- Questo risolve sia l'anamnesi che trattamenti/consensi quando il preview si aggiorna.
+**Comportamento**:
+- Due bottoni affiancati: `[ No ] [ Sì ]`
+- Quello attivo = `variant="default"` (pieno colore primario)
+- Quello inattivo = `variant="outline"`
+- Click cambia stato, niente disallineamenti possibili
+- Larghezza minima uniforme (`min-w-[64px]`) per renderli simmetrici
 
-**Workaround immediato per te ora**: fai un hard reload (Cmd+Shift+R) sulla preview.
+File: `src/components/paziente/anamnesi-panel.tsx` → riscrivo `YesNoRow`.
 
-## 2. Pallino "Sì/No" non centrato
+## 2. Prossima sezione: Consensi
 
-Nel componente `YesNoRow` il `RadioGroupItem` è dentro una `<label>` ma non è verticalmente allineato. Sistemo aggiungendo `items-center` corretti e usando `htmlFor`/`id` per coppia label↔radio, così il click funziona ovunque e il pallino è centrato.
-
-## 3. Interventi chirurgici → multi-select strutturata
-
-Sostituisco la singola textarea "Note interventi" con:
-
-Quando flaggo "Sì" su **Interventi chirurgici / traumi**, appare un blocco con checkbox multi-select:
-- Chirurgia maggiore (addominale / tiroidea / bariatrica)
-- Traumi / fratture
-- Chirurgia estetica
-- Chirurgia dermatologica / cutanea
-- Altro → se selezionato, apre textarea "Specifica"
-
-Schema JSONB aggiornato:
-```
-patologica.interventi: boolean
-patologica.interventi_tipi: { maggiore, traumi, estetica, dermatologica, altro: bool }
-patologica.interventi_altro_note: string
-```
-
-## 4. Tab "Alert" — chiarimento e fix
+Per pianificare bene serve sapere come li vuoi gestire. Ti propongo una bozza che poi affiniamo insieme:
 
 **Stato attuale**:
-- `paziente_alert` = alert **manuali** scritti a mano dall'operatore (es. "non usare prodotti al nichel")
-- `anamnesi_flag_rischio` = flag **automatici** generati dall'anamnesi (allergie, gravidanza, HSV, ecc.)
-- Il banner rosso in alto unisce entrambi, **ma il tab "Alert" mostra solo i manuali** → da qui la confusione.
+- Esiste `consenso_template` (titolo, testo, versione, trattamento collegato)
+- Esiste `consenso_firmato` (snapshot del template + firma immagine + IP/UA + hash)
+- C'è già `ConsensiPanel` nel paziente, da rivedere
+- C'è già la pagina `/consensi` per gestire i template (catalogo)
 
-**Fix proposto**: il tab "Alert" diventa **unificato** con due sezioni:
-- **Flag automatici da anamnesi** (sola lettura, badge severity, indica "generato da anamnesi")
-- **Alert manuali** (form di aggiunta + lista, come ora)
+**Cosa vorrei chiederti** (te lo chiedo con domande strutturate dopo l'approvazione di questo fix), in linea di massima:
+- Firma su tablet con `<canvas>` direttamente in app (`signature-pad.tsx` esiste già) o anche caricamento PDF firmato esternamente?
+- Validità temporale del consenso (es. scade dopo X mesi, da rifirmare)?
+- Consensi obbligatori per attivare un trattamento (blocco se mancante)?
+- Consenso GDPR/privacy generale separato da quelli per trattamento?
 
-Il contatore nel tab `Alert (N)` somma entrambi.
-
-## 5. Procediamo poi
-
-Una volta confermato e implementato questo blocco, passiamo alle prossime sezioni del modulo Paziente (parametri corporei per criolipolisi, foto, sedute, piani, ecc.) come da tua roadmap.
-
-## Dettagli tecnici
-
-- `src/router.tsx`: aggiungo `defaultErrorComponent` con detect del messaggio chunk-load + `window.location.reload()` one-shot.
-- `src/components/paziente/anamnesi-panel.tsx`: 
-  - fix `YesNoRow` (allineamento radio)
-  - blocco multi-select interventi con checkbox + condizionale "Altro"
-- `src/lib/flag-rischio.ts`: tipi `interventi_tipi` aggiunti (nessun nuovo flag critico, solo storage)
-- `src/routes/_authenticated/pazienti.$id.tsx`: `AlertPanel` riceve anche `flags`, mostra sezione "Da anamnesi" sopra gli alert manuali; contatore tab = `flags.length + alerts.length`.
-- Nessuna migrazione DB necessaria (i nuovi campi vivono nel JSONB `patologica`).
+Per ora il piano è solo: **sistemare Sì/No con segmented buttons**, poi riapro la conversazione sui consensi con domande mirate.
