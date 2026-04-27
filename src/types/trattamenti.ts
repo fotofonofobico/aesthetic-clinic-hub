@@ -1,5 +1,29 @@
 export type PianoStato = "attivo" | "completato" | "sospeso" | "annullato";
 
+export type ConsensoCategoria =
+  | "gdpr_generale"
+  | "trattamento_singolo"
+  | "trattamento_continuativo"
+  | "altro";
+
+export type ConsensoModalitaFirma = "tablet" | "pdf_caricato";
+
+export type ConsensoStato = "valido" | "scaduto" | "obsoleto" | "revocato";
+
+export const CATEGORIA_LABELS: Record<ConsensoCategoria, string> = {
+  gdpr_generale: "GDPR / Privacy",
+  trattamento_singolo: "Trattamento singolo",
+  trattamento_continuativo: "Trattamento continuativo",
+  altro: "Altro",
+};
+
+export const CATEGORIA_VALIDITA_DEFAULT: Record<ConsensoCategoria, number | null> = {
+  gdpr_generale: null, // fino a revoca/aggiornamento
+  trattamento_singolo: null, // valido per la singola seduta
+  trattamento_continuativo: 12,
+  altro: null,
+};
+
 export interface Trattamento {
   id: string;
   nome: string;
@@ -18,6 +42,9 @@ export interface ConsensoTemplate {
   titolo: string;
   testo: string;
   versione: string;
+  categoria: ConsensoCategoria;
+  validita_mesi: number | null;
+  descrizione: string | null;
   attivo: boolean;
   created_at: string;
   updated_at: string;
@@ -30,14 +57,32 @@ export interface ConsensoFirmato {
   titolo_snapshot: string;
   testo_snapshot: string;
   versione_snapshot: string;
-  firma_immagine: string;
+  categoria_snapshot: ConsensoCategoria;
+  validita_mesi_snapshot: number | null;
+  modalita_firma: ConsensoModalitaFirma;
+  firma_immagine: string | null;
+  pdf_url: string | null;
   firmato_il: string;
+  valido_fino_a: string | null;
+  revocato_il: string | null;
+  revocato_da: string | null;
   ip_dispositivo: string | null;
   user_agent: string | null;
   operatore_testimone: string | null;
   hash_integrita: string | null;
   note: string | null;
   created_at: string;
+}
+
+export interface ConsensoStatoRow {
+  consenso_id: string;
+  template_id: string | null;
+  titolo: string;
+  versione: string;
+  categoria: ConsensoCategoria;
+  firmato_il: string;
+  valido_fino_a: string | null;
+  stato: ConsensoStato;
 }
 
 export interface PianoTrattamento {

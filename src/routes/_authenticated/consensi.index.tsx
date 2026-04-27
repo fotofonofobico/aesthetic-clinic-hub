@@ -25,7 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, FileSignature, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
-import type { ConsensoTemplate, Trattamento } from "@/types/trattamenti";
+import {
+  CATEGORIA_LABELS,
+  CATEGORIA_VALIDITA_DEFAULT,
+  type ConsensoCategoria,
+  type ConsensoTemplate,
+  type Trattamento,
+} from "@/types/trattamenti";
 
 export const Route = createFileRoute("/_authenticated/consensi/")({
   component: ConsensiPage,
@@ -51,7 +57,7 @@ function ConsensiPage() {
       supabase.from("trattamenti").select("*").eq("attivo", true).order("nome"),
     ]);
     if (tplRes.error) toast.error(tplRes.error.message);
-    setTemplates((tplRes.data ?? []) as ConsensoTemplate[]);
+    setTemplates((tplRes.data ?? []) as unknown as ConsensoTemplate[]);
     setTrattamenti((trRes.data ?? []) as Trattamento[]);
     setLoading(false);
   }
@@ -76,7 +82,7 @@ function ConsensiPage() {
             Consensi informati
           </h1>
           <p className="text-sm text-muted-foreground">
-            Modelli di consenso da far firmare ai pazienti su tablet.
+            Modelli di consenso da far firmare ai pazienti su tablet o caricare come PDF.
           </p>
         </div>
         {isMedico && (
@@ -138,9 +144,17 @@ function ConsensiPage() {
                       <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                         v{t.versione}
                       </span>
+                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] uppercase tracking-wide text-primary">
+                        {CATEGORIA_LABELS[t.categoria]}
+                      </span>
                       {trat && (
                         <span className="rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] uppercase tracking-wide text-accent-foreground">
                           {trat.nome}
+                        </span>
+                      )}
+                      {t.validita_mesi != null && (
+                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] tracking-wide text-muted-foreground">
+                          Validità {t.validita_mesi} mesi
                         </span>
                       )}
                       {!t.attivo && (
@@ -149,6 +163,11 @@ function ConsensiPage() {
                         </span>
                       )}
                     </div>
+                    {t.descrizione && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t.descrizione}
+                      </p>
+                    )}
                     <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                       {t.testo}
                     </p>
@@ -198,6 +217,13 @@ function TemplateDialog({
   const [titolo, setTitolo] = useState(editing?.titolo ?? "");
   const [testo, setTesto] = useState(editing?.testo ?? "");
   const [versione, setVersione] = useState(editing?.versione ?? "1.0");
+  const [categoria, setCategoria] = useState<ConsensoCategoria>(
+    editing?.categoria ?? "trattamento_singolo",
+  );
+  const [validitaMesi, setValiditaMesi] = useState<string>(
+    editing?.validita_mesi != null ? String(editing.validita_mesi) : "",
+  );
+  const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
   const [trattamentoId, setTrattamentoId] = useState<string>(
     editing?.trattamento_id ?? "none",
   );
@@ -207,8 +233,20 @@ function TemplateDialog({
     setTitolo(editing?.titolo ?? "");
     setTesto(editing?.testo ?? "");
     setVersione(editing?.versione ?? "1.0");
+    setCategoria(editing?.categoria ?? "trattamento_singolo");
+    setValiditaMesi(
+      editing?.validita_mesi != null ? String(editing.validita_mesi) : "",
+    );
+    setDescrizione(editing?.descrizione ?? "");
     setTrattamentoId(editing?.trattamento_id ?? "none");
   }, [editing]);
+
+  // applica default categoria solo in creazione
+  React.useEffect(() => {
+    if (editing) return;
+    const def = CATEGORIA_VALIDITA_DEFAULT[categoria];
+    setValiditaMesi(def != null ? String(def) : "");
+  }, [categoria, editing]);
 
   async function save() {
     if (!titolo.trim() || !testo.trim()) {
@@ -220,6 +258,9 @@ function TemplateDialog({
       titolo: titolo.trim(),
       testo: testo.trim(),
       versione: versione.trim() || "1.0",
+      categoria,
+      validita_mesi: validitaMesi.trim() ? Number(validitaMesi) : null,
+      descrizione: descrizione.trim() || null,
       trattamento_id: trattamentoId === "none" ? null : trattamentoId,
     };
     const { error } = editing
@@ -240,7 +281,7 @@ function TemplateDialog({
   }
 
   return (
-    <DialogContent className="max-w-2xl">
+    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-display">
           {editing ? "Modifica modello" : "Nuovo modello di consenso"}
@@ -261,6 +302,41 @@ function TemplateDialog({
             />
           </div>
         </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <Label>Categoria *</Label>
+            <Select
+              value={categoria}
+              onValueChange={(v) => setCategoria(v as ConsensoCategoria)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CATEGORIA_LABELS) as ConsensoCategoria[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {CATEGORIA_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Validità (mesi)</Label>
+            <Input
+              type="number"
+              min="0"
+              value={validitaMesi}
+              onChange={(e) => setValiditaMesi(e.target.value)}
+              placeholder="Vuoto = nessuna scadenza"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Vuoto = valido fino a revoca o nuova versione del template.
+            </p>
+          </div>
+        </div>
+
         <div>
           <Label>Trattamento collegato</Label>
           <Select value={trattamentoId} onValueChange={setTrattamentoId}>
@@ -277,6 +353,16 @@ function TemplateDialog({
             </SelectContent>
           </Select>
         </div>
+
+        <div>
+          <Label>Descrizione interna</Label>
+          <Input
+            value={descrizione}
+            onChange={(e) => setDescrizione(e.target.value)}
+            placeholder="Note operative (non mostrate al paziente)"
+          />
+        </div>
+
         <div>
           <Label>Testo del consenso *</Label>
           <Textarea
@@ -285,6 +371,10 @@ function TemplateDialog({
             onChange={(e) => setTesto(e.target.value)}
             placeholder="Inserisci il testo completo del consenso informato…"
           />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Modificando il testo aggiorna la versione: i consensi firmati con la versione
+            precedente diventeranno "obsoleti" e dovranno essere rifirmati.
+          </p>
         </div>
       </div>
       <DialogFooter>
