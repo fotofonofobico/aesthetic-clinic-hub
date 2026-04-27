@@ -639,7 +639,7 @@ function YesNoConditional({
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="space-y-2">
