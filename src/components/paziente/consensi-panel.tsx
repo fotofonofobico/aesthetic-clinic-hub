@@ -59,7 +59,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
-  const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
+  
 
   useEffect(() => {
     void load();
@@ -92,16 +92,6 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
     }
     setStati(map);
     setLoading(false);
-  }
-
-  async function getSignedUrl(path: string): Promise<string | null> {
-    if (pdfUrls[path]) return pdfUrls[path];
-    const { data, error } = await supabase.storage
-      .from("consensi-pdf")
-      .createSignedUrl(path, 60 * 10);
-    if (error || !data) return null;
-    setPdfUrls((p) => ({ ...p, [path]: data.signedUrl }));
-    return data.signedUrl;
   }
 
   async function revoca(c: ConsensoFirmato) {
