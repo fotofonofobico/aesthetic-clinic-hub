@@ -16,6 +16,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedTrattamentiIndexRouteImport } from './routes/_authenticated/trattamenti.index'
 import { Route as AuthenticatedPazientiIndexRouteImport } from './routes/_authenticated/pazienti.index'
 import { Route as AuthenticatedConsensiIndexRouteImport } from './routes/_authenticated/consensi.index'
+import { Route as ShareConsensoTokenRouteImport } from './routes/share.consenso.$token'
 import { Route as AuthenticatedPazientiIdRouteImport } from './routes/_authenticated/pazienti.$id'
 import { Route as AuthenticatedPazientiIdEditRouteImport } from './routes/_authenticated/pazienti.$id.edit'
 
@@ -56,6 +57,11 @@ const AuthenticatedConsensiIndexRoute =
     path: '/consensi/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const ShareConsensoTokenRoute = ShareConsensoTokenRouteImport.update({
+  id: '/share/consenso/$token',
+  path: '/share/consenso/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPazientiIdRoute = AuthenticatedPazientiIdRouteImport.update({
   id: '/pazienti/$id',
   path: '/pazienti/$id',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
+  '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi/': typeof AuthenticatedConsensiIndexRoute
   '/pazienti/': typeof AuthenticatedPazientiIndexRoute
   '/trattamenti/': typeof AuthenticatedTrattamentiIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
+  '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi': typeof AuthenticatedConsensiIndexRoute
   '/pazienti': typeof AuthenticatedPazientiIndexRoute
   '/trattamenti': typeof AuthenticatedTrattamentiIndexRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
+  '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/_authenticated/consensi/': typeof AuthenticatedConsensiIndexRoute
   '/_authenticated/pazienti/': typeof AuthenticatedPazientiIndexRoute
   '/_authenticated/trattamenti/': typeof AuthenticatedTrattamentiIndexRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/pazienti/$id'
+    | '/share/consenso/$token'
     | '/consensi/'
     | '/pazienti/'
     | '/trattamenti/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/pazienti/$id'
+    | '/share/consenso/$token'
     | '/consensi'
     | '/pazienti'
     | '/trattamenti'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/dashboard'
     | '/_authenticated/pazienti/$id'
+    | '/share/consenso/$token'
     | '/_authenticated/consensi/'
     | '/_authenticated/pazienti/'
     | '/_authenticated/trattamenti/'
@@ -138,6 +150,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ShareConsensoTokenRoute: typeof ShareConsensoTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -190,6 +203,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/consensi/'
       preLoaderRoute: typeof AuthenticatedConsensiIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/share/consenso/$token': {
+      id: '/share/consenso/$token'
+      path: '/share/consenso/$token'
+      fullPath: '/share/consenso/$token'
+      preLoaderRoute: typeof ShareConsensoTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/pazienti/$id': {
       id: '/_authenticated/pazienti/$id'
@@ -246,7 +266,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ShareConsensoTokenRoute: ShareConsensoTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
