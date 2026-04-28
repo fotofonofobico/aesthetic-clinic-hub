@@ -130,6 +130,57 @@ function PazienteDetailPage() {
     // Valuta stato consensi/anamnesi (non bloccante per il rendering)
     void evaluateAccess(id).then(setAccess).catch(() => setAccess(null));
 
+    // Consensi mancanti per voci di piani non annullati
+    void (async () => {
+      try {
+        const { data: piani } = await supabase
+          .from("piano_trattamento")
+          .select("id, stato")
+          .eq("paziente_id", id)
+          .neq("stato", "annullato");
+        const ids = (piani ?? []).map((p) => (p as { id: string }).id);
+        if (ids.length === 0) {
+          setConsensiPianoMancanti([]);
+          return;
+        }
+        const { data: voci } = await supabase
+          .from("piano_trattamento_voce")
+          .select("trattamento_id")
+          .in("piano_id", ids);
+        const trattIds = Array.from(
+          new Set(
+            (voci ?? [])
+              .map((v) => (v as { trattamento_id: string | null }).trattamento_id)
+              .filter((x): x is string => !!x),
+          ),
+        );
+        if (trattIds.length === 0) {
+          setConsensiPianoMancanti([]);
+          return;
+        }
+        const { data: trattRows } = await supabase
+          .from("trattamenti")
+          .select("id, nome")
+          .in("id", trattIds);
+        const nameMap = new Map<string, string>(
+          (trattRows ?? []).map((t) => [
+            (t as { id: string }).id,
+            (t as { nome: string }).nome,
+          ]),
+        );
+        const mancanti: string[] = [];
+        await Promise.all(
+          trattIds.map(async (tid) => {
+            const res = await puoEseguireTrattamento(id, tid);
+            if (!res.ok) mancanti.push(nameMap.get(tid) ?? "Trattamento");
+          }),
+        );
+        setConsensiPianoMancanti(mancanti.sort());
+      } catch {
+        setConsensiPianoMancanti([]);
+      }
+    })();
+
     if (user?.id) {
       void supabase
         .from("paziente_access_log")
