@@ -184,7 +184,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
           const up = await supabase.storage
             .from("anamnesi-pdf")
             .upload(path, blob, { contentType: "application/pdf", upsert: true });
-          if (up.error) throw up.error;
+          if (up.error || !up.data?.path) {
+            console.error("[anamnesi-pdf upload] errore", up.error, "path:", path);
+            throw new Error(`Upload PDF anamnesi fallito: ${up.error?.message ?? "path vuoto"}`);
+          }
           uploadedPaths.push(`anamnesi-pdf:${path}`);
 
           const upd = await supabase
