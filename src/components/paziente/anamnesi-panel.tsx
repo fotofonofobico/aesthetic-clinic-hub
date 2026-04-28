@@ -98,7 +98,7 @@ interface Props {
 
 export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const { user } = useAuth();
-  const [data, setData] = useState<AnamnesiRow | null>(null);
+  const [data, setData] = React.useState<AnamnesiRow | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [signing, setSigning] = React.useState(false);
@@ -192,7 +192,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   async function setNoteLibere(v: string) {
     const editable = await ensureEditable();
     if (!editable) return;
-    setData((d) => {
+    setData((d: AnamnesiRow | null) => {
       const target = d?.id === editable.id ? d : editable;
       return target ? { ...target, note_libere: v } : d;
     });
