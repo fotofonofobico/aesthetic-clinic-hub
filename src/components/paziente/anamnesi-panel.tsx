@@ -104,8 +104,11 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [signing, setSigning] = React.useState(false);
   const [forking, setForking] = React.useState(false);
   const [signDlgOpen, setSignDlgOpen] = React.useState(false);
+  const [cartaceoDlgOpen, setCartaceoDlgOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
+  // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
+  const forkPromiseRef = React.useRef<Promise<AnamnesiRow | null> | null>(null);
 
   React.useEffect(() => {
     void load();
@@ -170,9 +173,18 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   async function ensureEditable(): Promise<AnamnesiRow | null> {
     if (!data) return null;
     if (data.stato !== "signed") return data;
-    const draft = await forkFromSigned(data);
-    if (draft) setData(draft);
-    return draft;
+    // Fork lock: se è già in corso un fork, riusa la stessa promise.
+    // Evita corse e violazioni dell'unique index `anamnesi_one_draft_per_paziente`.
+    if (forkPromiseRef.current) {
+      return forkPromiseRef.current;
+    }
+    const p = forkFromSigned(data).then((draft) => {
+      if (draft) setData(draft);
+      forkPromiseRef.current = null;
+      return draft;
+    });
+    forkPromiseRef.current = p;
+    return p;
   }
 
   async function patch<S extends keyof AnamnesiPayload>(
@@ -182,8 +194,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     const editable = await ensureEditable();
     if (!editable) return;
     setData((d: AnamnesiRow | null) => {
-      const target = d?.id === editable.id ? d : editable;
-      if (!target) return d;
+      // Usa SEMPRE editable come base (può essere il nuovo draft appena forkato)
+      // per evitare di applicare patch sul vecchio record signed.
+      const target = d && d.id === editable.id ? d : editable;
       const current = (target[sez] ?? {}) as Record<string, unknown>;
       return { ...target, [sez]: { ...current, ...patchObj } };
     });
@@ -193,8 +206,8 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     const editable = await ensureEditable();
     if (!editable) return;
     setData((d: AnamnesiRow | null) => {
-      const target = d?.id === editable.id ? d : editable;
-      return target ? { ...target, note_libere: v } : d;
+      const target = d && d.id === editable.id ? d : editable;
+      return { ...target, note_libere: v };
     });
   }
 
