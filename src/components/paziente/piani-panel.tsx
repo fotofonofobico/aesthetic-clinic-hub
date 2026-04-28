@@ -52,6 +52,7 @@ import {
   applicaSconto,
   calcolaTotaleRighe,
   formatEuro,
+  prezzoRiga,
 } from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
