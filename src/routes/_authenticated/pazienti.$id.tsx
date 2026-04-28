@@ -74,6 +74,7 @@ function PazienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [sessione, setSessione] = useState<SignatureSession | null>(null);
   const [sessioneOpen, setSessioneOpen] = useState(false);
+  const [tab, setTab] = useState<string>("diario");
 
   async function avviaFirmaVisita() {
     if (!paziente) return;
