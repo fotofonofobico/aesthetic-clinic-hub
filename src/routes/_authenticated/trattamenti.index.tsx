@@ -249,9 +249,8 @@ function TrattamentoDialog({
   const [duratValore, setDuratValore] = useState<string>(
     editing?.durata_ciclo_valore?.toString() ?? "",
   );
-  const [duratUnita, setDuratUnita] = useState<DurataUnita | "">(
-    (editing?.durata_ciclo_unita as DurataUnita | null) ?? "",
-  );
+  // (Le precedenti unità mesi/settimane/giorni non sono più gestibili dalla UI:
+  //  per i nuovi cicli salviamo sempre l'unità "sedute".)
   const [categoria, setCategoria] = useState<TrattamentoCategoria | "">(
     (editing?.categoria as TrattamentoCategoria | null) ?? "",
   );
@@ -264,7 +263,6 @@ function TrattamentoDialog({
     setNome(editing?.nome ?? "");
     setTipo((editing?.tipo as TrattamentoTipo | null) ?? "");
     setDuratValore(editing?.durata_ciclo_valore?.toString() ?? "");
-    setDuratUnita((editing?.durata_ciclo_unita as DurataUnita | null) ?? "");
     setCategoria((editing?.categoria as TrattamentoCategoria | null) ?? "");
     setConsensoId(editing?.consenso_template_id ?? "");
     setDurata(editing?.durata_minuti?.toString() ?? "");
