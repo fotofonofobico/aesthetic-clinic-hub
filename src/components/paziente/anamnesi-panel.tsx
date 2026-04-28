@@ -52,6 +52,8 @@ interface AnamnesiRow {
   firmata_il: string | null;
   pdf_url: string | null;
   hash_integrita: string | null;
+  firma_paziente: string | null;
+  firma_medico: string | null;
 }
 
 const PATOLOGIE = [
