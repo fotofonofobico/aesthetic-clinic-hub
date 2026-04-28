@@ -1,165 +1,148 @@
-## Refactor Piani di Trattamento
+## Refactor Piano: prezzo+sconto, zone, modifica, alert consenso, auto-stato
 
-Trasformazione del pannello "Piani" da blocco singolo a struttura clinica `Piano → Righe trattamento → Sedute → Prodotti previsti`.
+Iterazione sul `PianiPanel` con migrazione DB minimale. La sezione "Sedute" come esecuzione reale è esplicitamente rimandata a un turno successivo.
 
-### Decisioni chiave (confermate)
-
-- **Titolo piano**: auto-generato come `Piano <dd/mm/yyyy> — <Trattamento1>, <Trattamento2>` (colonna `piano_trattamento.titolo` resta NOT NULL, popolata in scrittura).
-- **Prodotti**: persistiti come JSONB sia su `piano_trattamento_voce.prodotti_previsti` sia su `seduta.prodotti_previsti` (copia per valore — nessuna mutazione condivisa).
-- **Stato seduta**: nessuna nuova colonna; `completata=false` = "programmata", derivato in UI.
-- **Consensi DB**: invariati. Riuso `puoEseguireTrattamento` / `has_consenso_valido`.
-
-### 1. Migrazione DB (minimale)
+### 1. Migrazione DB
 
 Una sola migrazione SQL:
 
 ```sql
+-- Sconto e prezzo finale piano
+ALTER TABLE public.piano_trattamento
+  ADD COLUMN IF NOT EXISTS sconto_tipo text NOT NULL DEFAULT 'nessuno'
+    CHECK (sconto_tipo IN ('nessuno','euro','percento')),
+  ADD COLUMN IF NOT EXISTS sconto_valore numeric NOT NULL DEFAULT 0;
+-- prezzo_totale e prezzo_finale già esistenti vengono ricalcolati lato client
+
+-- Zone trattate sulla riga
 ALTER TABLE public.piano_trattamento_voce
-  ADD COLUMN IF NOT EXISTS prodotti_previsti jsonb NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS zone jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Forma: ["glabella","zampe gallina","zona custom"]
 
-ALTER TABLE public.seduta
-  ADD COLUMN IF NOT EXISTS prodotti_previsti jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Trigger: quando tutte le sedute di un piano sono completata=true,
+-- imposta piano.stato='completato'. Se il piano è 'completato' e una
+-- seduta torna a completata=false, riporta a 'attivo'.
+CREATE OR REPLACE FUNCTION public.piano_auto_stato()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE
+  pid uuid := COALESCE(NEW.piano_id, OLD.piano_id);
+  tot int;
+  done int;
+  cur_stato piano_stato;
+BEGIN
+  SELECT stato INTO cur_stato FROM piano_trattamento WHERE id = pid;
+  IF cur_stato IN ('sospeso','annullato') THEN RETURN NEW; END IF;
+  SELECT count(*), count(*) FILTER (WHERE completata) INTO tot, done
+    FROM seduta WHERE piano_id = pid;
+  IF tot > 0 AND done = tot THEN
+    UPDATE piano_trattamento SET stato='completato' WHERE id=pid AND stato<>'completato';
+  ELSIF cur_stato = 'completato' AND done < tot THEN
+    UPDATE piano_trattamento SET stato='attivo' WHERE id=pid;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_seduta_piano_auto_stato ON public.seduta;
+CREATE TRIGGER trg_seduta_piano_auto_stato
+AFTER INSERT OR UPDATE OF completata OR DELETE ON public.seduta
+FOR EACH ROW EXECUTE FUNCTION public.piano_auto_stato();
 ```
 
-Forma JSONB:
-```json
-[{ "nome": "Hyalual 1.8%", "quantita": 1, "trattamento_id": "uuid-opzionale" }]
+### 2. Costanti zone (`src/lib/zone-trattamento.ts` — nuovo)
+
+Array `ZONE_PREDEFINITE` con: glabella, fronte, zampe di gallina, sopracciglia, palpebre, naso, labbra, solco nasogenieno, marionette, zigomi, mento, ovale viso, collo, décolleté, mani, addome, fianchi, glutei, cosce, braccia.
+
+### 3. Tipi (`src/types/trattamenti.ts`)
+
+- Aggiungere a `PianoTrattamento`: `sconto_tipo: "nessuno"|"euro"|"percento"`, `sconto_valore: number`, `prezzo_finale: number | null`.
+- Aggiungere a `PianoVoce`: `zone: string[]`.
+
+### 4. Helper prezzo (`src/lib/piano-prezzo.ts` — nuovo)
+
+```ts
+export function calcolaTotaleRighe(righe: { trattamento_id: string; numero_sedute: number }[],
+                                   trattamenti: Trattamento[]): number
+export function applicaSconto(totale: number, tipo: "nessuno"|"euro"|"percento",
+                              valore: number): { sconto: number; finale: number }
 ```
 
-Nessun cambio enum, nessuna nuova tabella, nessun trigger.
+### 5. Refactor `src/components/paziente/piani-panel.tsx`
 
-### 2. Mock prodotti (FASE 2)
-
-Nuovo file `src/lib/prodotti-demo.ts`:
-- Array statico `PRODOTTI_DEMO` con ~10 voci coerenti coi trattamenti già a DB (Vistabex, Hyalual 1.8%, filler vari, biostimolanti).
-- Esportata anche una funzione di filtro per trattamento (anche se per ora ritorna tutto).
-- Commento esplicito: "PLACEHOLDER — sostituire con tabella `prodotti` quando si introdurrà il magazzino".
-
-### 3. Refactor `src/components/paziente/piani-panel.tsx`
-
-#### Stato dialog "Nuovo piano"
-Sostituire campi `titolo / tratId / numSedute / prezzo / note` con:
+#### Form `RigaForm`
 
 ```ts
 type RigaForm = {
-  uid: string;                // uuid client-side per react key
-  trattamento_id: string;     // obbligatorio
-  numero_sedute: number;      // default da tipo trattamento
-  prodotti: { uid: string; nome: string; quantita: number }[];
-  consensoOk: boolean | null; // null = non ancora valutato
-  consensoLoading: boolean;
+  uid; trattamento_id; numero_sedute;
+  prodotti: { uid; prodotto_id; quantita: number /* SOLO INTERI step=1 */ }[];
+  zone: string[];                  // chip selezionati + custom
+  zoneCustomDraft: string;         // input testo per aggiungere chip custom
+  consensoOk; consensoLoading; consensoMotivi;
 };
-
-const [righe, setRighe] = useState<RigaForm[]>([]);
 ```
 
-#### UI dialog
-- `Dialog` allargato a `max-w-2xl`, `max-h-[85vh]` con scroll.
-- Bottone full-width `+ Aggiungi trattamento al piano` (apre nuova riga vuota).
-- Per ogni riga, una `Card` interna con:
-  - Header: `Select` trattamento (no "— Nessuno —"), bottone trash per rimuovere riga.
-  - Riga 2: `Input number` "Sedute" + badge stato consenso + bottone "Firma consenso" (disabled se trattamento non scelto o consenso ok).
-  - Sezione "Prodotti previsti": lista righe `[Select prodotto] [Input quantita step=0.1] [trash]` + bottone `+ Aggiungi prodotto`.
-- Default `numero_sedute` calcolato `onChange` del trattamento:
-  - `tipo === 'ciclo'` → `durata_ciclo_valore ?? 3`
-  - altrimenti → `1`
+Default `quantita=1`, input number `step=1 min=1`, niente decimali.
 
-#### Stato consenso inline
-- `useEffect` dipendente da `riga.trattamento_id`: chiama `puoEseguireTrattamento(pazienteId, trattamento_id)` e popola `consensoOk` + tooltip motivi.
-- Badge: `🟢 Consenso valido` / `🔴 Consenso mancante` / `…` durante loading.
+#### UI riga (Card)
+- Select trattamento + Input sedute (come oggi).
+- **Badge consenso** + tooltip motivi. **Rimosso bottone "Firma consenso"** dalla riga.
+- Sezione **"Prodotti previsti"**: per ogni prodotto `[Select prodotto] [Input qta intero] [trash]` + `+ Aggiungi prodotto`.
+- Sezione **"Zone previste"**: chip cliccabili da `ZONE_PREDEFINITE` (toggle), sotto un `Input + bottone "Aggiungi"` per zone custom; chip già selezionati mostrano una `x` per rimuovere.
 
-#### Bottone "Firma consenso" per riga
-- Apre il `SignatureSessionDialog` esistente in modalità "trattamento" passando `trattamentoId` della riga (riuso `firma-trattamento-launcher` come pattern di riferimento, **senza modificare** `signature-session-dialog`).
-- Alla chiusura del dialog firma, ri-valutare `puoEseguireTrattamento` per quella riga.
+#### Footer dialog Nuovo Piano
+Pannello riassuntivo prima dei bottoni:
+- Riga "Totale base: € X" (somma `prezzo_indicativo * numero_sedute` per ogni riga; se `prezzo_indicativo` null, riga vale 0 e mostra warning inline "Trattamento senza prezzo indicativo").
+- Selettore sconto: `[Nessuno] [€] [%]` + Input valore (disabilitato se "Nessuno").
+- Riga "Totale finale: € Y" in evidenza (font display, bold).
 
-#### Validazione + salvataggio
-`creaPiano()` riscritto:
-1. Blocca se `righe.length === 0` → toast `"Aggiungi almeno un trattamento al piano"`.
-2. Blocca se qualche riga ha `trattamento_id` vuoto.
-3. Warning (non blocco) se una riga ha `prodotti.length === 0` → `toast.warning`.
-4. Calcola titolo auto: `` `Piano ${dd/mm/yyyy} — ${nomi.join(", ")}` ``.
-5. `INSERT` su `piano_trattamento` con: `paziente_id`, `titolo`, `numero_sedute_previste = somma sedute righe`, `trattamento_id = null` (multi-trattamento), `created_by`.
-6. Per ogni riga, `INSERT` su `piano_trattamento_voce`: `piano_id`, `trattamento_id`, `numero_sedute`, `prezzo_unitario=0`, `prezzo_riga=0`, `ordine=i`, `prodotti_previsti = JSON delle righe prodotti`.
-7. Per ogni riga, generare N record `seduta` con: `piano_id`, `paziente_id`, `trattamento_id`, `voce_id`, `numero_seduta = 1..N`, `prodotti_previsti = copia JSON dalla voce` (deep clone per garantire indipendenza), `completata=false`.
+#### Salvataggio
+- `piano_trattamento`: salva `prezzo_totale = totaleBase`, `sconto_tipo`, `sconto_valore`, `prezzo_finale = finale`. Niente `data` per riga seduta (resta `data_seduta = now()` di default DB, non lo mostriamo più in UI).
+- `piano_trattamento_voce`: aggiunge `zone: string[]`.
+- Generazione sedute identica a oggi.
 
-Tutte le insert dentro un blocco try/catch con toast d'errore singolo. Nessuna transazione (Supabase JS non la supporta lato client) — accettiamo idempotenza best-effort, in errore mostriamo messaggio chiaro.
+#### Modifica piano esistente (NUOVO)
+Bottone "Modifica" su ogni `Card` piano. Apre lo stesso dialog precaricato:
+- Carica voci + sedute. Ogni riga form rappresenta una voce esistente con `voceId?: string`.
+- Per ogni voce: campi prodotti/zone editabili. `numero_sedute` editabile **ma con vincolo**: non scendere sotto il numero di sedute già `completata=true` di quella voce.
+- Sconto/tipo editabili.
+- Bottone `+ Aggiungi trattamento` permette di aggiungere nuove voci.
+- Bottone trash su una voce: consentito solo se nessuna seduta di quella voce è completata; toast d'errore altrimenti.
+- Salvataggio:
+  - `UPDATE piano_trattamento` (titolo ricomposto, totali, sconto, numero_sedute_previste).
+  - Per ogni voce esistente: `UPDATE` su prodotti/zone/numero_sedute.
+  - Per ogni voce nuova: `INSERT` voce + sedute.
+  - Per voce rimossa: `DELETE` voce + `DELETE` sedute non completate di quella voce.
+  - Aggiustamento sedute per voce esistente:
+    - Se `numero_sedute` aumenta: INSERT sedute mancanti `numero = max+1..nuovoTotale`.
+    - Se diminuisce: DELETE sedute con `numero_seduta > nuovoTotale AND completata=false`.
 
-#### Visualizzazione piani esistenti (FASE 6 + FASE 9 backward compatibility)
-Caricare anche `piano_trattamento_voce` (con il loro `prodotti_previsti`) accanto ai piani:
+#### Render piano (Card collassabile)
+- **Rimossi i tick "completa seduta"** e l'azione `completaSeduta`.
+- **Rimossa visualizzazione data per singola seduta**; mostra solo numero seduta + (se completata) badge "fatta" derivato.
+- Header piano mostra: titolo, **data piano** (`created_at`), badge stato, **prezzo finale**.
+- **Alert consenso**: per ogni voce, calcolo `puoEseguireTrattamento` lazy on-expand; se mancante mostra `<Alert variant="destructive">` con CTA bottone "Firma consenso ora" che apre `SignatureSessionDialog` per quel trattamento. L'alert appare anche compatto in cima alla card del piano: "⚠ N trattamenti senza consenso firmato".
+- Bottone "Modifica" + Select stato (attivo/sospeso/annullato — `completato` è auto e disabilitato manualmente).
+- Bottone "Aggiungi seduta" rimosso (le sedute si pianificano dal piano; aggiunte spot saranno gestite dalla futura sezione Sedute).
 
-```ts
-const [vociPerPiano, setVociPerPiano] = useState<Record<string, VoceConProdotti[]>>({});
-```
+#### Backward compatibility
+Piani vecchi senza voci: render "fallback semplice" con titolo + numero sedute + stato; nessun crash; bottone "Modifica" disabilitato con tooltip "Piano legacy non modificabile".
 
-Render espanso del piano:
-- Se `voci.length > 0` → render multi-riga: per ogni voce mostra `Trattamento`, `N sedute (X completate)`, badge consenso (calcolato lazy on-expand), lista prodotti previsti.
-- Se `voci.length === 0` (piani vecchi, "fallback semplice") → render attuale legacy basato su `piano.trattamento_id` + sedute, **senza crash**, senza sezione prodotti.
+### 6. Cosa NON tocchiamo in questo turno
 
-Mantenere bottoni esistenti `Aggiungi seduta` (resta valido, aggiunge a fine lista; per piani nuovi assocerà alla prima voce o richiede selezione voce — per ora lo lasciamo legato al `piano_id` come oggi).
-
-### 4. Tipi TS
-
-Aggiungere a `src/types/trattamenti.ts`:
-
-```ts
-export interface ProdottoPrevisto {
-  nome: string;
-  quantita: number;
-  trattamento_id?: string | null;
-}
-
-export interface PianoVoce {
-  id: string;
-  piano_id: string;
-  trattamento_id: string;
-  pacchetto_id: string | null;
-  numero_sedute: number;
-  prezzo_unitario: number;
-  prezzo_riga: number;
-  ordine: number;
-  prodotti_previsti: ProdottoPrevisto[];
-  created_at: string;
-}
-```
-
-E aggiungere `prodotti_previsti: ProdottoPrevisto[]` a `Seduta`. (Dopo la migrazione `src/integrations/supabase/types.ts` viene rigenerato in automatico, ma il tipo applicativo locale serve per i parsing JSON.)
-
-### 5. Cosa NON cambia
-
-- `signature-session-dialog.tsx`: invariato.
-- `consensi-engine`, `access-guard`, RLS, RPC, triggers consensi: invariati.
-- Nessuna nuova tabella, nessun magazzino, nessun collegamento a stock.
-- `consensi-panel`, `anamnesi-panel`: invariati.
-
-### 6. Diagramma flusso "Nuovo piano"
-
-```text
-[+ Aggiungi trattamento]
-   │
-   ▼
-┌─────────────────────────────────────────┐
-│ Riga 1                            [🗑]  │
-│ Trattamento: [Filler XYZ        ▼]     │
-│ Sedute: [1]    🟢 Consenso valido      │
-│                       [Firma consenso] │
-│ Prodotti previsti:                     │
-│   • Hyalual 1.8%   qta [1.0]   [🗑]    │
-│   • Filler XYZ     qta [1.0]   [🗑]    │
-│   [+ Aggiungi prodotto]                │
-└─────────────────────────────────────────┘
-[+ Aggiungi trattamento]
-                                 [Crea piano]
-```
+- Nessuna nuova sezione "Sedute" (rimandata).
+- `signature-session-dialog`, `consensi-engine`, `access-guard`, `anamnesi-panel`, `consensi-panel`: invariati.
+- `firma-trattamento-launcher`: invariato (riusato dentro l'alert).
+- Nessuna scrittura su `diario` / `paziente_nota`.
 
 ### 7. File toccati
 
-- `supabase/migrations/<timestamp>_piano_voce_prodotti.sql` (nuovo)
-- `src/lib/prodotti-demo.ts` (nuovo)
-- `src/types/trattamenti.ts` (aggiunte tipi `ProdottoPrevisto`, `PianoVoce`, campo su `Seduta`)
-- `src/components/paziente/piani-panel.tsx` (refactor profondo, dialog + render)
+- `supabase/migrations/<ts>_piano_sconto_zone_autostato.sql` (nuovo)
+- `src/lib/zone-trattamento.ts` (nuovo)
+- `src/lib/piano-prezzo.ts` (nuovo)
+- `src/types/trattamenti.ts` (campi `sconto_*`, `prezzo_finale`, `zone`)
+- `src/components/paziente/piani-panel.tsx` (refactor: rimozione tick/data/firma riga, aggiunta zone/sconto/totale/modifica/alert)
 
-### 8. Rischi & mitigazioni
+### 8. Rischi
 
-- **Race insert voci/sedute**: se l'insert sedute fallisce dopo le voci, il piano resta inconsistente. Mitigazione: log su console + toast `"Piano creato ma errore generazione sedute: riprovare aggiunta seduta manualmente"`. Accettabile perché la struttura voci basta per ricostruire.
-- **Tipi Supabase rigenerati**: dopo migrazione i tipi auto-generati conterranno `prodotti_previsti: Json`. Casteremo localmente a `ProdottoPrevisto[]` con un parser difensivo.
-- **Piani vecchi senza voci**: il blocco "fallback legacy" garantisce zero crash; verificato che `vociPerPiano[id] ?? []` produce render alternativo.
+- **Modifica voci con sedute completate**: vincoli espliciti + toast. Test manuale richiesto su: riduzione sedute, eliminazione voce, cambio prodotti su voce con sedute future esistenti (i prodotti delle sedute future verranno **ri-clonati** dalla voce aggiornata).
+- **Trigger auto-stato**: scatta anche su INSERT/DELETE seduta — verificato che la modifica piano (insert/delete sedute) lascia il piano `attivo` finché esistono sedute non completate.
+- **Prezzo per trattamenti senza `prezzo_indicativo`**: warning inline, totale calcolato come 0 per quella riga, nessun blocco.

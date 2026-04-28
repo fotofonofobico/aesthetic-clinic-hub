@@ -660,6 +660,8 @@ export type Database = {
           prezzo_finale: number | null
           prezzo_totale: number | null
           sconto: number
+          sconto_tipo: string
+          sconto_valore: number
           stato: Database["public"]["Enums"]["piano_stato"]
           titolo: string
           trattamento_id: string | null
@@ -675,6 +677,8 @@ export type Database = {
           prezzo_finale?: number | null
           prezzo_totale?: number | null
           sconto?: number
+          sconto_tipo?: string
+          sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
           titolo: string
           trattamento_id?: string | null
@@ -690,6 +694,8 @@ export type Database = {
           prezzo_finale?: number | null
           prezzo_totale?: number | null
           sconto?: number
+          sconto_tipo?: string
+          sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
           titolo?: string
           trattamento_id?: string | null
@@ -724,6 +730,7 @@ export type Database = {
           prezzo_unitario: number
           prodotti_previsti: Json
           trattamento_id: string
+          zone: Json
         }
         Insert: {
           created_at?: string
@@ -736,6 +743,7 @@ export type Database = {
           prezzo_unitario?: number
           prodotti_previsti?: Json
           trattamento_id: string
+          zone?: Json
         }
         Update: {
           created_at?: string
@@ -748,6 +756,7 @@ export type Database = {
           prezzo_unitario?: number
           prodotti_previsti?: Json
           trattamento_id?: string
+          zone?: Json
         }
         Relationships: []
       }
