@@ -540,36 +540,100 @@ export type Database = {
       }
       paziente_nota: {
         Row: {
+          auto_generata: boolean
           created_at: string
           created_by: string | null
           data_evento: string
+          firmata_da: string | null
+          firmata_il: string | null
           id: string
           paziente_id: string
+          seduta_id: string | null
           testo: string
           tipo: Database["public"]["Enums"]["nota_tipo"]
           updated_at: string
         }
         Insert: {
+          auto_generata?: boolean
           created_at?: string
           created_by?: string | null
           data_evento?: string
+          firmata_da?: string | null
+          firmata_il?: string | null
           id?: string
           paziente_id: string
+          seduta_id?: string | null
           testo: string
           tipo?: Database["public"]["Enums"]["nota_tipo"]
           updated_at?: string
         }
         Update: {
+          auto_generata?: boolean
           created_at?: string
           created_by?: string | null
           data_evento?: string
+          firmata_da?: string | null
+          firmata_il?: string | null
           id?: string
           paziente_id?: string
+          seduta_id?: string | null
           testo?: string
           tipo?: Database["public"]["Enums"]["nota_tipo"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "paziente_nota_seduta_id_fkey"
+            columns: ["seduta_id"]
+            isOneToOne: false
+            referencedRelation: "seduta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paziente_nota_modifica: {
+        Row: {
+          campo: string
+          id: string
+          modificata_da: string
+          modificata_il: string
+          motivo: string | null
+          nota_id: string
+          oltre_48h: boolean
+          valore_nuovo: Json | null
+          valore_precedente: Json | null
+        }
+        Insert: {
+          campo: string
+          id?: string
+          modificata_da: string
+          modificata_il?: string
+          motivo?: string | null
+          nota_id: string
+          oltre_48h?: boolean
+          valore_nuovo?: Json | null
+          valore_precedente?: Json | null
+        }
+        Update: {
+          campo?: string
+          id?: string
+          modificata_da?: string
+          modificata_il?: string
+          motivo?: string | null
+          nota_id?: string
+          oltre_48h?: boolean
+          valore_nuovo?: Json | null
+          valore_precedente?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paziente_nota_modifica_nota_id_fkey"
+            columns: ["nota_id"]
+            isOneToOne: false
+            referencedRelation: "paziente_nota"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pazienti: {
         Row: {
@@ -803,15 +867,20 @@ export type Database = {
         Row: {
           completata: boolean
           created_at: string
+          data_esecuzione_effettiva: string | null
+          data_registrazione: string
           data_seduta: string
           durata_minuti: number | null
+          firmata_da: string | null
+          firmata_il: string | null
           id: string
+          nota_diario_id: string | null
           note_cliniche: string | null
           numero_seduta: number
           operatore_id: string | null
           parametri_tecnici: Json
           paziente_id: string
-          piano_id: string
+          piano_id: string | null
           prodotti_previsti: Json
           trattamento_id: string | null
           updated_at: string
@@ -820,15 +889,20 @@ export type Database = {
         Insert: {
           completata?: boolean
           created_at?: string
+          data_esecuzione_effettiva?: string | null
+          data_registrazione?: string
           data_seduta?: string
           durata_minuti?: number | null
+          firmata_da?: string | null
+          firmata_il?: string | null
           id?: string
+          nota_diario_id?: string | null
           note_cliniche?: string | null
           numero_seduta?: number
           operatore_id?: string | null
           parametri_tecnici?: Json
           paziente_id: string
-          piano_id: string
+          piano_id?: string | null
           prodotti_previsti?: Json
           trattamento_id?: string | null
           updated_at?: string
@@ -837,15 +911,20 @@ export type Database = {
         Update: {
           completata?: boolean
           created_at?: string
+          data_esecuzione_effettiva?: string | null
+          data_registrazione?: string
           data_seduta?: string
           durata_minuti?: number | null
+          firmata_da?: string | null
+          firmata_il?: string | null
           id?: string
+          nota_diario_id?: string | null
           note_cliniche?: string | null
           numero_seduta?: number
           operatore_id?: string | null
           parametri_tecnici?: Json
           paziente_id?: string
-          piano_id?: string
+          piano_id?: string | null
           prodotti_previsti?: Json
           trattamento_id?: string | null
           updated_at?: string
@@ -864,6 +943,50 @@ export type Database = {
             columns: ["piano_id"]
             isOneToOne: false
             referencedRelation: "piano_trattamento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seduta_modifica: {
+        Row: {
+          campo: string
+          id: string
+          modificata_da: string
+          modificata_il: string
+          motivo: string | null
+          oltre_48h: boolean
+          seduta_id: string
+          valore_nuovo: Json | null
+          valore_precedente: Json | null
+        }
+        Insert: {
+          campo: string
+          id?: string
+          modificata_da: string
+          modificata_il?: string
+          motivo?: string | null
+          oltre_48h?: boolean
+          seduta_id: string
+          valore_nuovo?: Json | null
+          valore_precedente?: Json | null
+        }
+        Update: {
+          campo?: string
+          id?: string
+          modificata_da?: string
+          modificata_il?: string
+          motivo?: string | null
+          oltre_48h?: boolean
+          seduta_id?: string
+          valore_nuovo?: Json | null
+          valore_precedente?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seduta_modifica_seduta_id_fkey"
+            columns: ["seduta_id"]
+            isOneToOne: false
+            referencedRelation: "seduta"
             referencedColumns: ["id"]
           },
         ]
