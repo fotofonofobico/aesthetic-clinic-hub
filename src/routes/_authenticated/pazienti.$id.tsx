@@ -71,6 +71,7 @@ function PazienteDetailPage() {
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
   const [access, setAccess] = useState<AccessEvaluation | null>(null);
+  const [consensiPianoMancanti, setConsensiPianoMancanti] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessione, setSessione] = useState<SignatureSession | null>(null);
   const [sessioneOpen, setSessioneOpen] = useState(false);
