@@ -515,7 +515,7 @@ function NuovoConsensoDialog({
           firmaPazienteDataUrl: firmaImmagine,
           firmaMedicoDataUrl: null,
           operatoreNome,
-          rifiutato: false,
+          rifiutato: isRifiutato,
           note: note.trim() || null,
         });
         const path = `${pazienteId}/manuale/${Date.now()}-${crypto.randomUUID()}.pdf`;
