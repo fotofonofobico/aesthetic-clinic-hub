@@ -99,15 +99,15 @@ interface Props {
 export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const { user } = useAuth();
   const [data, setData] = useState<AnamnesiRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [signing, setSigning] = useState(false);
-  const [forking, setForking] = useState(false);
-  const [signDlgOpen, setSignDlgOpen] = useState(false);
-  const sigPazRef = useRef<SignaturePadHandle>(null);
-  const sigMedRef = useRef<SignaturePadHandle>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [signing, setSigning] = React.useState(false);
+  const [forking, setForking] = React.useState(false);
+  const [signDlgOpen, setSignDlgOpen] = React.useState(false);
+  const sigPazRef = React.useRef<SignaturePadHandle>(null);
+  const sigMedRef = React.useRef<SignaturePadHandle>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     void load();
   }, [pazienteId]);
 
