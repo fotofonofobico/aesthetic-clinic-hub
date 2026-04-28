@@ -673,6 +673,13 @@ function StatoBadge({ stato }: { stato: StatoSeduta }) {
         Oggi
       </Badge>
     );
+  if (stato === "da_definire")
+    return (
+      <Badge variant="outline" className="gap-1 text-[10px] border-muted-foreground/40 text-muted-foreground">
+        <Calendar className="h-3 w-3" />
+        Da pianificare
+      </Badge>
+    );
   return (
     <Badge variant="outline" className="gap-1 text-[10px]">
       <Calendar className="h-3 w-3" />
