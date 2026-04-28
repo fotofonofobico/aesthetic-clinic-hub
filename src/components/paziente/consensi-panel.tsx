@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { sha256Hex } from "@/lib/hash";
 import { generaPdfConsenso } from "@/lib/pdf-consenso";
 import {
@@ -45,6 +46,7 @@ import {
 } from "@/types/trattamenti";
 import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
+import { PdfSignedLink } from "@/components/pdf-signed-link";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
