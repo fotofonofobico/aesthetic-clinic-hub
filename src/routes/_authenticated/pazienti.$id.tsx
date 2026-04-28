@@ -265,6 +265,7 @@ function PazienteDetailPage() {
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
           <TabsTrigger value="piani">Piani</TabsTrigger>
+          <TabsTrigger value="sedute">Sedute</TabsTrigger>
           <TabsTrigger value="consensi">Consensi</TabsTrigger>
           <TabsTrigger value="alert">Alert ({flags.length + alerts.length})</TabsTrigger>
         </TabsList>
@@ -287,6 +288,10 @@ function PazienteDetailPage() {
 
         <TabsContent value="piani">
           <PianiPanel pazienteId={id} />
+        </TabsContent>
+
+        <TabsContent value="sedute">
+          <SedutePanel pazienteId={id} />
         </TabsContent>
 
         <TabsContent value="consensi">
