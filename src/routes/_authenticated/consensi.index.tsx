@@ -27,7 +27,7 @@ import { Plus, FileSignature, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
 import {
   CATEGORIA_LABELS,
-  CATEGORIA_VALIDITA_DEFAULT,
+  
   type ConsensoCategoria,
   type ConsensoTemplate,
   type Trattamento,
@@ -96,7 +96,7 @@ function ConsensiPage() {
             <DialogTrigger asChild>
               <Button onClick={() => setEditing(null)}>
                 <Plus className="h-4 w-4" />
-                Nuovo modello
+                Nuovo template consenso
               </Button>
             </DialogTrigger>
             <TemplateDialog
@@ -119,12 +119,12 @@ function ConsensiPage() {
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <FileSignature className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nessun modello di consenso ancora creato.
+              Nessun template consenso ancora creato.
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Crea il primo modello
+                Crea il primo template
               </Button>
             )}
           </CardContent>
@@ -204,6 +204,32 @@ function ConsensiPage() {
   );
 }
 
+type TipoUI = "gdpr" | "uso_immagini" | "trattamento" | "altro";
+type ModValidita = "singola" | "ciclo";
+
+const TIPO_LABELS: Record<TipoUI, string> = {
+  gdpr: "GDPR",
+  uso_immagini: "Uso immagini",
+  trattamento: "Trattamento",
+  altro: "Altro",
+};
+
+function categoriaToTipo(c: ConsensoCategoria): { tipo: TipoUI; mod: ModValidita } {
+  if (c === "gdpr") return { tipo: "gdpr", mod: "singola" };
+  if (c === "uso_immagini") return { tipo: "uso_immagini", mod: "singola" };
+  if (c === "trattamento_singolo") return { tipo: "trattamento", mod: "singola" };
+  if (c === "trattamento_ciclo") return { tipo: "trattamento", mod: "ciclo" };
+  // anamnesi (legacy) e altro → "altro"
+  return { tipo: "altro", mod: "singola" };
+}
+
+function titoloAuto(tipo: TipoUI, trattamentoNome: string | null): string {
+  if (tipo === "gdpr") return "Informativa privacy e GDPR";
+  if (tipo === "uso_immagini") return "Consenso uso immagini";
+  if (tipo === "trattamento" && trattamentoNome) return `Consenso per ${trattamentoNome}`;
+  return "";
+}
+
 function TemplateDialog({
   editing,
   trattamenti,
@@ -214,54 +240,116 @@ function TemplateDialog({
   onSaved: () => void;
 }) {
   const { user } = useAuth();
+  const initialMap = editing
+    ? categoriaToTipo(editing.categoria)
+    : { tipo: "gdpr" as TipoUI, mod: "singola" as ModValidita };
+
   const [titolo, setTitolo] = useState(editing?.titolo ?? "");
+  const [titoloDirty, setTitoloDirty] = useState(!!editing?.titolo);
   const [testo, setTesto] = useState(editing?.testo ?? "");
   const [versione, setVersione] = useState(editing?.versione ?? "1.0");
-  const [categoria, setCategoria] = useState<ConsensoCategoria>(
-    editing?.categoria ?? "trattamento_singolo",
+  const [tipoUI, setTipoUI] = useState<TipoUI>(initialMap.tipo);
+  const [modValidita, setModValidita] = useState<ModValidita>(initialMap.mod);
+  const [cicloDurata, setCicloDurata] = useState<string>(
+    editing?.categoria === "trattamento_ciclo"
+      ? String(editing.validita_mesi ?? 12)
+      : "12",
   );
-  const [validitaMesi, setValiditaMesi] = useState<string>(
-    editing?.validita_mesi != null ? String(editing.validita_mesi) : "",
-  );
+  const [cicloUnita, setCicloUnita] = useState<"giorni" | "mesi">("mesi");
   const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
   const [trattamentoId, setTrattamentoId] = useState<string>(
-    editing?.trattamento_id ?? "none",
+    editing?.trattamento_id ?? "",
   );
   const [saving, setSaving] = useState(false);
+  const [legacyAnamnesi, setLegacyAnamnesi] = useState(
+    editing?.categoria === "anamnesi",
+  );
 
   React.useEffect(() => {
+    const map = editing
+      ? categoriaToTipo(editing.categoria)
+      : { tipo: "gdpr" as TipoUI, mod: "singola" as ModValidita };
     setTitolo(editing?.titolo ?? "");
+    setTitoloDirty(!!editing?.titolo);
     setTesto(editing?.testo ?? "");
     setVersione(editing?.versione ?? "1.0");
-    setCategoria(editing?.categoria ?? "trattamento_singolo");
-    setValiditaMesi(
-      editing?.validita_mesi != null ? String(editing.validita_mesi) : "",
+    setTipoUI(map.tipo);
+    setModValidita(map.mod);
+    setCicloDurata(
+      editing?.categoria === "trattamento_ciclo"
+        ? String(editing.validita_mesi ?? 12)
+        : "12",
     );
+    setCicloUnita("mesi");
     setDescrizione(editing?.descrizione ?? "");
-    setTrattamentoId(editing?.trattamento_id ?? "none");
+    setTrattamentoId(editing?.trattamento_id ?? "");
+    setLegacyAnamnesi(editing?.categoria === "anamnesi");
   }, [editing]);
 
-  // applica default categoria solo in creazione
+  // Auto-titolo se l'utente non l'ha modificato manualmente
+  const trattamentoNome = trattamenti.find((t) => t.id === trattamentoId)?.nome ?? null;
   React.useEffect(() => {
-    if (editing) return;
-    const def = CATEGORIA_VALIDITA_DEFAULT[categoria];
-    setValiditaMesi(def != null ? String(def) : "");
-  }, [categoria, editing]);
+    if (titoloDirty) return;
+    const auto = titoloAuto(tipoUI, trattamentoNome);
+    if (auto) setTitolo(auto);
+  }, [tipoUI, trattamentoNome, titoloDirty]);
+
+  function changeTipo(t: TipoUI) {
+    setTipoUI(t);
+    if (t !== "trattamento") {
+      setTrattamentoId("");
+    }
+  }
 
   async function save() {
     if (!titolo.trim() || !testo.trim()) {
       toast.error("Titolo e testo sono obbligatori");
       return;
     }
+
+    let categoriaSalvata: ConsensoCategoria;
+    let validitaMesiSalvata: number | null;
+    let trattamentoIdSalvato: string | null = null;
+
+    if (tipoUI === "trattamento") {
+      if (!trattamentoId) {
+        toast.error("Seleziona il trattamento collegato");
+        return;
+      }
+      trattamentoIdSalvato = trattamentoId;
+      if (modValidita === "singola") {
+        categoriaSalvata = "trattamento_singolo";
+        validitaMesiSalvata = null;
+      } else {
+        const n = Number(cicloDurata);
+        if (!Number.isFinite(n) || n <= 0) {
+          toast.error("Durata del ciclo non valida");
+          return;
+        }
+        categoriaSalvata = "trattamento_ciclo";
+        validitaMesiSalvata =
+          cicloUnita === "mesi" ? Math.round(n) : Math.max(1, Math.ceil(n / 30));
+      }
+    } else if (tipoUI === "gdpr") {
+      categoriaSalvata = "gdpr";
+      validitaMesiSalvata = null;
+    } else if (tipoUI === "uso_immagini") {
+      categoriaSalvata = "uso_immagini";
+      validitaMesiSalvata = null;
+    } else {
+      categoriaSalvata = "altro";
+      validitaMesiSalvata = null;
+    }
+
     setSaving(true);
     const payload = {
       titolo: titolo.trim(),
       testo: testo.trim(),
       versione: versione.trim() || "1.0",
-      categoria,
-      validita_mesi: validitaMesi.trim() ? Number(validitaMesi) : null,
+      categoria: categoriaSalvata,
+      validita_mesi: validitaMesiSalvata,
       descrizione: descrizione.trim() || null,
-      trattamento_id: trattamentoId === "none" ? null : trattamentoId,
+      trattamento_id: trattamentoIdSalvato,
     };
     const { error } = editing
       ? await supabase
@@ -276,7 +364,7 @@ function TemplateDialog({
       toast.error(error.message);
       return;
     }
-    toast.success(editing ? "Modello aggiornato" : "Modello creato");
+    toast.success(editing ? "Template aggiornato" : "Template creato");
     onSaved();
   }
 
@@ -284,14 +372,32 @@ function TemplateDialog({
     <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-display">
-          {editing ? "Modifica modello" : "Nuovo modello di consenso"}
+          {editing ? "Modifica template consenso" : "Nuovo template consenso"}
         </DialogTitle>
       </DialogHeader>
       <div className="space-y-3">
-        <div className="grid gap-3 md:grid-cols-[1fr_120px]">
+        {legacyAnamnesi && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+            Categoria <strong>Anamnesi</strong> deprecata: salvando convertirai questo
+            template in <strong>Altro</strong>. Considera di archiviarlo se non più in uso.
+          </div>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <Label>Titolo *</Label>
-            <Input value={titolo} onChange={(e) => setTitolo(e.target.value)} />
+            <Label>Tipo *</Label>
+            <Select value={tipoUI} onValueChange={(v) => changeTipo(v as TipoUI)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(TIPO_LABELS) as TipoUI[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {TIPO_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label>Versione</Label>
@@ -303,55 +409,101 @@ function TemplateDialog({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <Label>Categoria *</Label>
-            <Select
-              value={categoria}
-              onValueChange={(v) => setCategoria(v as ConsensoCategoria)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(CATEGORIA_LABELS) as ConsensoCategoria[]).map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {CATEGORIA_LABELS[k]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Validità (mesi)</Label>
-            <Input
-              type="number"
-              min="0"
-              value={validitaMesi}
-              onChange={(e) => setValiditaMesi(e.target.value)}
-              placeholder="Vuoto = nessuna scadenza"
-            />
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Vuoto = valido fino a revoca o nuova versione del template.
-            </p>
-          </div>
-        </div>
+        {tipoUI === "trattamento" && (
+          <>
+            <div>
+              <Label>Trattamento collegato *</Label>
+              <Select value={trattamentoId} onValueChange={setTrattamentoId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleziona un trattamento…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {trattamenti.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Nessun trattamento attivo. Crealo prima in Trattamenti.
+                    </div>
+                  ) : (
+                    trattamenti.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nome}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Modalità validità *</Label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={modValidita === "singola" ? "default" : "outline"}
+                  onClick={() => setModValidita("singola")}
+                >
+                  Singola seduta
+                </Button>
+                <Button
+                  type="button"
+                  variant={modValidita === "ciclo" ? "default" : "outline"}
+                  onClick={() => setModValidita("ciclo")}
+                >
+                  Ciclo
+                </Button>
+              </div>
+              {modValidita === "singola" ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Validità legata alla singola seduta: serve un nuovo consenso ogni volta.
+                </p>
+              ) : (
+                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_140px]">
+                  <div>
+                    <Label>Durata *</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={cicloDurata}
+                      onChange={(e) => setCicloDurata(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Unità</Label>
+                    <Select
+                      value={cicloUnita}
+                      onValueChange={(v) => setCicloUnita(v as "giorni" | "mesi")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="giorni">Giorni</SelectItem>
+                        <SelectItem value="mesi">Mesi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground md:col-span-2">
+                    La durata del ciclo viene salvata in mesi (i giorni vengono convertiti
+                    arrotondando per eccesso).
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <div>
-          <Label>Trattamento collegato</Label>
-          <Select value={trattamentoId} onValueChange={setTrattamentoId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Nessuno" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">— Nessuno (generico) —</SelectItem>
-              {trattamenti.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Titolo *</Label>
+          <Input
+            value={titolo}
+            onChange={(e) => {
+              setTitolo(e.target.value);
+              setTitoloDirty(true);
+            }}
+            placeholder="Verrà compilato automaticamente in base al tipo"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Suggerito automaticamente in base al tipo, modificabile.
+          </p>
         </div>
 
         <div>
@@ -379,7 +531,7 @@ function TemplateDialog({
       </div>
       <DialogFooter>
         <Button onClick={save} disabled={saving}>
-          {saving ? "Salvataggio…" : "Salva modello"}
+          {saving ? "Salvataggio…" : "Salva template"}
         </Button>
       </DialogFooter>
     </DialogContent>

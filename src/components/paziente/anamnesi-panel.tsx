@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import * as React from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import type { SignaturePadHandle } from "@/components/signature-pad";
+
+type ReactNode = React.ReactNode;
+
+// Lazy-load SignaturePad: la lib (react-signature-canvas alpha) viene importata
+// solo quando il dialog di firma si apre, riducendo la superficie di errori al mount.
+const SignaturePad = React.lazy(() =>
+  import("@/components/signature-pad").then((m) => ({ default: m.SignaturePad })),
+);
 
 
 interface AnamnesiRow {
@@ -90,16 +98,16 @@ interface Props {
 
 export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const { user } = useAuth();
-  const [data, setData] = useState<AnamnesiRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [signing, setSigning] = useState(false);
-  const [forking, setForking] = useState(false);
-  const [signDlgOpen, setSignDlgOpen] = useState(false);
-  const sigPazRef = useRef<SignaturePadHandle>(null);
-  const sigMedRef = useRef<SignaturePadHandle>(null);
+  const [data, setData] = React.useState<AnamnesiRow | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [signing, setSigning] = React.useState(false);
+  const [forking, setForking] = React.useState(false);
+  const [signDlgOpen, setSignDlgOpen] = React.useState(false);
+  const sigPazRef = React.useRef<SignaturePadHandle>(null);
+  const sigMedRef = React.useRef<SignaturePadHandle>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     void load();
   }, [pazienteId]);
 
@@ -173,7 +181,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   ) {
     const editable = await ensureEditable();
     if (!editable) return;
-    setData((d) => {
+    setData((d: AnamnesiRow | null) => {
       const target = d?.id === editable.id ? d : editable;
       if (!target) return d;
       const current = (target[sez] ?? {}) as Record<string, unknown>;
@@ -184,7 +192,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   async function setNoteLibere(v: string) {
     const editable = await ensureEditable();
     if (!editable) return;
-    setData((d) => {
+    setData((d: AnamnesiRow | null) => {
       const target = d?.id === editable.id ? d : editable;
       return target ? { ...target, note_libere: v } : d;
     });
@@ -779,16 +787,22 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
-              <SignaturePad ref={sigPazRef} />
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-medium">
-                Firma del medico <span className="text-muted-foreground">(opzionale)</span>
-              </p>
-              <SignaturePad ref={sigMedRef} />
-            </div>
+            <React.Suspense
+              fallback={
+                <p className="text-sm text-muted-foreground">Caricamento area firma…</p>
+              }
+            >
+              <div>
+                <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
+                <SignaturePad ref={sigPazRef} />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">
+                  Firma del medico <span className="text-muted-foreground">(opzionale)</span>
+                </p>
+                <SignaturePad ref={sigMedRef} />
+              </div>
+            </React.Suspense>
             <p className="text-xs text-muted-foreground">
               Firmando, il paziente conferma la veridicità delle informazioni. Il record diventerà
               immutabile; modifiche future creeranno una nuova versione.
