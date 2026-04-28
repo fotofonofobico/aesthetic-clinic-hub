@@ -100,8 +100,8 @@ function PazienteDetailPage() {
     void load();
   }, [id, isChildRoute]);
 
-  async function load() {
-    setLoading(true);
+  async function load(opts: { silent?: boolean } = {}) {
+    if (!opts.silent) setLoading(true);
     const [pRes, aRes, fRes] = await Promise.all([
       supabase.from("pazienti").select("*").eq("id", id).maybeSingle(),
       supabase
