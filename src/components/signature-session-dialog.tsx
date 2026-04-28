@@ -341,36 +341,39 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
                 onValueChange={(v) => setScelta(v as "acconsento" | "non_acconsento")}
                 className="grid gap-2"
               >
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2 hover:bg-accent/30">
+                <label
+                  htmlFor={`acc-${current.localId}`}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
                   <RadioGroupItem value="acconsento" id={`acc-${current.localId}`} />
-                  <span>Acconsento</span>
+                  <span className="text-sm leading-none">Acconsento</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2 hover:bg-accent/30">
+                <label
+                  htmlFor={`nacc-${current.localId}`}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
                   <RadioGroupItem value="non_acconsento" id={`nacc-${current.localId}`} />
-                  <span>Non acconsento</span>
+                  <span className="text-sm leading-none">Non acconsento</span>
                 </label>
               </RadioGroup>
             </div>
 
-            {scelta === "acconsento" && (
-              <>
-                <div>
-                  <Label className="text-sm font-semibold">Firma del paziente *</Label>
-                  <SignaturePad
-                    ref={sigPazRef}
-                    onChange={(empty) => setFirmaReady(!empty)}
-                  />
-                </div>
-                {current.richiedeFirmaMedico && (
-                  <div>
-                    <Label className="text-sm font-semibold">Firma del medico *</Label>
-                    <SignaturePad
-                      ref={sigMedRef}
-                      onChange={(empty) => setFirmaMedReady(!empty)}
-                    />
-                  </div>
-                )}
-              </>
+            {/* Firma sempre richiesta, indipendentemente dalla scelta */}
+            <div>
+              <Label className="text-sm font-semibold">Firma del paziente *</Label>
+              <SignaturePad
+                ref={sigPazRef}
+                onChange={(empty) => setFirmaReady(!empty)}
+              />
+            </div>
+            {current.richiedeFirmaMedico && (
+              <div>
+                <Label className="text-sm font-semibold">Firma del medico *</Label>
+                <SignaturePad
+                  ref={sigMedRef}
+                  onChange={(empty) => setFirmaMedReady(!empty)}
+                />
+              </div>
             )}
           </div>
         )}
@@ -394,8 +397,8 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
               onClick={confermaDocumento}
               disabled={
                 !scelta ||
-                (scelta === "acconsento" && !firmaReady) ||
-                (scelta === "acconsento" && current.richiedeFirmaMedico && !firmaMedReady)
+                !firmaReady ||
+                (current.richiedeFirmaMedico && !firmaMedReady)
               }
             >
               {step + 1 < total ? "Conferma e prosegui" : "Completa e salva"}
