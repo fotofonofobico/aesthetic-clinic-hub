@@ -573,8 +573,15 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       if (r.numero_sedute < 1) return "Il numero di sedute deve essere almeno 1";
       if (r.numero_sedute < r.numero_sedute_min)
         return `Non puoi scendere sotto ${r.numero_sedute_min} sedute (già completate) per un trattamento`;
-      if (r.prodotti.some((p) => !p.prodotto_id || p.quantita < 1))
-        return "Completa o rimuovi i prodotti con quantità < 1";
+      if (!r.personalizzaPerSeduta) {
+        if (r.prodotti.some((p) => !p.prodotto_id || p.quantita < 1))
+          return "Completa o rimuovi i prodotti con quantità < 1";
+      } else {
+        for (const arr of r.prodottiPerSeduta) {
+          if (arr.some((p) => !p.prodotto_id || p.quantita < 1))
+            return "Completa o rimuovi i prodotti per seduta con quantità < 1";
+        }
+      }
     }
     if (scontoTipo === "percento" && (scontoValore < 0 || scontoValore > 100))
       return "Lo sconto in percentuale deve essere tra 0 e 100";
