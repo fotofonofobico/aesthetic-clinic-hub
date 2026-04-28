@@ -480,9 +480,13 @@ function TemplateDialog({
                   Validità legata alla singola seduta: serve un nuovo consenso ogni volta.
                 </p>
               ) : (
-                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_140px]">
+                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_160px]">
                   <div>
-                    <Label>Durata *</Label>
+                    <Label>
+                      {cicloDurataTipo === "sedute"
+                        ? "Numero sedute *"
+                        : "Durata (mesi) *"}
+                    </Label>
                     <Input
                       type="number"
                       min="1"
@@ -493,21 +497,24 @@ function TemplateDialog({
                   <div>
                     <Label>Unità</Label>
                     <Select
-                      value={cicloUnita}
-                      onValueChange={(v) => setCicloUnita(v as "giorni" | "mesi")}
+                      value={cicloDurataTipo}
+                      onValueChange={(v) =>
+                        setCicloDurataTipo(v as "mesi" | "sedute")
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="giorni">Giorni</SelectItem>
+                        <SelectItem value="sedute">Sedute</SelectItem>
                         <SelectItem value="mesi">Mesi</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <p className="text-[11px] text-muted-foreground md:col-span-2">
-                    La durata del ciclo viene salvata in mesi (i giorni vengono convertiti
-                    arrotondando per eccesso).
+                    {cicloDurataTipo === "sedute"
+                      ? "Il consenso resta valido finché non si raggiunge questo numero di sedute eseguite."
+                      : "Il consenso scade al termine del periodo indicato (in mesi) dalla data di firma."}
                   </p>
                 </div>
               )}
