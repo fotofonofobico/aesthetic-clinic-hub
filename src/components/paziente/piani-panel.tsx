@@ -923,12 +923,12 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                       </div>
                     </div>
 
-                    {/* Prodotti previsti */}
+                    {/* Prodotti previsti per singola seduta */}
                     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
                       <div className="flex items-center justify-between">
                         <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
                           <Package className="h-3 w-3" />
-                          Prodotti previsti (conteggio)
+                          Prodotti per seduta (× {r.numero_sedute} sedute)
                         </Label>
                         <Button
                           type="button"
@@ -940,6 +940,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           Aggiungi
                         </Button>
                       </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Le quantità qui sotto si riferiscono a <strong>una singola seduta</strong>. Verranno
+                        replicate su ogni seduta del ciclo.
+                      </p>
 
                       {r.prodotti.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
