@@ -771,31 +771,27 @@ export type Database = {
       }
       is_active_operator: { Args: { _user_id: string }; Returns: boolean }
       is_valid_cf: { Args: { _cf: string }; Returns: boolean }
-      paziente_consensi_stato: {
-        Args: { _paziente_id: string }
-        Returns: {
-          categoria: Database["public"]["Enums"]["consenso_categoria"]
-          consenso_id: string
-          firmato_il: string
-          stato: string
-          template_id: string
-          titolo: string
-          valido_fino_a: string
-          versione: string
-        }[]
-      }
     }
     Enums: {
       alert_severity: "info" | "attenzione" | "critico"
+      anamnesi_stato: "draft" | "signed" | "superseded"
       app_role: "medico" | "collaboratore"
       consenso_categoria:
-        | "gdpr_generale"
+        | "gdpr"
         | "trattamento_singolo"
-        | "trattamento_continuativo"
+        | "trattamento_ciclo"
         | "altro"
+        | "uso_immagini"
+        | "anamnesi"
       consenso_modalita_firma: "tablet" | "pdf_caricato"
       nota_tipo: "clinica" | "telefonata" | "promemoria" | "altro"
-      piano_stato: "attivo" | "completato" | "sospeso" | "annullato"
+      piano_stato:
+        | "attivo"
+        | "completato"
+        | "sospeso"
+        | "annullato"
+        | "bozza"
+        | "confermato"
       sesso: "M" | "F" | "altro"
     }
     CompositeTypes: {
@@ -925,16 +921,26 @@ export const Constants = {
   public: {
     Enums: {
       alert_severity: ["info", "attenzione", "critico"],
+      anamnesi_stato: ["draft", "signed", "superseded"],
       app_role: ["medico", "collaboratore"],
       consenso_categoria: [
-        "gdpr_generale",
+        "gdpr",
         "trattamento_singolo",
-        "trattamento_continuativo",
+        "trattamento_ciclo",
         "altro",
+        "uso_immagini",
+        "anamnesi",
       ],
       consenso_modalita_firma: ["tablet", "pdf_caricato"],
       nota_tipo: ["clinica", "telefonata", "promemoria", "altro"],
-      piano_stato: ["attivo", "completato", "sospeso", "annullato"],
+      piano_stato: [
+        "attivo",
+        "completato",
+        "sospeso",
+        "annullato",
+        "bozza",
+        "confermato",
+      ],
       sesso: ["M", "F", "altro"],
     },
   },
