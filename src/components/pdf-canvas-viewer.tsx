@@ -1,6 +1,6 @@
 import * as React from "react";
-import * as pdfjsLib from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +64,7 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
           canvas.className = "mx-auto my-4 block rounded-md bg-background shadow-sm";
           context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          await page.render({ canvas, canvasContext: context, viewport }).promise;
+          await page.render({ canvas, canvasContext: context, viewport, intent: "display" }).promise;
           if (!cancelled) currentHost.appendChild(canvas);
         }
         await pdf.destroy();
