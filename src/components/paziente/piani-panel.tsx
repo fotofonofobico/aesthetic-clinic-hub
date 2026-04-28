@@ -98,13 +98,19 @@ function formatDateIT(d: Date) {
 }
 
 // ---------- riga form ----------
+type ProdottoForm = { uid: string; prodotto_id: string; quantita: number };
+
 type RigaForm = {
   uid: string;
   voceId?: string; // presente se esistente (modifica)
   trattamento_id: string;
   numero_sedute: number;
   numero_sedute_min: number; // sedute già completate (vincolo)
-  prodotti: { uid: string; prodotto_id: string; quantita: number }[];
+  prodotti: ProdottoForm[]; // lista "default" applicata se non personalizzato
+  /** Se true, ogni seduta ha la propria lista in prodottiPerSeduta */
+  personalizzaPerSeduta: boolean;
+  /** length === numero_sedute quando personalizzaPerSeduta = true */
+  prodottiPerSeduta: ProdottoForm[][];
   zone: string[];
   zoneDraft: string;
   consensoOk: boolean | null;
@@ -119,12 +125,39 @@ function newRiga(): RigaForm {
     numero_sedute: 1,
     numero_sedute_min: 0,
     prodotti: [],
+    personalizzaPerSeduta: false,
+    prodottiPerSeduta: [],
     zone: [],
     zoneDraft: "",
     consensoOk: null,
     consensoLoading: false,
     consensoMotivi: [],
   };
+}
+
+/** Allinea l'array prodottiPerSeduta al numero di sedute (estende/tronca). */
+function allineaProdottiPerSeduta(
+  current: ProdottoForm[][],
+  n: number,
+  fallback: ProdottoForm[],
+): ProdottoForm[][] {
+  const next: ProdottoForm[][] = [];
+  for (let i = 0; i < n; i++) {
+    const existing = current[i];
+    if (existing) {
+      next.push(existing.map((p) => ({ ...p, uid: p.uid || uid() })));
+    } else {
+      // nuova seduta: clona fallback come punto di partenza
+      next.push(
+        fallback.map((p) => ({
+          uid: uid(),
+          prodotto_id: p.prodotto_id,
+          quantita: p.quantita,
+        })),
+      );
+    }
+  }
+  return next;
 }
 
 // ---------- consenso per voce piano (lazy) ----------
