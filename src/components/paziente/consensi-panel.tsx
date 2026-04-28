@@ -860,5 +860,16 @@ function NuovoConsensoDialog({
         </Button>
       </DialogFooter>
     </DialogContent>
+    <PdfBlobDialog
+      open={stampaOpen}
+      onOpenChange={(o) => {
+        setStampaOpen(o);
+        if (!o) setStampaBlob(null);
+      }}
+      blob={stampaBlob}
+      title={stampaTitle}
+      filename="modulo-consenso-vuoto.pdf"
+    />
+    </>
   );
 }
