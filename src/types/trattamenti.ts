@@ -58,6 +58,7 @@ export interface ConsensoTemplate {
   categoria: ConsensoCategoria;
   validita_mesi: number | null;
   descrizione: string | null;
+  richiede_firma_medico: boolean;
   attivo: boolean;
   created_at: string;
   updated_at: string;

@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [roles, setRoles] = React.useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const bootstrappedRef = React.useRef(false);
 
   const loadRoles = React.useCallback(async (uid: string | undefined) => {
     if (!uid) {
@@ -43,30 +44,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
-    // Listener PRIMA di getSession (evita race condition)
+    let cancelled = false;
+
+    // Listener registrato PRIMA di getSession.
+    // Aggiorna sessione/utente/ruoli ma NON chiude isLoading: lo fa solo il bootstrap iniziale.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (cancelled) return;
       setSession(newSession);
       setUser(newSession?.user ?? null);
-      // Defer per evitare deadlock su chiamate Supabase nel callback
       if (newSession?.user) {
-        setTimeout(() => {
-          void loadRoles(newSession.user.id);
-        }, 0);
+        void loadRoles(newSession.user.id);
       } else {
         setRoles([]);
       }
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
+    // Bootstrap: aspettiamo SIA getSession() SIA loadRoles() prima di chiudere isLoading,
+    // così _authenticated.tsx non triggera il redirect a /login mentre la sessione si idrata.
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
       setSession(data.session);
       setUser(data.session?.user ?? null);
       if (data.session?.user) {
-        void loadRoles(data.session.user.id);
+        await loadRoles(data.session.user.id);
       }
-      setIsLoading(false);
-    });
+      if (!cancelled) {
+        bootstrappedRef.current = true;
+        setIsLoading(false);
+      }
+    })();
 
     return () => {
+      cancelled = true;
       sub.subscription.unsubscribe();
     };
   }, [loadRoles]);

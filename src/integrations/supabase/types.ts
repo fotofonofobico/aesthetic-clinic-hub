@@ -79,7 +79,7 @@ export type Database = {
           {
             foreignKeyName: "anamnesi_paziente_id_fkey"
             columns: ["paziente_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "pazienti"
             referencedColumns: ["id"]
           },
@@ -278,6 +278,76 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "consenso_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consenso_share_access_log: {
+        Row: {
+          accessed_at: string
+          id: string
+          ip: string | null
+          share_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          accessed_at?: string
+          id?: string
+          ip?: string | null
+          share_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          accessed_at?: string
+          id?: string
+          ip?: string | null
+          share_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consenso_share_access_log_share_id_fkey"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "consenso_share_link"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consenso_share_link: {
+        Row: {
+          consenso_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          consenso_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          revoked_at?: string | null
+          token: string
+        }
+        Update: {
+          consenso_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consenso_share_link_consenso_id_fkey"
+            columns: ["consenso_id"]
+            isOneToOne: false
+            referencedRelation: "consenso_firmato"
             referencedColumns: ["id"]
           },
         ]
