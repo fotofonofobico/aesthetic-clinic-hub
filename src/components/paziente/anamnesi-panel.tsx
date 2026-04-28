@@ -46,7 +46,6 @@ const SignaturePad = React.lazy(() =>
   import("@/components/signature-pad").then((m) => ({ default: m.SignaturePad })),
 );
 
-
 interface AnamnesiRow {
   id: string;
   paziente_id: string;
@@ -224,11 +223,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           .eq("id", pazienteId)
           .single(),
         user?.id
-          ? supabase
-              .from("profiles")
-              .select("nome, cognome")
-              .eq("user_id", user.id)
-              .maybeSingle()
+          ? supabase.from("profiles").select("nome, cognome").eq("user_id", user.id).maybeSingle()
           : Promise.resolve({ data: null, error: null } as const),
       ]);
       if (pazRes.error || !pazRes.data) {
@@ -298,7 +293,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   async function save() {
     if (!data) return;
     if (data.stato === "signed") {
-      toast.error("Anamnesi firmata: modifica un campo per creare automaticamente una nuova versione");
+      toast.error(
+        "Anamnesi firmata: modifica un campo per creare automaticamente una nuova versione",
+      );
       return;
     }
     setSaving(true);
@@ -374,6 +371,15 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   /** Stampa anamnesi senza firme per workflow cartaceo. */
   async function stampaAnamnesi() {
     if (!data) return;
+    const pdfWindow = window.open("", "_blank");
+    if (!pdfWindow) {
+      toast.error("Abilita i popup per aprire la stampa bozza.");
+      return;
+    }
+    pdfWindow.opener = null;
+    pdfWindow.document.write(
+      '<!doctype html><html lang="it"><head><title>Generazione PDF…</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">Generazione PDF…</body></html>',
+    );
     try {
       const { data: paz, error: pazErr } = await supabase
         .from("pazienti")
@@ -402,10 +408,13 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         operatoreNome: null,
         modalita: "cartaceo",
       });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      const pdfBlob =
+        blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
+      pdfWindow.location.replace(url);
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
+      pdfWindow.close();
       toast.error(`Errore stampa: ${(e as Error).message}`);
     }
   }
@@ -484,9 +493,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       {/* === Stato firma === */}
       <div
         className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 p-3 text-sm ${
-          isSigned
-            ? "border-success/40 bg-success/10"
-            : "border-warning/40 bg-warning/10"
+          isSigned ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"
         }`}
       >
         <div className="flex items-center gap-2">
@@ -508,7 +515,12 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 <Printer className="h-4 w-4" />
                 Stampa bozza
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setCartaceoDlgOpen(true)} disabled={signing || forking}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCartaceoDlgOpen(true)}
+                disabled={signing || forking}
+              >
                 <Upload className="h-4 w-4" />
                 Carica PDF firmato
               </Button>
@@ -545,7 +557,6 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         onConfirm={(file, dataFirma) => caricaCartaceo(file, dataFirma)}
         saving={signing}
       />
-
 
       {/* === 1. GENERALE === */}
       <Card>
@@ -614,9 +625,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 onValueChange={(v) =>
                   patch("generale", {
                     alimentazione:
-                      v === "_none"
-                        ? ""
-                        : (v as "sana" | "abbastanza" | "disequilibrata"),
+                      v === "_none" ? "" : (v as "sana" | "abbastanza" | "disequilibrata"),
                   })
                 }
               >
@@ -719,9 +728,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                     className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card p-2"
                   >
                     <Checkbox
-                      checked={
-                        !!(p as Record<string, unknown>)[pat.k]
-                      }
+                      checked={!!(p as Record<string, unknown>)[pat.k]}
                       onCheckedChange={(v) =>
                         patch("patologica", { [pat.k]: !!v } as Partial<AnamnesiPatologica>)
                       }
@@ -772,9 +779,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                     className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card p-2"
                   >
                     <Checkbox
-                      checked={
-                        !!(fa as Record<string, unknown>)[t.k]
-                      }
+                      checked={!!(fa as Record<string, unknown>)[t.k]}
                       onCheckedChange={(v) =>
                         patch("farmacologica", { [t.k]: !!v } as Partial<AnamnesiFarmacologica>)
                       }
@@ -808,8 +813,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 value={es.fototipo || "_none"}
                 onValueChange={(v) =>
                   patch("estetica", {
-                    fototipo:
-                      v === "_none" ? "" : (v as "I" | "II" | "III" | "IV" | "V" | "VI"),
+                    fototipo: v === "_none" ? "" : (v as "I" | "II" | "III" | "IV" | "V" | "VI"),
                   })
                 }
               >
@@ -832,10 +836,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 value={es.texture || "_none"}
                 onValueChange={(v) =>
                   patch("estetica", {
-                    texture:
-                      v === "_none"
-                        ? ""
-                        : (v as "omogenea" | "parziale" | "disomogenea"),
+                    texture: v === "_none" ? "" : (v as "omogenea" | "parziale" | "disomogenea"),
                   })
                 }
               >
@@ -913,7 +914,11 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
 
       <div className="flex justify-end gap-2">
         <Button onClick={save} disabled={saving || isSigned} variant="outline">
-          {saving ? "Salvataggio…" : isSigned ? "Firmata (modifica per nuova versione)" : "Salva bozza"}
+          {saving
+            ? "Salvataggio…"
+            : isSigned
+              ? "Firmata (modifica per nuova versione)"
+              : "Salva bozza"}
         </Button>
         {!isSigned && (
           <Button onClick={openSignDialog} disabled={signing || forking}>
@@ -933,9 +938,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           </DialogHeader>
           <div className="space-y-4">
             <React.Suspense
-              fallback={
-                <p className="text-sm text-muted-foreground">Caricamento area firma…</p>
-              }
+              fallback={<p className="text-sm text-muted-foreground">Caricamento area firma…</p>}
             >
               <div>
                 <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
@@ -1139,11 +1142,7 @@ function FieldNote({
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Textarea
-        rows={2}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <Textarea rows={2} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -1160,9 +1159,7 @@ function CartaceoUploadDialog({
   saving: boolean;
 }) {
   const [file, setFile] = React.useState<File | null>(null);
-  const [dataFirma, setDataFirma] = React.useState<string>(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [dataFirma, setDataFirma] = React.useState<string>(new Date().toISOString().slice(0, 10));
   React.useEffect(() => {
     if (!open) {
       setFile(null);
