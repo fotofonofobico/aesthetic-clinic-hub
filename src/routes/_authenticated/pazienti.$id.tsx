@@ -84,6 +84,9 @@ function PazienteDetailPage() {
     setAlerts((aRes.data ?? []) as PazienteAlert[]);
     setFlags((fRes.data ?? []) as FlagRischio[]);
 
+    // Valuta stato consensi/anamnesi (non bloccante per il rendering)
+    void evaluateAccess(id).then(setAccess).catch(() => setAccess(null));
+
     if (user?.id) {
       void supabase
         .from("paziente_access_log")
