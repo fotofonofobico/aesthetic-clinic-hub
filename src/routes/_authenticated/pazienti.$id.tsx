@@ -21,6 +21,7 @@ import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/type
 import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
+import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
@@ -264,6 +265,7 @@ function PazienteDetailPage() {
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
           <TabsTrigger value="piani">Piani</TabsTrigger>
+          <TabsTrigger value="sedute">Sedute</TabsTrigger>
           <TabsTrigger value="consensi">Consensi</TabsTrigger>
           <TabsTrigger value="alert">Alert ({flags.length + alerts.length})</TabsTrigger>
         </TabsList>
@@ -286,6 +288,10 @@ function PazienteDetailPage() {
 
         <TabsContent value="piani">
           <PianiPanel pazienteId={id} />
+        </TabsContent>
+
+        <TabsContent value="sedute">
+          <SedutePanel pazienteId={id} />
         </TabsContent>
 
         <TabsContent value="consensi">
