@@ -184,6 +184,8 @@ export type Database = {
         Row: {
           categoria_snapshot: Database["public"]["Enums"]["consenso_categoria"]
           created_at: string
+          durata_sedute_snapshot: number | null
+          durata_tipo_snapshot: string
           firma_immagine: string | null
           firma_medico_immagine: string | null
           firmato_da_medico: string | null
@@ -201,6 +203,8 @@ export type Database = {
           revocato_il: string | null
           rifiutato: boolean
           seduta_id: string | null
+          sedute_consumate: number
+          sedute_max_snapshot: number | null
           template_id: string | null
           testo_snapshot: string
           titolo_snapshot: string
@@ -212,6 +216,8 @@ export type Database = {
         Insert: {
           categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
+          durata_sedute_snapshot?: number | null
+          durata_tipo_snapshot?: string
           firma_immagine?: string | null
           firma_medico_immagine?: string | null
           firmato_da_medico?: string | null
@@ -229,6 +235,8 @@ export type Database = {
           revocato_il?: string | null
           rifiutato?: boolean
           seduta_id?: string | null
+          sedute_consumate?: number
+          sedute_max_snapshot?: number | null
           template_id?: string | null
           testo_snapshot: string
           titolo_snapshot: string
@@ -240,6 +248,8 @@ export type Database = {
         Update: {
           categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
+          durata_sedute_snapshot?: number | null
+          durata_tipo_snapshot?: string
           firma_immagine?: string | null
           firma_medico_immagine?: string | null
           firmato_da_medico?: string | null
@@ -257,6 +267,8 @@ export type Database = {
           revocato_il?: string | null
           rifiutato?: boolean
           seduta_id?: string | null
+          sedute_consumate?: number
+          sedute_max_snapshot?: number | null
           template_id?: string | null
           testo_snapshot?: string
           titolo_snapshot?: string
@@ -359,6 +371,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           descrizione: string | null
+          durata_sedute: number | null
+          durata_tipo: string
           id: string
           richiede_firma_medico: boolean
           testo: string
@@ -374,6 +388,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           descrizione?: string | null
+          durata_sedute?: number | null
+          durata_tipo?: string
           id?: string
           richiede_firma_medico?: boolean
           testo: string
@@ -389,6 +405,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           descrizione?: string | null
+          durata_sedute?: number | null
+          durata_tipo?: string
           id?: string
           richiede_firma_medico?: boolean
           testo?: string
@@ -792,6 +810,7 @@ export type Database = {
           piano_id: string
           prezzo_riga: number
           prezzo_unitario: number
+          prodotti_per_seduta: Json | null
           prodotti_previsti: Json
           trattamento_id: string
           zone: Json
@@ -805,6 +824,7 @@ export type Database = {
           piano_id: string
           prezzo_riga?: number
           prezzo_unitario?: number
+          prodotti_per_seduta?: Json | null
           prodotti_previsti?: Json
           trattamento_id: string
           zone?: Json
@@ -818,6 +838,7 @@ export type Database = {
           piano_id?: string
           prezzo_riga?: number
           prezzo_unitario?: number
+          prodotti_per_seduta?: Json | null
           prodotti_previsti?: Json
           trattamento_id?: string
           zone?: Json
@@ -869,7 +890,7 @@ export type Database = {
           created_at: string
           data_esecuzione_effettiva: string | null
           data_registrazione: string
-          data_seduta: string
+          data_seduta: string | null
           durata_minuti: number | null
           firmata_da: string | null
           firmata_il: string | null
@@ -891,7 +912,7 @@ export type Database = {
           created_at?: string
           data_esecuzione_effettiva?: string | null
           data_registrazione?: string
-          data_seduta?: string
+          data_seduta?: string | null
           durata_minuti?: number | null
           firmata_da?: string | null
           firmata_il?: string | null
@@ -913,7 +934,7 @@ export type Database = {
           created_at?: string
           data_esecuzione_effettiva?: string | null
           data_registrazione?: string
-          data_seduta?: string
+          data_seduta?: string | null
           durata_minuti?: number | null
           firmata_da?: string | null
           firmata_il?: string | null
