@@ -755,7 +755,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       let ordine = 0;
       for (const r of righe) {
         if (r.voceId) {
-          const vEsistente = vociEsistenti.find((v) => v.id === r.voceId);
+          // (vEsistente non più necessario: i prodotti sono già nel form)
           const { error } = await supabase
             .from("piano_trattamento_voce")
             .update({
