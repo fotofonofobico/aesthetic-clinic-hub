@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -20,16 +20,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Plus,
   Syringe,
   ChevronDown,
   ChevronRight,
-  CheckCircle2,
   Trash2,
   PenLine,
   Loader2,
   Package,
+  MapPin,
+  AlertTriangle,
+  Pencil,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -39,9 +43,16 @@ import type {
   PianoStato,
   ProdottoPrevisto,
   PianoVoce,
+  ScontoTipo,
 } from "@/types/trattamenti";
-import { puoEseguireTrattamento, evaluateAccess } from "@/lib/access-guard";
+import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
+import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
+import {
+  applicaSconto,
+  calcolaTotaleRighe,
+  formatEuro,
+} from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 
@@ -70,6 +81,11 @@ function parseProdotti(value: unknown): ProdottoPrevisto[] {
     .filter((p) => p.nome.length > 0);
 }
 
+function parseZone(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
 function defaultSedute(t: Trattamento | undefined): number {
   if (!t) return 1;
   if (t.tipo === "ciclo") return Math.max(1, t.durata_ciclo_valore ?? 3);
@@ -83,9 +99,13 @@ function formatDateIT(d: Date) {
 // ---------- riga form ----------
 type RigaForm = {
   uid: string;
+  voceId?: string; // presente se esistente (modifica)
   trattamento_id: string;
   numero_sedute: number;
+  numero_sedute_min: number; // sedute già completate (vincolo)
   prodotti: { uid: string; prodotto_id: string; quantita: number }[];
+  zone: string[];
+  zoneDraft: string;
   consensoOk: boolean | null;
   consensoLoading: boolean;
   consensoMotivi: string[];
@@ -96,12 +116,18 @@ function newRiga(): RigaForm {
     uid: uid(),
     trattamento_id: "",
     numero_sedute: 1,
+    numero_sedute_min: 0,
     prodotti: [],
+    zone: [],
+    zoneDraft: "",
     consensoOk: null,
     consensoLoading: false,
     consensoMotivi: [],
   };
 }
+
+// ---------- consenso per voce piano (lazy) ----------
+type ConsensoVoce = { ok: boolean; motivi: string[]; loading: boolean };
 
 export function PianiPanel({ pazienteId }: { pazienteId: string }) {
   const { user } = useAuth();
@@ -113,14 +139,20 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // form nuovo piano
+  // form
+  const [editingPianoId, setEditingPianoId] = useState<string | null>(null);
   const [righe, setRighe] = useState<RigaForm[]>([]);
+  const [scontoTipo, setScontoTipo] = useState<ScontoTipo>("nessuno");
+  const [scontoValore, setScontoValore] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
-  // sessione firma per riga
+  // consensi voce (per render piani esistenti)
+  const [consensiVoce, setConsensiVoce] = useState<Record<string, ConsensoVoce>>({});
+
+  // sessione firma
   const [firmaSession, setFirmaSession] = useState<SignatureSession | null>(null);
   const [firmaOpen, setFirmaOpen] = useState(false);
-  const [firmaRigaUid, setFirmaRigaUid] = useState<string | null>(null);
+  const [firmaVoceKey, setFirmaVoceKey] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -145,14 +177,16 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         .order("ordine"),
       supabase.from("trattamenti").select("*").eq("attivo", true).order("nome"),
     ]);
-    const lst = (pRes.data ?? []) as PianoTrattamento[];
+    const lst = (pRes.data ?? []) as unknown as PianoTrattamento[];
     setPiani(lst);
 
     const sMap: Record<string, Seduta[]> = {};
     for (const raw of sRes.data ?? []) {
       const s = {
         ...(raw as Record<string, unknown>),
-        prodotti_previsti: parseProdotti((raw as { prodotti_previsti?: unknown }).prodotti_previsti),
+        prodotti_previsti: parseProdotti(
+          (raw as { prodotti_previsti?: unknown }).prodotti_previsti,
+        ),
       } as unknown as Seduta;
       (sMap[s.piano_id] ??= []).push(s);
     }
@@ -165,6 +199,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         prodotti_previsti: parseProdotti(
           (raw as { prodotti_previsti?: unknown }).prodotti_previsti,
         ),
+        zone: parseZone((raw as { zone?: unknown }).zone),
       } as unknown as PianoVoce;
       (vMap[v.piano_id] ??= []).push(v);
     }
@@ -180,6 +215,13 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
   }
 
   function rimuoviRiga(rUid: string) {
+    const r = righe.find((x) => x.uid === rUid);
+    if (r && r.numero_sedute_min > 0) {
+      toast.error(
+        "Non puoi rimuovere un trattamento che ha già sedute completate",
+      );
+      return;
+    }
     setRighe((cur) => cur.filter((r) => r.uid !== rUid));
   }
 
@@ -233,9 +275,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
   function rimuoviProdotto(rUid: string, pUid: string) {
     setRighe((cur) =>
       cur.map((r) =>
-        r.uid === rUid
-          ? { ...r, prodotti: r.prodotti.filter((p) => p.uid !== pUid) }
-          : r,
+        r.uid === rUid ? { ...r, prodotti: r.prodotti.filter((p) => p.uid !== pUid) } : r,
       ),
     );
   }
@@ -257,107 +297,225 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     );
   }
 
-  // ---------- firma da riga ----------
-  async function avviaFirmaRiga(r: RigaForm) {
-    if (!r.trattamento_id) {
-      toast.error("Seleziona prima un trattamento");
+  // ---------- zone riga ----------
+  function toggleZona(rUid: string, zona: string) {
+    setRighe((cur) =>
+      cur.map((r) =>
+        r.uid === rUid
+          ? {
+              ...r,
+              zone: r.zone.includes(zona)
+                ? r.zone.filter((z) => z !== zona)
+                : [...r.zone, zona],
+            }
+          : r,
+      ),
+    );
+  }
+
+  function aggiungiZonaCustom(rUid: string) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const z = r.zoneDraft.trim();
+        if (!z) return r;
+        if (r.zone.some((x) => x.toLowerCase() === z.toLowerCase()))
+          return { ...r, zoneDraft: "" };
+        return { ...r, zone: [...r.zone, z], zoneDraft: "" };
+      }),
+    );
+  }
+
+  // ---------- totale calcolato live ----------
+  const totaleBase = useMemo(
+    () => calcolaTotaleRighe(righe, trattamenti),
+    [righe, trattamenti],
+  );
+  const { sconto, finale } = useMemo(
+    () => applicaSconto(totaleBase, scontoTipo, scontoValore),
+    [totaleBase, scontoTipo, scontoValore],
+  );
+
+  // ---------- apertura dialog ----------
+  function apriNuovo() {
+    setEditingPianoId(null);
+    setRighe([]);
+    setScontoTipo("nessuno");
+    setScontoValore(0);
+    setOpen(true);
+  }
+
+  function apriModifica(p: PianoTrattamento) {
+    const voci = vociPerPiano[p.id] ?? [];
+    if (voci.length === 0) {
+      toast.error("Piano legacy: modifica non disponibile");
       return;
     }
-    const session = await buildTrattamentoSession(pazienteId, [r.trattamento_id]);
+    const sedute = sedutePerPiano[p.id] ?? [];
+    const newRighe: RigaForm[] = voci.map((v) => {
+      const completate = sedute.filter(
+        (s) => s.voce_id === v.id && s.completata,
+      ).length;
+      return {
+        uid: uid(),
+        voceId: v.id,
+        trattamento_id: v.trattamento_id,
+        numero_sedute: v.numero_sedute,
+        numero_sedute_min: completate,
+        prodotti: v.prodotti_previsti.map((p) => ({
+          uid: uid(),
+          prodotto_id: p.prodotto_id ?? "",
+          quantita: p.quantita,
+        })),
+        zone: [...v.zone],
+        zoneDraft: "",
+        consensoOk: null,
+        consensoLoading: false,
+        consensoMotivi: [],
+      };
+    });
+    setRighe(newRighe);
+    setScontoTipo(p.sconto_tipo ?? "nessuno");
+    setScontoValore(Number(p.sconto_valore ?? 0));
+    setEditingPianoId(p.id);
+    setOpen(true);
+    // valuta consenso per ogni riga
+    for (const r of newRighe) void valutaConsenso(r.uid, r.trattamento_id);
+  }
+
+  // ---------- firma consenso da alert piano ----------
+  async function avviaFirmaPerVoce(pianoId: string, voceId: string, trattamentoId: string) {
+    const session = await buildTrattamentoSession(pazienteId, [trattamentoId]);
     if (!session || session.documenti.length === 0) {
       toast.success("Tutti i consensi richiesti sono già validi");
-      void valutaConsenso(r.uid, r.trattamento_id);
+      void valutaConsensoVoce(pianoId, voceId, trattamentoId);
       return;
     }
     setFirmaSession(session);
-    setFirmaRigaUid(r.uid);
+    setFirmaVoceKey(`${pianoId}::${voceId}::${trattamentoId}`);
     setFirmaOpen(true);
   }
 
-  // ---------- creazione piano ----------
-  function resetForm() {
-    setRighe([]);
+  async function valutaConsensoVoce(_pianoId: string, voceId: string, trattamentoId: string) {
+    setConsensiVoce((cur) => ({
+      ...cur,
+      [voceId]: { ok: false, motivi: [], loading: true },
+    }));
+    const res = await puoEseguireTrattamento(pazienteId, trattamentoId);
+    setConsensiVoce((cur) => ({
+      ...cur,
+      [voceId]: { ok: res.ok, motivi: res.motivi, loading: false },
+    }));
   }
 
-  async function creaPiano() {
-    if (righe.length === 0) {
-      toast.error("Aggiungi almeno un trattamento al piano");
-      return;
+  // valuta consensi delle voci visibili quando un piano viene espanso
+  useEffect(() => {
+    for (const pid of expanded) {
+      const voci = vociPerPiano[pid] ?? [];
+      for (const v of voci) {
+        if (!consensiVoce[v.id]) {
+          void valutaConsensoVoce(pid, v.id, v.trattamento_id);
+        }
+      }
     }
-    if (righe.some((r) => !r.trattamento_id)) {
-      toast.error("Tutte le righe devono avere un trattamento selezionato");
-      return;
-    }
-    if (righe.some((r) => r.numero_sedute < 1)) {
-      toast.error("Il numero di sedute deve essere almeno 1");
-      return;
-    }
-    if (righe.some((r) => r.prodotti.some((p) => !p.prodotto_id || p.quantita <= 0))) {
-      toast.error("Completa o rimuovi i prodotti incompleti");
-      return;
-    }
-    const senzaProdotti = righe.filter((r) => r.prodotti.length === 0);
-    if (senzaProdotti.length > 0) {
-      toast.warning(
-        `${senzaProdotti.length} riga/e senza prodotti previsti — procedo comunque`,
-      );
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, vociPerPiano]);
 
+  // ---------- validazione comune ----------
+  function validaForm(): string | null {
+    if (righe.length === 0) return "Aggiungi almeno un trattamento al piano";
+    if (righe.some((r) => !r.trattamento_id))
+      return "Tutte le righe devono avere un trattamento selezionato";
+    for (const r of righe) {
+      if (r.numero_sedute < 1) return "Il numero di sedute deve essere almeno 1";
+      if (r.numero_sedute < r.numero_sedute_min)
+        return `Non puoi scendere sotto ${r.numero_sedute_min} sedute (già completate) per un trattamento`;
+      if (r.prodotti.some((p) => !p.prodotto_id || p.quantita < 1))
+        return "Completa o rimuovi i prodotti con quantità < 1";
+    }
+    if (scontoTipo === "percento" && (scontoValore < 0 || scontoValore > 100))
+      return "Lo sconto in percentuale deve essere tra 0 e 100";
+    if (scontoTipo === "euro" && scontoValore < 0)
+      return "Lo sconto in € non può essere negativo";
+    return null;
+  }
+
+  function buildTitolo(): string {
+    const nomi = righe.map(
+      (r) => trattamenti.find((t) => t.id === r.trattamento_id)?.nome ?? "?",
+    );
+    return `Piano ${formatDateIT(new Date())} — ${nomi.join(", ")}`;
+  }
+
+  function buildVocePayload(r: RigaForm, ordine: number) {
+    const prodotti: ProdottoPrevisto[] = r.prodotti.map((p) => {
+      const prod = PRODOTTI_DEMO.find((x) => x.id === p.prodotto_id);
+      return {
+        nome: prod?.nome ?? p.prodotto_id,
+        quantita: Math.max(1, Math.floor(p.quantita)),
+        prodotto_id: p.prodotto_id,
+        trattamento_id: r.trattamento_id,
+      };
+    });
+    return {
+      trattamento_id: r.trattamento_id,
+      numero_sedute: r.numero_sedute,
+      prezzo_unitario: 0,
+      prezzo_riga: 0,
+      ordine,
+      prodotti_previsti: prodotti as unknown as never,
+      zone: r.zone as unknown as never,
+    };
+  }
+
+  // ---------- creazione piano ----------
+  async function creaPiano() {
+    const err = validaForm();
+    if (err) {
+      toast.error(err);
+      return;
+    }
     setSaving(true);
     try {
-      const nomi = righe.map((r) => trattamenti.find((t) => t.id === r.trattamento_id)?.nome ?? "?");
-      const titolo = `Piano ${formatDateIT(new Date())} — ${nomi.join(", ")}`;
       const totSedute = righe.reduce((acc, r) => acc + r.numero_sedute, 0);
 
-      // 1. Piano
       const { data: pianoData, error: pianoErr } = await supabase
         .from("piano_trattamento")
         .insert({
           paziente_id: pazienteId,
           trattamento_id: null,
-          titolo,
+          titolo: buildTitolo(),
           numero_sedute_previste: totSedute,
-          prezzo_totale: null,
+          prezzo_totale: totaleBase,
+          prezzo_finale: finale,
+          sconto_tipo: scontoTipo,
+          sconto_valore: scontoValore,
           note: null,
           created_by: user?.id,
-        })
+        } as never)
         .select("id")
         .single();
       if (pianoErr || !pianoData) throw pianoErr ?? new Error("Errore creazione piano");
-      const pianoId = pianoData.id;
+      const pianoId = (pianoData as { id: string }).id;
 
-      // 2. Voci (con ritorno per generare sedute)
-      const vociPayload = righe.map((r, i) => {
-        const prodottiJson: ProdottoPrevisto[] = r.prodotti.map((p) => {
-          const prod = PRODOTTI_DEMO.find((x) => x.id === p.prodotto_id);
-          return {
-            nome: prod?.nome ?? p.prodotto_id,
-            quantita: p.quantita,
-            prodotto_id: p.prodotto_id,
-            trattamento_id: r.trattamento_id,
-          };
-        });
-        return {
-          piano_id: pianoId,
-          trattamento_id: r.trattamento_id,
-          numero_sedute: r.numero_sedute,
-          prezzo_unitario: 0,
-          prezzo_riga: 0,
-          ordine: i,
-          prodotti_previsti: prodottiJson as unknown as never,
-        };
-      });
-
+      const vociPayload = righe.map((r, i) => ({
+        piano_id: pianoId,
+        ...buildVocePayload(r, i),
+      }));
       const { data: vociData, error: vociErr } = await supabase
         .from("piano_trattamento_voce")
-        .insert(vociPayload)
-        .select("id, trattamento_id, numero_sedute, prodotti_previsti, ordine");
+        .insert(vociPayload as never)
+        .select("id, trattamento_id, numero_sedute, prodotti_previsti");
       if (vociErr || !vociData) throw vociErr ?? new Error("Errore creazione voci");
 
-      // 3. Sedute (deep clone prodotti per evitare mutazione condivisa)
       const sedutePayload: Array<Record<string, unknown>> = [];
-      for (const v of vociData) {
-        const prodotti = parseProdotti(v.prodotti_previsti as unknown);
+      for (const v of vociData as Array<{
+        id: string;
+        trattamento_id: string;
+        numero_sedute: number;
+        prodotti_previsti: unknown;
+      }>) {
+        const prodotti = parseProdotti(v.prodotti_previsti);
         for (let n = 1; n <= v.numero_sedute; n++) {
           sedutePayload.push({
             piano_id: pianoId,
@@ -376,73 +534,205 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           .from("seduta")
           .insert(sedutePayload as never);
         if (sErr) {
-          toast.error(
-            `Piano creato ma errore nella generazione delle sedute: ${sErr.message}`,
-            { duration: 8000 },
-          );
+          toast.error(`Piano creato ma errore generazione sedute: ${sErr.message}`, {
+            duration: 8000,
+          });
         }
       }
 
       toast.success("Piano creato");
       setOpen(false);
-      resetForm();
       void load();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
-      toast.error(msg);
+      toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
       setSaving(false);
     }
   }
 
-  // ---------- azioni piano esistente ----------
+  // ---------- modifica piano ----------
+  async function modificaPiano() {
+    if (!editingPianoId) return;
+    const err = validaForm();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setSaving(true);
+    try {
+      const pianoId = editingPianoId;
+      const vociEsistenti = vociPerPiano[pianoId] ?? [];
+      const sedute = sedutePerPiano[pianoId] ?? [];
+      const totSedute = righe.reduce((acc, r) => acc + r.numero_sedute, 0);
+
+      // 1. update piano (titolo, totali, sconto, sedute previste)
+      const { error: upErr } = await supabase
+        .from("piano_trattamento")
+        .update({
+          titolo: buildTitolo(),
+          numero_sedute_previste: totSedute,
+          prezzo_totale: totaleBase,
+          prezzo_finale: finale,
+          sconto_tipo: scontoTipo,
+          sconto_valore: scontoValore,
+        } as never)
+        .eq("id", pianoId);
+      if (upErr) throw upErr;
+
+      // 2. voci rimosse: cancella voce + sedute non completate
+      const idsForm = new Set(righe.map((r) => r.voceId).filter(Boolean) as string[]);
+      const vociDaRimuovere = vociEsistenti.filter((v) => !idsForm.has(v.id));
+      for (const v of vociDaRimuovere) {
+        // delete sedute non completate
+        const { error: dsErr } = await supabase
+          .from("seduta")
+          .delete()
+          .eq("voce_id", v.id)
+          .eq("completata", false);
+        if (dsErr) throw dsErr;
+        // delete voce
+        const { error: dvErr } = await supabase
+          .from("piano_trattamento_voce")
+          .delete()
+          .eq("id", v.id);
+        if (dvErr) throw dvErr;
+      }
+
+      // 3. voci esistenti: update + aggiusta sedute
+      let ordine = 0;
+      for (const r of righe) {
+        if (r.voceId) {
+          const vEsistente = vociEsistenti.find((v) => v.id === r.voceId);
+          const { error } = await supabase
+            .from("piano_trattamento_voce")
+            .update({
+              ...buildVocePayload(r, ordine),
+            } as never)
+            .eq("id", r.voceId);
+          if (error) throw error;
+
+          // aggiorna prodotti_previsti delle sedute non completate (ri-clona)
+          const seduteVoce = sedute.filter((s) => s.voce_id === r.voceId);
+          const completate = seduteVoce.filter((s) => s.completata);
+          const programmate = seduteVoce.filter((s) => !s.completata);
+          const prodottiNuovi = (buildVocePayload(r, ordine).prodotti_previsti as unknown) as ProdottoPrevisto[];
+
+          // aggiorna prodotti su sedute future
+          for (const s of programmate) {
+            await supabase
+              .from("seduta")
+              .update({
+                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+                trattamento_id: r.trattamento_id,
+              } as never)
+              .eq("id", s.id);
+          }
+
+          const totaleVoceCorrente = seduteVoce.length;
+          if (r.numero_sedute > totaleVoceCorrente) {
+            const dataMax = seduteVoce.reduce(
+              (m, s) => Math.max(m, s.numero_seduta),
+              0,
+            );
+            const insertSed: Array<Record<string, unknown>> = [];
+            for (let n = dataMax + 1; n <= dataMax + (r.numero_sedute - totaleVoceCorrente); n++) {
+              insertSed.push({
+                piano_id: pianoId,
+                paziente_id: pazienteId,
+                trattamento_id: r.trattamento_id,
+                voce_id: r.voceId,
+                numero_seduta: n,
+                operatore_id: user?.id,
+                completata: false,
+                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+              });
+            }
+            if (insertSed.length > 0) {
+              const { error: isErr } = await supabase
+                .from("seduta")
+                .insert(insertSed as never);
+              if (isErr) throw isErr;
+            }
+          } else if (r.numero_sedute < totaleVoceCorrente) {
+            // rimuovi sedute extra non completate, partendo dalle più alte
+            const daRimuovere = programmate
+              .sort((a, b) => b.numero_seduta - a.numero_seduta)
+              .slice(0, totaleVoceCorrente - r.numero_sedute);
+            // assicurati che dopo la rimozione restino >= numero_sedute_min completate
+            if (completate.length > r.numero_sedute) {
+              throw new Error(
+                "Impossibile ridurre: ci sono già più sedute completate del nuovo totale",
+              );
+            }
+            for (const s of daRimuovere) {
+              const { error: ddErr } = await supabase
+                .from("seduta")
+                .delete()
+                .eq("id", s.id);
+              if (ddErr) throw ddErr;
+            }
+          }
+        } else {
+          // voce nuova
+          const { data: vNew, error } = await supabase
+            .from("piano_trattamento_voce")
+            .insert({ piano_id: pianoId, ...buildVocePayload(r, ordine) } as never)
+            .select("id, trattamento_id, numero_sedute, prodotti_previsti")
+            .single();
+          if (error || !vNew) throw error ?? new Error("Errore creazione voce");
+          const v = vNew as {
+            id: string;
+            trattamento_id: string;
+            numero_sedute: number;
+            prodotti_previsti: unknown;
+          };
+          const prodotti = parseProdotti(v.prodotti_previsti);
+          const insertSed: Array<Record<string, unknown>> = [];
+          for (let n = 1; n <= v.numero_sedute; n++) {
+            insertSed.push({
+              piano_id: pianoId,
+              paziente_id: pazienteId,
+              trattamento_id: v.trattamento_id,
+              voce_id: v.id,
+              numero_seduta: n,
+              operatore_id: user?.id,
+              completata: false,
+              prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
+            });
+          }
+          if (insertSed.length > 0) {
+            const { error: isErr } = await supabase
+              .from("seduta")
+              .insert(insertSed as never);
+            if (isErr) throw isErr;
+          }
+        }
+        ordine += 1;
+      }
+
+      toast.success("Piano aggiornato");
+      setOpen(false);
+      setEditingPianoId(null);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ---------- stato piano (manuale, esclude completato) ----------
   async function aggiornaStato(p: PianoTrattamento, stato: PianoStato) {
-    const { error } = await supabase.from("piano_trattamento").update({ stato }).eq("id", p.id);
-    if (error) {
-      toast.error(error.message);
+    if (stato === "completato") {
+      toast.info(
+        "Lo stato 'completato' è automatico al termine di tutte le sedute",
+      );
       return;
     }
-    void load();
-  }
-
-  async function aggiungiSeduta(p: PianoTrattamento) {
-    if (p.trattamento_id) {
-      const guard = await puoEseguireTrattamento(pazienteId, p.trattamento_id);
-      if (!guard.ok) {
-        toast.error(`Impossibile aggiungere seduta. ${guard.motivi.join(" · ")}`, {
-          duration: 7000,
-        });
-        return;
-      }
-    } else {
-      const ev = await evaluateAccess(pazienteId);
-      if (ev.bloccoTotale || ev.bloccoTrattamenti) {
-        toast.error(`Blocco trattamenti: ${ev.motivi.join(" · ")}`, { duration: 7000 });
-        return;
-      }
-    }
-
-    const sedute = sedutePerPiano[p.id] ?? [];
-    const numero = (sedute.at(-1)?.numero_seduta ?? 0) + 1;
-    const { error } = await supabase.from("seduta").insert({
-      piano_id: p.id,
-      paziente_id: pazienteId,
-      numero_seduta: numero,
-      operatore_id: user?.id,
-    } as never);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(`Seduta ${numero} aggiunta`);
-    void load();
-  }
-
-  async function completaSeduta(s: Seduta) {
     const { error } = await supabase
-      .from("seduta")
-      .update({ completata: !s.completata })
-      .eq("id", s.id);
+      .from("piano_trattamento")
+      .update({ stato } as never)
+      .eq("id", p.id);
     if (error) {
       toast.error(error.message);
       return;
@@ -466,234 +756,370 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         <div>
           <h3 className="font-display text-base font-semibold">Piani di trattamento</h3>
           <p className="text-xs text-muted-foreground">
-            Piano → trattamenti → sedute → prodotti previsti.
+            Pianifica trattamenti, prodotti, zone e prezzo. Le sedute si registrano in seduta.
           </p>
         </div>
-        <Dialog
-          open={open}
-          onOpenChange={(v) => {
-            setOpen(v);
-            if (!v) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4" />
-              Nuovo piano
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-display">Nuovo piano</DialogTitle>
-            </DialogHeader>
+        <Button onClick={apriNuovo}>
+          <Plus className="h-4 w-4" />
+          Nuovo piano
+        </Button>
+      </div>
 
-            <div className="space-y-3">
-              {righe.length === 0 && (
-                <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                  Aggiungi uno o più trattamenti per costruire il piano.
-                </p>
-              )}
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) {
+            setEditingPianoId(null);
+            setRighe([]);
+            setScontoTipo("nessuno");
+            setScontoValore(0);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {editingPianoId ? "Modifica piano" : "Nuovo piano"}
+            </DialogTitle>
+          </DialogHeader>
 
-              {righe.map((r, idx) => {
-                const tratt = trattamenti.find((t) => t.id === r.trattamento_id);
-                return (
-                  <Card key={r.uid} className="border-border">
-                    <CardContent className="space-y-3 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 space-y-1">
-                          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                            Trattamento #{idx + 1}
-                          </Label>
-                          <Select
-                            value={r.trattamento_id || undefined}
-                            onValueChange={(v) => onTrattamentoChange(r.uid, v)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona trattamento…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {trattamenti.map((t) => (
-                                <SelectItem key={t.id} value={t.id}>
-                                  {t.nome}
-                                  {t.tipo === "ciclo" ? " (ciclo)" : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="mt-5 text-muted-foreground hover:text-destructive"
-                          onClick={() => rimuoviRiga(r.uid)}
-                          title="Rimuovi riga"
+          <div className="space-y-3">
+            {righe.length === 0 && (
+              <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                Aggiungi uno o più trattamenti per costruire il piano.
+              </p>
+            )}
+
+            {righe.map((r, idx) => {
+              const tratt = trattamenti.find((t) => t.id === r.trattamento_id);
+              return (
+                <Card key={r.uid} className="border-border">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Trattamento #{idx + 1}
+                        </Label>
+                        <Select
+                          value={r.trattamento_id || undefined}
+                          onValueChange={(v) => onTrattamentoChange(r.uid, v)}
+                          disabled={!!r.voceId && r.numero_sedute_min > 0}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona trattamento…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {trattamenti.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nome}
+                                {t.tipo === "ciclo" ? " (ciclo)" : ""}
+                                {typeof t.prezzo_indicativo === "number"
+                                  ? ` · ${formatEuro(t.prezzo_indicativo)}`
+                                  : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="mt-5 text-muted-foreground hover:text-destructive"
+                        onClick={() => rimuoviRiga(r.uid)}
+                        title={
+                          r.numero_sedute_min > 0
+                            ? "Trattamento con sedute completate, non rimovibile"
+                            : "Rimuovi"
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="w-28">
+                        <Label className="text-xs">Sedute</Label>
+                        <Input
+                          type="number"
+                          min={Math.max(1, r.numero_sedute_min)}
+                          step={1}
+                          value={r.numero_sedute}
+                          onChange={(e) =>
+                            patchRiga(r.uid, {
+                              numero_sedute: Math.max(
+                                Math.max(1, r.numero_sedute_min),
+                                Math.floor(Number(e.target.value) || 1),
+                              ),
+                            })
+                          }
+                        />
+                        {r.numero_sedute_min > 0 && (
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            min {r.numero_sedute_min} (completate)
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-1 items-center gap-2">
+                        {r.consensoLoading ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Verifica…
+                          </span>
+                        ) : r.consensoOk === true ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-xs text-success-foreground">
+                            🟢 Consenso valido
+                          </span>
+                        ) : r.consensoOk === false ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-xs text-destructive-foreground"
+                            title={r.consensoMotivi.join(" · ")}
+                          >
+                            🔴 Consenso mancante (firma dopo aver salvato il piano)
+                          </span>
+                        ) : (
+                          r.trattamento_id && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Prodotti previsti */}
+                    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                          <Package className="h-3 w-3" />
+                          Prodotti previsti (conteggio)
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => aggiungiProdotto(r.uid)}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Aggiungi
                         </Button>
                       </div>
 
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div className="w-28">
-                          <Label className="text-xs">Sedute</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={r.numero_sedute}
-                            onChange={(e) =>
-                              patchRiga(r.uid, {
-                                numero_sedute: Math.max(1, Number(e.target.value) || 1),
-                              })
-                            }
-                          />
+                      {r.prodotti.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Nessun prodotto previsto.
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {r.prodotti.map((p) => (
+                            <div key={p.uid} className="flex items-center gap-2">
+                              <Select
+                                value={p.prodotto_id || undefined}
+                                onValueChange={(v) =>
+                                  patchProdotto(r.uid, p.uid, { prodotto_id: v })
+                                }
+                              >
+                                <SelectTrigger className="h-8 flex-1 text-xs">
+                                  <SelectValue placeholder="Seleziona prodotto…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PRODOTTI_DEMO.map((prod) => (
+                                    <SelectItem key={prod.id} value={prod.id}>
+                                      {prod.nome}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                step={1}
+                                min={1}
+                                className="h-8 w-20 text-xs"
+                                value={p.quantita}
+                                onChange={(e) =>
+                                  patchProdotto(r.uid, p.uid, {
+                                    quantita: Math.max(
+                                      1,
+                                      Math.floor(Number(e.target.value) || 1),
+                                    ),
+                                  })
+                                }
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => rimuoviProdotto(r.uid, p.uid)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
                         </div>
+                      )}
+                    </div>
 
-                        <div className="flex flex-1 items-center gap-2">
-                          {r.consensoLoading ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Verifica…
-                            </span>
-                          ) : r.consensoOk === true ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-xs text-success-foreground">
-                              🟢 Consenso valido
-                            </span>
-                          ) : r.consensoOk === false ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-xs text-destructive-foreground"
-                              title={r.consensoMotivi.join(" · ")}
+                    {/* Zone */}
+                    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+                      <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        Zone previste
+                      </Label>
+                      <div className="flex flex-wrap gap-1">
+                        {ZONE_PREDEFINITE.map((z) => {
+                          const sel = r.zone.includes(z);
+                          return (
+                            <button
+                              key={z}
+                              type="button"
+                              onClick={() => toggleZona(r.uid, z)}
+                              className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                                sel
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-background text-foreground hover:bg-muted"
+                              }`}
                             >
-                              🔴 Consenso mancante
+                              {z}
+                            </button>
+                          );
+                        })}
+                        {r.zone
+                          .filter((z) => !ZONE_PREDEFINITE.includes(z))
+                          .map((z) => (
+                            <span
+                              key={z}
+                              className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2 py-0.5 text-[11px]"
+                            >
+                              {z}
+                              <button
+                                type="button"
+                                onClick={() => toggleZona(r.uid, z)}
+                                className="opacity-70 hover:opacity-100"
+                                aria-label="Rimuovi zona"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
                             </span>
-                          ) : (
-                            r.trattamento_id && (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )
-                          )}
-                        </div>
-
+                          ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Aggiungi zona personalizzata…"
+                          className="h-8 text-xs"
+                          value={r.zoneDraft}
+                          onChange={(e) => patchRiga(r.uid, { zoneDraft: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              aggiungiZonaCustom(r.uid);
+                            }
+                          }}
+                        />
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={!r.trattamento_id || r.consensoOk === true}
-                          onClick={() => void avviaFirmaRiga(r)}
+                          onClick={() => aggiungiZonaCustom(r.uid)}
                         >
-                          <PenLine className="h-4 w-4" />
-                          Firma consenso
+                          Aggiungi
                         </Button>
                       </div>
+                    </div>
 
-                      {/* Prodotti previsti */}
-                      <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-                            <Package className="h-3 w-3" />
-                            Prodotti previsti
-                          </Label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => aggiungiProdotto(r.uid)}
-                          >
-                            <Plus className="h-3 w-3" />
-                            Aggiungi
-                          </Button>
-                        </div>
+                    {tratt?.tipo === "ciclo" && tratt.durata_ciclo_valore && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Ciclo consigliato: {tratt.durata_ciclo_valore}{" "}
+                        {tratt.durata_ciclo_unita ?? ""}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
 
-                        {r.prodotti.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
-                            Nessun prodotto previsto.
-                          </p>
-                        ) : (
-                          <div className="space-y-1">
-                            {r.prodotti.map((p) => (
-                              <div key={p.uid} className="flex items-center gap-2">
-                                <Select
-                                  value={p.prodotto_id || undefined}
-                                  onValueChange={(v) =>
-                                    patchProdotto(r.uid, p.uid, { prodotto_id: v })
-                                  }
-                                >
-                                  <SelectTrigger className="h-8 flex-1 text-xs">
-                                    <SelectValue placeholder="Seleziona prodotto…" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {PRODOTTI_DEMO.map((prod) => (
-                                      <SelectItem key={prod.id} value={prod.id}>
-                                        {prod.nome}{" "}
-                                        <span className="text-muted-foreground">
-                                          ({prod.unita})
-                                        </span>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  className="h-8 w-20 text-xs"
-                                  value={p.quantita}
-                                  onChange={(e) =>
-                                    patchProdotto(r.uid, p.uid, {
-                                      quantita: Number(e.target.value) || 0,
-                                    })
-                                  }
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => rimuoviProdotto(r.uid, p.uid)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={aggiungiRiga}
+            >
+              <Plus className="h-4 w-4" />
+              Aggiungi trattamento al piano
+            </Button>
 
-                      {tratt?.tipo === "ciclo" && tratt.durata_ciclo_valore && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Ciclo consigliato: {tratt.durata_ciclo_valore}{" "}
-                          {tratt.durata_ciclo_unita ?? ""}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            {/* Totale + sconto */}
+            {righe.length > 0 && (
+              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Totale base</span>
+                  <span className="font-medium">{formatEuro(totaleBase)}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Sconto
+                  </Label>
+                  <Select
+                    value={scontoTipo}
+                    onValueChange={(v) => setScontoTipo(v as ScontoTipo)}
+                  >
+                    <SelectTrigger className="h-8 w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nessuno">Nessuno</SelectItem>
+                      <SelectItem value="euro">€</SelectItem>
+                      <SelectItem value="percento">%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={scontoTipo === "percento" ? 1 : 0.01}
+                    max={scontoTipo === "percento" ? 100 : undefined}
+                    className="h-8 w-28"
+                    disabled={scontoTipo === "nessuno"}
+                    value={scontoValore}
+                    onChange={(e) => setScontoValore(Number(e.target.value) || 0)}
+                  />
+                  {scontoTipo !== "nessuno" && (
+                    <span className="text-xs text-muted-foreground">
+                      − {formatEuro(sconto)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-2">
+                  <span className="font-display text-sm uppercase tracking-wide">
+                    Totale finale
+                  </span>
+                  <span className="font-display text-lg font-bold">
+                    {formatEuro(finale)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={aggiungiRiga}
-              >
-                <Plus className="h-4 w-4" />
-                Aggiungi trattamento al piano
-              </Button>
-            </div>
-
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Annulla
-              </Button>
-              <Button onClick={() => void creaPiano()} disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Creazione…
-                  </>
-                ) : (
-                  "Crea piano"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              onClick={() => void (editingPianoId ? modificaPiano() : creaPiano())}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                  {editingPianoId ? "Salvataggio…" : "Creazione…"}
+                </>
+              ) : editingPianoId ? (
+                "Salva modifiche"
+              ) : (
+                "Crea piano"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Lista piani esistenti */}
       {loading ? (
@@ -714,6 +1140,9 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
             const voci = vociPerPiano[p.id] ?? [];
             const completate = sedute.filter((s) => s.completata).length;
             const isOpen = expanded.has(p.id);
+            const isLegacy = voci.length === 0;
+            // alert consenso aggregato
+            const vociMancanti = voci.filter((v) => consensiVoce[v.id]?.ok === false);
             return (
               <Card key={p.id}>
                 <CardContent className="space-y-3 p-5">
@@ -744,48 +1173,125 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
+                          {new Date(p.created_at).toLocaleDateString("it-IT")} ·{" "}
                           {completate} / {p.numero_sedute_previste} sedute
                           {voci.length > 0 ? ` · ${voci.length} trattamento/i` : ""}
+                          {typeof p.prezzo_finale === "number"
+                            ? ` · ${formatEuro(p.prezzo_finale)}`
+                            : typeof p.prezzo_totale === "number"
+                              ? ` · ${formatEuro(p.prezzo_totale)}`
+                              : ""}
                         </p>
                       </div>
                     </button>
-                    <Select
-                      value={p.stato}
-                      onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
-                    >
-                      <SelectTrigger className="h-8 w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="attivo">Attivo</SelectItem>
-                        <SelectItem value="completato">Completato</SelectItem>
-                        <SelectItem value="sospeso">Sospeso</SelectItem>
-                        <SelectItem value="annullato">Annullato</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      {!isLegacy && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => apriModifica(p)}
+                          disabled={p.stato === "annullato"}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Modifica
+                        </Button>
+                      )}
+                      <Select
+                        value={p.stato}
+                        onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
+                      >
+                        <SelectTrigger className="h-8 w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="attivo">Attivo</SelectItem>
+                          <SelectItem value="sospeso">Sospeso</SelectItem>
+                          <SelectItem value="annullato">Annullato</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
+                  {/* Alert consenso aggregato */}
+                  {!isLegacy && isOpen && vociMancanti.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>
+                        Consenso mancante per {vociMancanti.length} trattamento/i
+                      </AlertTitle>
+                      <AlertDescription>
+                        Firma il consenso prima di iniziare le sedute. Lo trovi
+                        accanto a ogni trattamento qui sotto.
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   {isOpen && (
                     <div className="space-y-3 border-t border-border pt-3">
-                      {/* Render multi-voce (piani nuovi) */}
-                      {voci.length > 0 ? (
+                      {!isLegacy ? (
                         voci.map((v) => {
                           const trattNome =
                             trattamenti.find((t) => t.id === v.trattamento_id)?.nome ??
                             "Trattamento";
                           const seduteVoce = sedute.filter((s) => s.voce_id === v.id);
-                          const completateVoce = seduteVoce.filter((s) => s.completata).length;
+                          const completateVoce = seduteVoce.filter(
+                            (s) => s.completata,
+                          ).length;
+                          const cv = consensiVoce[v.id];
                           return (
                             <div
                               key={v.id}
                               className="space-y-2 rounded-md border border-border bg-card p-3"
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="font-medium">{trattNome}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {completateVoce} / {v.numero_sedute} sedute
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{trattNome}</span>
+                                  {cv?.loading ? (
+                                    <span className="text-[11px] text-muted-foreground">
+                                      <Loader2 className="inline h-3 w-3 animate-spin" />
+                                    </span>
+                                  ) : cv?.ok === true ? (
+                                    <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] text-success-foreground">
+                                      🟢 Consenso ok
+                                    </span>
+                                  ) : cv?.ok === false ? (
+                                    <span className="rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive-foreground">
+                                      🔴 Consenso mancante
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {cv?.ok === false && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        void avviaFirmaPerVoce(p.id, v.id, v.trattamento_id)
+                                      }
+                                    >
+                                      <PenLine className="h-3 w-3" />
+                                      Firma consenso
+                                    </Button>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {completateVoce} / {v.numero_sedute} sedute
+                                  </span>
                                 </div>
                               </div>
+
+                              {v.zone.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {v.zone.map((z, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
+                                    >
+                                      <MapPin className="h-3 w-3" />
+                                      {z}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
 
                               {v.prodotti_previsti.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
@@ -795,50 +1301,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                                       className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
                                     >
                                       <Package className="h-3 w-3" />
-                                      {prod.nome} · {prod.quantita}
+                                      {prod.nome} × {prod.quantita}
                                     </span>
                                   ))}
                                 </div>
-                              )}
-
-                              {seduteVoce.length > 0 && (
-                                <ul className="space-y-1">
-                                  {seduteVoce.map((s) => (
-                                    <li
-                                      key={s.id}
-                                      className="flex items-center justify-between rounded border border-border/60 px-2 py-1 text-sm"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => void completaSeduta(s)}
-                                          className={
-                                            s.completata
-                                              ? "text-success-foreground"
-                                              : "text-muted-foreground hover:text-foreground"
-                                          }
-                                        >
-                                          <CheckCircle2 className="h-4 w-4" />
-                                        </button>
-                                        <span
-                                          className={
-                                            s.completata ? "line-through opacity-60" : ""
-                                          }
-                                        >
-                                          Seduta {s.numero_seduta}
-                                          {!s.completata && (
-                                            <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                              programmata
-                                            </span>
-                                          )}
-                                        </span>
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {new Date(s.data_seduta).toLocaleDateString("it-IT")}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
                               )}
                             </div>
                           );
@@ -849,50 +1315,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           {p.note && (
                             <p className="text-sm text-muted-foreground">{p.note}</p>
                           )}
-                          {sedute.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              Nessuna seduta registrata.
-                            </p>
-                          ) : (
-                            <ul className="space-y-1">
-                              {sedute.map((s) => (
-                                <li
-                                  key={s.id}
-                                  className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm"
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => void completaSeduta(s)}
-                                      className={
-                                        s.completata
-                                          ? "text-success-foreground"
-                                          : "text-muted-foreground hover:text-foreground"
-                                      }
-                                    >
-                                      <CheckCircle2 className="h-4 w-4" />
-                                    </button>
-                                    <span
-                                      className={s.completata ? "line-through opacity-60" : ""}
-                                    >
-                                      Seduta {s.numero_seduta}
-                                    </span>
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(s.data_seduta).toLocaleDateString("it-IT")}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void aggiungiSeduta(p)}
-                          >
-                            <Plus className="h-4 w-4" />
-                            Aggiungi seduta
-                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Piano legacy: {p.numero_sedute_previste} sedute previste,{" "}
+                            {completate} completate.
+                          </p>
                         </>
                       )}
                     </div>
@@ -904,23 +1330,22 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         </div>
       )}
 
-      {/* Dialog firma consenso per riga (riusa SignatureSessionDialog senza modificarlo) */}
+      {/* Dialog firma consenso da alert piano */}
       <SignatureSessionDialog
         open={firmaOpen}
         session={firmaSession}
         onClose={() => {
           setFirmaOpen(false);
-          // Riverifica consenso della riga al termine, indipendentemente dall'esito
-          if (firmaRigaUid) {
-            const r = righe.find((x) => x.uid === firmaRigaUid);
-            if (r?.trattamento_id) void valutaConsenso(r.uid, r.trattamento_id);
+          if (firmaVoceKey) {
+            const [pid, vid, tid] = firmaVoceKey.split("::");
+            if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
           }
         }}
         onCompleted={() => {
           setFirmaOpen(false);
-          if (firmaRigaUid) {
-            const r = righe.find((x) => x.uid === firmaRigaUid);
-            if (r?.trattamento_id) void valutaConsenso(r.uid, r.trattamento_id);
+          if (firmaVoceKey) {
+            const [pid, vid, tid] = firmaVoceKey.split("::");
+            if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
           }
         }}
       />
