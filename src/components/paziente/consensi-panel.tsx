@@ -711,9 +711,11 @@ function NuovoConsensoDialog({
               <p className="whitespace-pre-wrap">{tpl.testo}</p>
             </div>
             <p className="text-xs text-muted-foreground">
-              {tpl.validita_mesi
-                ? `Validità: ${tpl.validita_mesi} mesi dalla firma.`
-                : "Nessuna scadenza temporale (valido finché non cambia versione o non viene revocato)."}
+              {tpl.durata_tipo === "sedute" && tpl.durata_sedute
+                ? `Validità: ${tpl.durata_sedute} sedute (scade al raggiungimento del numero).`
+                : tpl.validita_mesi
+                  ? `Validità: ${tpl.validita_mesi} mesi dalla firma.`
+                  : "Nessuna scadenza temporale (valido finché non cambia versione o non viene revocato)."}
             </p>
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 p-2">
               <span className="text-xs font-medium text-muted-foreground">
