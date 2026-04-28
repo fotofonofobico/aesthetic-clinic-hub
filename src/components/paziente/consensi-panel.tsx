@@ -320,31 +320,6 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   );
 }
 
-function PdfLink({
-  path,
-  getUrl,
-}: {
-  path: string;
-  getUrl: () => Promise<string | null>;
-}) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    void getUrl().then(setUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
-  if (!url) return <p className="text-xs text-muted-foreground">Caricamento PDF…</p>;
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="mt-1 inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent"
-    >
-      <FileText className="h-4 w-4" />
-      Apri PDF firmato
-    </a>
-  );
-}
 
 function NuovoConsensoDialog({
   pazienteId,
