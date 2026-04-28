@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, Download, Printer, RefreshCw } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -72,11 +72,9 @@ function PdfViewerPage() {
   return (
     <div className="flex h-[calc(100vh-10rem)] min-h-[620px] flex-col overflow-hidden rounded-lg border border-border bg-background">
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="..">
-            <ArrowLeft className="h-4 w-4" />
-            Indietro
-          </Link>
+        <Button type="button" variant="ghost" size="sm" onClick={() => window.history.back()}>
+          <ArrowLeft className="h-4 w-4" />
+          Indietro
         </Button>
         <div className="min-w-0 flex-1 px-1">
           <h1 className="truncate text-sm font-semibold text-foreground">{displayTitle}</h1>
