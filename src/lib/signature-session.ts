@@ -236,7 +236,12 @@ export async function buildTrattamentoSession(
           titolo: tpl.titolo,
           testo: tpl.testo,
           versione: tpl.versione,
-          validitaMesi: tpl.validita_mesi ?? (cat === "trattamento_ciclo" ? 12 : null),
+          validitaMesi:
+            tpl.durata_tipo === "sedute"
+              ? null
+              : tpl.validita_mesi ?? (cat === "trattamento_ciclo" ? 12 : null),
+          durataTipo: tpl.durata_tipo === "sedute" ? "sedute" : "mesi",
+          duratSedute: tpl.durata_tipo === "sedute" ? tpl.durata_sedute : null,
           richiedeFirmaMedico: tpl.richiede_firma_medico,
         },
       ),
@@ -256,6 +261,11 @@ export function calcolaValidoFinoA(
   doc: SessionDoc,
   firmatoIl: Date,
 ): string | null {
+  // Ciclo a sedute: nessuna scadenza temporale, gestita dal contatore sedute
+  if (doc.kind.kind === "trattamento" && doc.kind.categoria === "trattamento_ciclo"
+      && doc.durataTipo === "sedute") {
+    return null;
+  }
   if (doc.kind.kind === "trattamento" && doc.kind.categoria === "trattamento_ciclo") {
     const mesi = doc.validitaMesi && doc.validitaMesi > 0 ? doc.validitaMesi : 12;
     const d = new Date(firmatoIl);
