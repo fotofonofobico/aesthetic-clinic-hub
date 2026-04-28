@@ -81,6 +81,8 @@ export interface Trattamento {
   consenso_template_id: string | null;
 }
 
+export type ConsensoDurataTipo = "mesi" | "sedute";
+
 export interface ConsensoTemplate {
   id: string;
   trattamento_id: string | null;
@@ -89,6 +91,8 @@ export interface ConsensoTemplate {
   versione: string;
   categoria: ConsensoCategoria;
   validita_mesi: number | null;
+  durata_tipo: ConsensoDurataTipo;
+  durata_sedute: number | null;
   descrizione: string | null;
   richiede_firma_medico: boolean;
   attivo: boolean;
