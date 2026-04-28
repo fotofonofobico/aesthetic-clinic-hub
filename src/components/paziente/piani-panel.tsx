@@ -698,6 +698,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
               trattamento_id: v.trattamento_id,
               voce_id: v.id,
               numero_seduta: n,
+              data_seduta: null,
               operatore_id: user?.id,
               completata: false,
               prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
