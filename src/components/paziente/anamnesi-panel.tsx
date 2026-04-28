@@ -82,6 +82,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [data, setData] = useState<AnamnesiRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signing, setSigning] = useState(false);
 
   useEffect(() => {
     void load();
@@ -89,18 +90,131 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
 
   async function load() {
     setLoading(true);
-    const { data: row, error } = await supabase
+    // Carica l'ultima anamnesi (preferendo draft, poi più recente)
+    const { data: rows, error } = await supabase
       .from("anamnesi")
       .select("*")
       .eq("paziente_id", pazienteId)
-      .maybeSingle();
+      .order("updated_at", { ascending: false });
     if (error) {
       toast.error(`Errore: ${error.message}`);
       setLoading(false);
       return;
     }
-    setData(row as unknown as AnamnesiRow);
+    const list = (rows ?? []) as unknown as AnamnesiRow[];
+    // preferisci un draft attivo
+    const draft = list.find((r) => r.stato === "draft");
+    setData(draft ?? list[0] ?? null);
     setLoading(false);
+  }
+
+  /**
+   * Crea una nuova versione draft a partire dall'ultima firmata, mantenendo i dati.
+   * Usata quando l'utente vuole modificare un'anamnesi già firmata.
+   */
+  async function nuovaVersioneDraft() {
+    if (!data) return;
+    const { data: created, error } = await supabase
+      .from("anamnesi")
+      .insert({
+        paziente_id: pazienteId,
+        generale: (data.generale ?? {}) as never,
+        patologica: (data.patologica ?? {}) as never,
+        farmacologica: (data.farmacologica ?? {}) as never,
+        estetica: (data.estetica ?? {}) as never,
+        note_libere: data.note_libere,
+        compilata_da: user?.id ?? null,
+        versione_numero: (data.versione_numero ?? 1) + 1,
+      })
+      .select("*")
+      .single();
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      return;
+    }
+    setData(created as unknown as AnamnesiRow);
+    toast.success("Nuova versione creata. Modifica e firma di nuovo.");
+  }
+
+  async function firmaAnamnesi() {
+    if (!data) return;
+    if (data.stato === "signed") return;
+    setSigning(true);
+    try {
+      // 1. Recupera dati paziente + operatore
+      const [pazRes, profRes] = await Promise.all([
+        supabase
+          .from("pazienti")
+          .select("nome, cognome, codice_fiscale, data_nascita")
+          .eq("id", pazienteId)
+          .single(),
+        user?.id
+          ? supabase
+              .from("profiles")
+              .select("nome, cognome")
+              .eq("user_id", user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null } as const),
+      ]);
+      if (pazRes.error || !pazRes.data) {
+        throw new Error(pazRes.error?.message ?? "Paziente non trovato");
+      }
+      const operatoreNome = profRes.data
+        ? `${profRes.data.cognome ?? ""} ${profRes.data.nome ?? ""}`.trim() || null
+        : null;
+
+      const firmataIl = new Date();
+
+      // 2. Genera PDF + hash
+      const { blob, hash } = await generaPdfAnamnesi({
+        paziente: {
+          nome: pazRes.data.nome,
+          cognome: pazRes.data.cognome,
+          codice_fiscale: pazRes.data.codice_fiscale ?? null,
+          data_nascita: pazRes.data.data_nascita ?? null,
+        },
+        versioneNumero: data.versione_numero ?? 1,
+        firmataIl,
+        payload: {
+          generale: (data.generale ?? {}) as Record<string, unknown>,
+          patologica: (data.patologica ?? {}) as Record<string, unknown>,
+          farmacologica: (data.farmacologica ?? {}) as Record<string, unknown>,
+          estetica: (data.estetica ?? {}) as Record<string, unknown>,
+          note_libere: data.note_libere,
+        },
+        firmaPazienteDataUrl: null,
+        firmaMedicoDataUrl: null,
+        operatoreNome,
+      });
+
+      // 3. Upload PDF su Storage
+      const path = `${pazienteId}/${data.id}-v${data.versione_numero}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from("anamnesi-pdf")
+        .upload(path, blob, { contentType: "application/pdf", upsert: true });
+      if (upErr) throw upErr;
+
+      // 4. Update record → signed
+      const { error: updErr } = await supabase
+        .from("anamnesi")
+        .update({
+          stato: "signed",
+          firmata_il: firmataIl.toISOString(),
+          firmata_da_medico: user?.id ?? null,
+          hash_integrita: hash,
+          pdf_url: path,
+        })
+        .eq("id", data.id);
+      if (updErr) throw updErr;
+
+      toast.success("Anamnesi firmata e bloccata");
+      await load();
+      onSaved();
+    } catch (e) {
+      toast.error(`Errore firma: ${(e as Error).message}`);
+    } finally {
+      setSigning(false);
+    }
   }
 
   function patch<S extends keyof AnamnesiPayload>(
