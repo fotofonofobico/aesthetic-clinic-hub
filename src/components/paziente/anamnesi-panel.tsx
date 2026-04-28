@@ -561,7 +561,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                   {annullando ? "Annullamento…" : `Annulla modifiche (torna a v${lastSigned.versione_numero})`}
                 </Button>
               )}
-              <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
+              <Button size="sm" onClick={() => void openSignDialog()} disabled={signing || forking}>
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
               </Button>
@@ -969,7 +969,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
               : "Salva bozza"}
         </Button>
         {!isSigned && (
-          <Button onClick={openSignDialog} disabled={signing || forking}>
+          <Button onClick={() => void openSignDialog()} disabled={signing || forking}>
             <FileSignature className="h-4 w-4" />
             {signing ? "Firma…" : "Firma e blocca"}
           </Button>
