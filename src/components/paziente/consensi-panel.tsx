@@ -37,6 +37,7 @@ import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pa
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { sha256Hex } from "@/lib/hash";
 import { generaPdfConsenso } from "@/lib/pdf-consenso";
+import { generaPdfModuloVuoto } from "@/lib/pdf-consenso-vuoto";
 import {
   CATEGORIA_LABELS,
   type ConsensoFirmato,
@@ -47,6 +48,7 @@ import {
 import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
+import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
