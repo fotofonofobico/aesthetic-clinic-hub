@@ -22,6 +22,7 @@ import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
+import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -41,6 +42,7 @@ function PazienteDetailPage() {
   const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
+  const [access, setAccess] = useState<AccessEvaluation | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,6 +83,9 @@ function PazienteDetailPage() {
     setPaziente(pRes.data as Paziente);
     setAlerts((aRes.data ?? []) as PazienteAlert[]);
     setFlags((fRes.data ?? []) as FlagRischio[]);
+
+    // Valuta stato consensi/anamnesi (non bloccante per il rendering)
+    void evaluateAccess(id).then(setAccess).catch(() => setAccess(null));
 
     if (user?.id) {
       void supabase
@@ -135,7 +140,7 @@ function PazienteDetailPage() {
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
-      <CriticalBanner flags={flags} alerts={alerts} />
+      <CriticalBanner flags={flags} alerts={alerts} access={access} />
 
       <Tabs defaultValue="diario" className="space-y-4">
         <TabsList>
@@ -187,23 +192,53 @@ function PazienteDetailPage() {
 function CriticalBanner({
   flags,
   alerts,
+  access,
 }: {
   flags: FlagRischio[];
   alerts: PazienteAlert[];
+  access: AccessEvaluation | null;
 }) {
   const critici = [
     ...flags.filter((f) => f.severity === "critico").map((f) => f.etichetta),
     ...alerts.filter((a) => a.severity === "critico").map((a) => a.testo),
   ];
-  if (critici.length === 0) return null;
+  const blocchi = access ? access.motivi : [];
+  const haBlocco = !!access && (access.bloccoTotale || access.bloccoTrattamenti);
+
+  if (critici.length === 0 && blocchi.length === 0) return null;
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-4 text-sm shadow-sm">
-      <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-      <div>
-        <div className="font-semibold text-destructive">Attenzione clinica</div>
-        <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
-      </div>
+    <div className="space-y-2">
+      {critici.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-4 text-sm shadow-sm">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-semibold text-destructive">Attenzione clinica</div>
+            <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
+          </div>
+        </div>
+      )}
+      {blocchi.length > 0 && (
+        <div
+          className={`flex items-start gap-3 rounded-lg border-2 p-4 text-sm shadow-sm ${
+            haBlocco
+              ? "border-destructive/40 bg-destructive/10"
+              : "border-warning/40 bg-warning/10"
+          }`}
+        >
+          <ShieldAlert
+            className={`mt-0.5 h-5 w-5 shrink-0 ${
+              haBlocco ? "text-destructive" : "text-warning"
+            }`}
+          />
+          <div>
+            <div className={`font-semibold ${haBlocco ? "text-destructive" : ""}`}>
+              {haBlocco ? "Trattamenti bloccati" : "Avvisi consensi"}
+            </div>
+            <div className="mt-0.5 text-foreground">{blocchi.join(" · ")}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
