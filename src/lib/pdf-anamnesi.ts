@@ -1,6 +1,11 @@
 import { jsPDF } from "jspdf";
 import { sha256Hex } from "./hash";
 import type { DatiPazientePdf } from "./pdf-consenso";
+import {
+  renderHeaderPaziente,
+  renderMetadata,
+  renderSignatureBlock,
+} from "./pdf-template";
 
 export interface AnamnesiPdfInput {
   paziente: DatiPazientePdf;
@@ -13,9 +18,12 @@ export interface AnamnesiPdfInput {
     estetica: Record<string, unknown> | null;
     note_libere: string | null;
   };
+  /** null = stampa senza firma (workflow cartaceo) */
   firmaPazienteDataUrl: string | null;
   firmaMedicoDataUrl: string | null;
   operatoreNome: string | null;
+  /** "cartaceo" se generato per stampa/firma manuale */
+  modalita?: "tablet" | "cartaceo";
 }
 
 function formatVal(v: unknown): string {
@@ -75,31 +83,30 @@ export async function generaPdfAnamnesi(
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 48;
   let y = margin;
+  const modalita = input.modalita ?? "tablet";
 
+  // Titolo
   doc.setFont("helvetica", "bold").setFontSize(14);
   doc.text("ANAMNESI", margin, y);
-  y += 18;
-  doc.setFont("helvetica", "normal").setFontSize(10);
-  doc.text(`Versione ${input.versioneNumero}`, margin, y);
-  y += 16;
+  y += 22;
 
-  doc.setDrawColor(180).line(margin, y, pageW - margin, y);
-  y += 14;
-  doc.setFont("helvetica", "bold").setFontSize(10);
-  doc.text("Paziente:", margin, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${input.paziente.cognome} ${input.paziente.nome}`, margin + 60, y);
-  y += 14;
-  if (input.paziente.codice_fiscale) {
-    doc.setFont("helvetica", "bold");
-    doc.text("CF:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(input.paziente.codice_fiscale, margin + 60, y);
-    y += 14;
-  }
-  doc.line(margin, y, pageW - margin, y);
-  y += 16;
+  // 1. HEADER paziente
+  y = renderHeaderPaziente(doc, input.paziente, margin, y);
 
+  // 2. METADATA
+  y = renderMetadata(
+    doc,
+    {
+      tipoDocumento: "Anamnesi clinica",
+      titolo: `Anamnesi v${input.versioneNumero}`,
+      versione: String(input.versioneNumero),
+      firmatoIl: modalita === "cartaceo" ? null : input.firmataIl,
+    },
+    margin,
+    y,
+  );
+
+  // 3. CONTENUTO
   y = renderSection(doc, "1. Generale", input.payload.generale, y, margin, pageW, pageH);
   y = renderSection(doc, "2. Patologica", input.payload.patologica, y, margin, pageW, pageH);
   y = renderSection(doc, "3. Farmacologica", input.payload.farmacologica, y, margin, pageW, pageH);
@@ -126,53 +133,23 @@ export async function generaPdfAnamnesi(
     y += 10;
   }
 
-  // Firme
-  y += 20;
-  if (y > pageH - 140) {
-    doc.addPage();
-    y = margin;
-  }
-  const colW = (pageW - margin * 2 - 30) / 2;
-  doc.setFont("helvetica", "bold").setFontSize(10);
-  doc.text("Firma paziente", margin, y);
-  if (input.firmaMedicoDataUrl) {
-    doc.text("Firma medico", margin + colW + 30, y);
-  }
-  y += 8;
-  if (input.firmaPazienteDataUrl) {
-    try {
-      doc.addImage(input.firmaPazienteDataUrl, "PNG", margin, y, colW, 70);
-    } catch {
-      /* skip */
-    }
-  }
-  if (input.firmaMedicoDataUrl) {
-    try {
-      doc.addImage(input.firmaMedicoDataUrl, "PNG", margin + colW + 30, y, colW, 70);
-    } catch {
-      /* skip */
-    }
-  }
-  y += 78;
-  doc.setDrawColor(150).line(margin, y, margin + colW, y);
-  if (input.firmaMedicoDataUrl) {
-    doc.line(margin + colW + 30, y, margin + colW * 2 + 30, y);
-  }
-  y += 12;
-  doc.setFont("helvetica", "normal").setFontSize(8);
-  doc.text(`${input.paziente.cognome} ${input.paziente.nome}`, margin, y);
-  if (input.firmaMedicoDataUrl && input.operatoreNome) {
-    doc.text(input.operatoreNome, margin + colW + 30, y);
-  }
-  y += 14;
-  doc.text(
-    `Firmato: ${input.firmataIl.toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" })}`,
+  // 4. SIGNATURE BLOCK (sempre presente; vuoto in modalità cartaceo)
+  y = renderSignatureBlock(
+    doc,
+    {
+      firmaPazienteDataUrl: input.firmaPazienteDataUrl,
+      firmaMedicoDataUrl: input.firmaMedicoDataUrl,
+      firmatoIl: input.firmataIl,
+      modalita,
+      pazienteLabel: `${input.paziente.cognome} ${input.paziente.nome}`,
+      operatoreLabel: input.operatoreNome,
+    },
     margin,
-    y,
+    y + 10,
   );
 
   const hash = await sha256Hex(
-    `anamnesi|${input.versioneNumero}|${input.firmataIl.toISOString()}|${JSON.stringify(input.payload)}`,
+    `anamnesi|${input.versioneNumero}|${input.firmataIl.toISOString()}|${JSON.stringify(input.payload)}|${modalita}`,
   );
   const totalPages = doc.getNumberOfPages();
   doc.setPage(totalPages);
