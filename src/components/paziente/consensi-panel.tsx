@@ -252,9 +252,12 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                         dateStyle: "medium",
                         timeStyle: "short",
                       })}
-                      {c.valido_fino_a
-                        ? ` · scade ${new Date(c.valido_fino_a).toLocaleDateString("it-IT")}`
-                        : ""}
+                      {c.durata_tipo_snapshot === "sedute" &&
+                      c.sedute_max_snapshot != null
+                        ? ` · ${c.sedute_consumate}/${c.sedute_max_snapshot} sedute usate`
+                        : c.valido_fino_a
+                          ? ` · scade ${new Date(c.valido_fino_a).toLocaleDateString("it-IT")}`
+                          : ""}
                     </p>
                   </div>
                   {c.modalita_firma === "tablet" && c.firma_immagine ? (
@@ -306,11 +309,16 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                   <span className="text-muted-foreground">
                     Firmato {new Date(viewing.firmato_il).toLocaleString("it-IT")}
                   </span>
-                  {viewing.valido_fino_a && (
+                  {viewing.durata_tipo_snapshot === "sedute" &&
+                  viewing.sedute_max_snapshot != null ? (
+                    <span className="text-muted-foreground">
+                      · {viewing.sedute_consumate}/{viewing.sedute_max_snapshot} sedute usate
+                    </span>
+                  ) : viewing.valido_fino_a ? (
                     <span className="text-muted-foreground">
                       · scade {new Date(viewing.valido_fino_a).toLocaleDateString("it-IT")}
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="max-h-64 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-sm">

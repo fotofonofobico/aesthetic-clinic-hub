@@ -93,7 +93,9 @@ export async function buildVisitaSession(
     supabase.rpc("paziente_consensi_stato", { _paziente_id: pazienteId }),
     supabase
       .from("anamnesi")
-      .select("id, stato, versione_numero, updated_at, firmata_il")
+      .select(
+        "id, stato, versione_numero, updated_at, firmata_il, generale, patologica, farmacologica, estetica, note_libere",
+      )
       .eq("paziente_id", pazienteId)
       .order("updated_at", { ascending: false }),
     supabase
@@ -161,9 +163,15 @@ export async function buildVisitaSession(
       versione_numero: number;
       updated_at: string;
       firmata_il: string | null;
+      generale: Record<string, unknown> | null;
+      patologica: Record<string, unknown> | null;
+      farmacologica: Record<string, unknown> | null;
+      estetica: Record<string, unknown> | null;
+      note_libere: string | null;
     }>;
   const draftCorrente = anamRows.find((a) => a.stato === "draft");
   if (draftCorrente) {
+    const riassunto = buildAnamnesiRiassunto(draftCorrente);
     docs.push(
       makeDoc(
         {
@@ -174,7 +182,8 @@ export async function buildVisitaSession(
         {
           titolo: `Anamnesi v${draftCorrente.versione_numero}`,
           testo:
-            "Confermo la veridicità delle informazioni anamnestiche fornite e autorizzo il trattamento dei dati clinici per le finalità mediche.",
+            riassunto +
+            "\n\n— — —\nConfermo la veridicità delle informazioni anamnestiche fornite e autorizzo il trattamento dei dati clinici per le finalità mediche.",
           versione: String(draftCorrente.versione_numero),
           validitaMesi: null,
           richiedeFirmaMedico: false,
@@ -185,6 +194,57 @@ export async function buildVisitaSession(
 
   if (docs.length === 0) return null;
   return { tipo: "visita", pazienteId, documenti: docs };
+}
+
+/**
+ * Produce un riassunto testuale leggibile delle sezioni anamnesi compilate.
+ * Mostra solo i campi valorizzati per non confondere il paziente.
+ */
+function buildAnamnesiRiassunto(row: {
+  generale: Record<string, unknown> | null;
+  patologica: Record<string, unknown> | null;
+  farmacologica: Record<string, unknown> | null;
+  estetica: Record<string, unknown> | null;
+  note_libere: string | null;
+}): string {
+  const parts: string[] = [];
+
+  function fmtVal(v: unknown): string | null {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "boolean") return v ? "Sì" : "No";
+    if (typeof v === "number") return String(v);
+    if (typeof v === "string") return v;
+    return null;
+  }
+
+  function dumpSection(titolo: string, obj: Record<string, unknown> | null) {
+    if (!obj) return;
+    const righe: string[] = [];
+    for (const [k, v] of Object.entries(obj)) {
+      const val = fmtVal(v);
+      if (val === null) continue;
+      // skip valori "false" booleani per non riempire di "No"
+      if (typeof v === "boolean" && v === false) continue;
+      const label = k.replace(/_/g, " ");
+      righe.push(`  • ${label}: ${val}`);
+    }
+    if (righe.length > 0) {
+      parts.push(`${titolo}:\n${righe.join("\n")}`);
+    }
+  }
+
+  dumpSection("Generale", row.generale);
+  dumpSection("Patologica", row.patologica);
+  dumpSection("Farmacologica", row.farmacologica);
+  dumpSection("Estetica", row.estetica);
+  if (row.note_libere && row.note_libere.trim()) {
+    parts.push(`Note libere:\n  ${row.note_libere.trim()}`);
+  }
+
+  if (parts.length === 0) {
+    return "Nessuna informazione anamnestica significativa registrata.";
+  }
+  return "RIASSUNTO ANAMNESI\n\n" + parts.join("\n\n");
 }
 
 /**

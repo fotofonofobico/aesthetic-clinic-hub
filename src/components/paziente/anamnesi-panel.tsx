@@ -38,6 +38,8 @@ import {
 import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
+import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 
 type ReactNode = React.ReactNode;
 
@@ -110,6 +112,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [draftPdfBlob, setDraftPdfBlob] = React.useState<Blob | null>(null);
   const [draftPdfOpen, setDraftPdfOpen] = React.useState(false);
   const [annullando, setAnnullando] = React.useState(false);
+  // Sessione firma visita unificata (consensi GDPR/uso immagini + anamnesi)
+  const [visitaSession, setVisitaSession] = React.useState<SignatureSession | null>(null);
+  const [visitaOpen, setVisitaOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
@@ -374,13 +379,20 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     onSaved();
   }
 
-  function openSignDialog() {
+  async function openSignDialog() {
     if (!data) return;
     if (data.stato === "signed") {
       toast.info("Già firmata. Modifica un campo per creare una nuova versione.");
       return;
     }
-    setSignDlgOpen(true);
+    // Avvia sessione visita unificata: anamnesi + eventuali consensi GDPR/uso immagini
+    const session = await buildVisitaSession(pazienteId);
+    if (!session) {
+      toast.success("Tutto in regola: nessuna firma necessaria");
+      return;
+    }
+    setVisitaSession(session);
+    setVisitaOpen(true);
   }
 
   function confermaFirma() {
@@ -549,7 +561,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                   {annullando ? "Annullamento…" : `Annulla modifiche (torna a v${lastSigned.versione_numero})`}
                 </Button>
               )}
-              <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
+              <Button size="sm" onClick={() => void openSignDialog()} disabled={signing || forking}>
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
               </Button>
@@ -592,6 +604,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         blob={draftPdfBlob}
         title="Bozza anamnesi"
         filename="bozza-anamnesi.pdf"
+      />
+
+      <SignatureSessionDialog
+        open={visitaOpen}
+        session={visitaSession}
+        onClose={() => setVisitaOpen(false)}
+        onCompleted={() => {
+          setVisitaOpen(false);
+          void load();
+          onSaved();
+        }}
       />
 
       {/* === 1. GENERALE === */}
@@ -957,7 +980,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
               : "Salva bozza"}
         </Button>
         {!isSigned && (
-          <Button onClick={openSignDialog} disabled={signing || forking}>
+          <Button onClick={() => void openSignDialog()} disabled={signing || forking}>
             <FileSignature className="h-4 w-4" />
             {signing ? "Firma…" : "Firma e blocca"}
           </Button>

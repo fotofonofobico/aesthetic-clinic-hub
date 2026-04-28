@@ -98,13 +98,19 @@ function formatDateIT(d: Date) {
 }
 
 // ---------- riga form ----------
+type ProdottoForm = { uid: string; prodotto_id: string; quantita: number };
+
 type RigaForm = {
   uid: string;
   voceId?: string; // presente se esistente (modifica)
   trattamento_id: string;
   numero_sedute: number;
   numero_sedute_min: number; // sedute già completate (vincolo)
-  prodotti: { uid: string; prodotto_id: string; quantita: number }[];
+  prodotti: ProdottoForm[]; // lista "default" applicata se non personalizzato
+  /** Se true, ogni seduta ha la propria lista in prodottiPerSeduta */
+  personalizzaPerSeduta: boolean;
+  /** length === numero_sedute quando personalizzaPerSeduta = true */
+  prodottiPerSeduta: ProdottoForm[][];
   zone: string[];
   zoneDraft: string;
   consensoOk: boolean | null;
@@ -119,12 +125,39 @@ function newRiga(): RigaForm {
     numero_sedute: 1,
     numero_sedute_min: 0,
     prodotti: [],
+    personalizzaPerSeduta: false,
+    prodottiPerSeduta: [],
     zone: [],
     zoneDraft: "",
     consensoOk: null,
     consensoLoading: false,
     consensoMotivi: [],
   };
+}
+
+/** Allinea l'array prodottiPerSeduta al numero di sedute (estende/tronca). */
+function allineaProdottiPerSeduta(
+  current: ProdottoForm[][],
+  n: number,
+  fallback: ProdottoForm[],
+): ProdottoForm[][] {
+  const next: ProdottoForm[][] = [];
+  for (let i = 0; i < n; i++) {
+    const existing = current[i];
+    if (existing) {
+      next.push(existing.map((p) => ({ ...p, uid: p.uid || uid() })));
+    } else {
+      // nuova seduta: clona fallback come punto di partenza
+      next.push(
+        fallback.map((p) => ({
+          uid: uid(),
+          prodotto_id: p.prodotto_id,
+          quantita: p.quantita,
+        })),
+      );
+    }
+  }
+  return next;
 }
 
 // ---------- consenso per voce piano (lazy) ----------
@@ -357,6 +390,21 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       const completate = sedute.filter(
         (s) => s.voce_id === v.id && s.completata,
       ).length;
+      // Ricostruisci eventuale personalizzazione per-seduta dal jsonb
+      const rawPps = (v as unknown as { prodotti_per_seduta?: unknown })
+        .prodotti_per_seduta;
+      const pps: ProdottoForm[][] = Array.isArray(rawPps)
+        ? (rawPps as unknown[]).map((arr) =>
+            Array.isArray(arr)
+              ? parseProdotti(arr).map((p) => ({
+                  uid: uid(),
+                  prodotto_id: p.prodotto_id ?? "",
+                  quantita: p.quantita,
+                }))
+              : [],
+          )
+        : [];
+      const personalizzata = pps.length > 0;
       return {
         uid: uid(),
         voceId: v.id,
@@ -368,6 +416,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           prodotto_id: p.prodotto_id ?? "",
           quantita: p.quantita,
         })),
+        personalizzaPerSeduta: personalizzata,
+        prodottiPerSeduta: personalizzata
+          ? allineaProdottiPerSeduta(pps, v.numero_sedute, [])
+          : [],
         zone: [...v.zone],
         zoneDraft: "",
         consensoOk: null,
@@ -1241,13 +1293,25 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                         value={p.stato}
                         onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
                       >
-                        <SelectTrigger className="h-8 w-36">
+                        <SelectTrigger
+                          className="h-8 w-36"
+                          title={
+                            p.stato === "completato"
+                              ? "Stato impostato automaticamente al termine di tutte le sedute"
+                              : undefined
+                          }
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="attivo">Attivo</SelectItem>
                           <SelectItem value="sospeso">Sospeso</SelectItem>
                           <SelectItem value="annullato">Annullato</SelectItem>
+                          {p.stato === "completato" && (
+                            <SelectItem value="completato" disabled>
+                              Completato (auto)
+                            </SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

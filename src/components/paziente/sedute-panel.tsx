@@ -274,7 +274,7 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
       return;
     }
     setFirmaSession(session);
-    setPendingExecAfterFirma(s);
+    setPendingExecAfterFirma(null);
     setFirmaOpen(true);
   }
 
@@ -458,10 +458,11 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
         }}
         onCompleted={() => {
           setFirmaOpen(false);
-          const s = pendingExecAfterFirma;
           setPendingExecAfterFirma(null);
           void load();
-          if (s) setEseguiSeduta(s);
+          toast.success(
+            "Consenso firmato. Puoi registrare la seduta quando vuoi.",
+          );
         }}
       />
     </div>

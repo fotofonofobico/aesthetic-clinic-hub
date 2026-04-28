@@ -228,7 +228,7 @@ function PazienteDetailPage() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={avviaFirmaVisita}>
             <FileSignature className="h-4 w-4" />
-            Firma visita
+            Firma visita & anamnesi
           </Button>
           <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load({ silent: true })} />
           <Button

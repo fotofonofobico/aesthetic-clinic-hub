@@ -255,7 +255,11 @@ function TemplateDialog({
   const [tipoUI, setTipoUI] = useState<TipoUI>(initialMap.tipo);
   const [modValidita, setModValidita] = useState<ModValidita>(initialMap.mod);
   const [cicloDurataTipo, setCicloDurataTipo] = useState<"mesi" | "sedute">(
-    editing?.durata_tipo === "sedute" ? "sedute" : "mesi",
+    editing
+      ? editing.durata_tipo === "sedute"
+        ? "sedute"
+        : "mesi"
+      : "sedute",
   );
   const [cicloDurata, setCicloDurata] = useState<string>(
     editing?.categoria === "trattamento_ciclo"
@@ -264,7 +268,7 @@ function TemplateDialog({
             ? editing.durata_sedute ?? 3
             : editing.validita_mesi ?? 12,
         )
-      : "12",
+      : "3",
   );
   const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
   const [trattamentoId, setTrattamentoId] = useState<string>(
@@ -285,7 +289,13 @@ function TemplateDialog({
     setVersione(editing?.versione ?? "1.0");
     setTipoUI(map.tipo);
     setModValidita(map.mod);
-    setCicloDurataTipo(editing?.durata_tipo === "sedute" ? "sedute" : "mesi");
+    setCicloDurataTipo(
+      editing
+        ? editing.durata_tipo === "sedute"
+          ? "sedute"
+          : "mesi"
+        : "sedute",
+    );
     setCicloDurata(
       editing?.categoria === "trattamento_ciclo"
         ? String(
@@ -293,7 +303,7 @@ function TemplateDialog({
               ? editing.durata_sedute ?? 3
               : editing.validita_mesi ?? 12,
           )
-        : "12",
+        : "3",
     );
     setDescrizione(editing?.descrizione ?? "");
     setTrattamentoId(editing?.trattamento_id ?? "");
@@ -301,12 +311,28 @@ function TemplateDialog({
   }, [editing]);
 
   // Auto-titolo se l'utente non l'ha modificato manualmente
-  const trattamentoNome = trattamenti.find((t) => t.id === trattamentoId)?.nome ?? null;
+  const trattamentoSelezionato = trattamenti.find((t) => t.id === trattamentoId) ?? null;
+  const trattamentoNome = trattamentoSelezionato?.nome ?? null;
   React.useEffect(() => {
     if (titoloDirty) return;
     const auto = titoloAuto(tipoUI, trattamentoNome);
     if (auto) setTitolo(auto);
   }, [tipoUI, trattamentoNome, titoloDirty]);
+
+  // Auto-precompila durata sedute quando si seleziona un trattamento ciclo
+  // (solo in creazione, non in modifica di un template esistente)
+  React.useEffect(() => {
+    if (editing) return;
+    if (tipoUI !== "trattamento") return;
+    if (modValidita !== "ciclo") return;
+    if (cicloDurataTipo !== "sedute") return;
+    if (!trattamentoSelezionato) return;
+    const n = trattamentoSelezionato.durata_ciclo_valore;
+    if (typeof n === "number" && n > 0) {
+      setCicloDurata(String(n));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trattamentoId, tipoUI, modValidita, cicloDurataTipo]);
 
   function changeTipo(t: TipoUI) {
     setTipoUI(t);
