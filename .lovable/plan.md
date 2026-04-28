@@ -1,75 +1,194 @@
-## Fix Piani: prezzo per ciclo, riassunto voce, totale paziente, alert consenso globale
 
-### 1. Bug calcolo prezzo (root cause)
+# Sezione "Sedute" - esecuzione clinica reale
 
-`src/lib/piano-prezzo.ts → calcolaTotaleRighe` fa sempre `prezzo_indicativo * numero_sedute`. Per i trattamenti con `tipo = "ciclo"`, il `prezzo_indicativo` rappresenta già il prezzo dell'**intero ciclo** (es. Biostimolazione viso 3 sedute = 750 €), quindi va contato **una sola volta**, non moltiplicato per le sedute.
+## Decisioni recepite
 
-Nuova regola di pricing:
-- `tipo === "ciclo"` → `prezzo_riga = prezzo_indicativo` (il numero di sedute è informativo, il prezzo del ciclo è fisso)
-- `tipo === "singolo"` (o null) → `prezzo_riga = prezzo_indicativo * numero_sedute` (comportamento attuale)
-- prezzo nullo → 0 + warning inline come oggi
+- **Date**: opzionali in fase di piano, modificabili nella sezione Sedute
+- **Sedute spot**: ammesse, senza piano (richiede migrazione: `seduta.piano_id` nullable)
+- **Modifica post-firma**: libera entro 48h da chi l'ha eseguita; oltre 48h serve ruolo medico + motivo obbligatorio + audit completo
+- **Data retroattiva**: possibile inserire data di esecuzione passata, ma il sistema registra anche data di inserimento reale
+- **Diario**: ogni seduta completata genera automaticamente una voce nel diario (`paziente_nota` tipo `clinica`), aggiornata se la seduta viene modificata
 
-Modifiche in `src/lib/piano-prezzo.ts`:
-- `calcolaTotaleRighe(righe, trattamenti)` → applica la regola sopra
-- nuova funzione esportata `prezzoRiga(trattamento, numeroSedute): number` riusabile in UI
+## 1. Modifiche database
 
-### 2. Riassunto prezzo per voce (vista piano espansa)
-
-In `src/components/paziente/piani-panel.tsx`, dentro il render di ogni `voce` (sezione `{voci.map((v) => …)}`, ~riga 1232), aggiungere accanto al nome trattamento un piccolo blocco prezzo:
+### Migrazione schema (`seduta`)
 
 ```text
-[Trattamento]  [badge consenso]                    € 750,00 · 3 sedute
+ALTER TABLE seduta:
+  - piano_id DROP NOT NULL                       (sedute spot)
+  - data_esecuzione_effettiva timestamptz NULL   (quando il trattamento è stato fatto davvero)
+  - data_registrazione timestamptz DEFAULT now() (quando l'operatore l'ha inserita nel sistema)
+  - firmata_il timestamptz NULL                  (timestamp del "completata = true")
+  - firmata_da uuid NULL                         (operatore che ha firmato)
+  - bloccata boolean DEFAULT false               (true dopo 48h dalla firma)
+  - nota_diario_id uuid NULL                     (FK logica a paziente_nota auto-generata)
+  - trattamento_id valorizzato anche per spot
 ```
 
-Il prezzo mostrato per voce è `prezzoRiga(trattamento, v.numero_sedute)` calcolato lato client dal `prezzo_indicativo` corrente (i piani non hanno il prezzo per voce salvato in DB — `prezzo_unitario`/`prezzo_riga` esistono ma sono sempre 0). Mostriamo SEMPRE il prezzo derivato live dal trattamento.
+`data_seduta` resta come "data programmata/prevista". `data_esecuzione_effettiva` è la data clinica reale (può essere nel passato).
 
-Sotto la lista voci, aggiungere un riepilogo del piano:
-- "Totale base: €X"
-- se `sconto_tipo !== 'nessuno' && sconto_valore > 0`: "Sconto: − €Y (10% / fisso)"
-- "Totale finale: €Z" (in evidenza)
-
-Lo sconto viene letto da `p.sconto_tipo` / `p.sconto_valore`; il finale viene ricalcolato live (più affidabile del `prezzo_finale` salvato, in caso il prezzo del trattamento cambi).
-
-L'header del piano collassato continua a mostrare `prezzo_finale` salvato (sintesi rapida).
-
-### 3. Totale generale speso dal paziente
-
-Sopra la lista piani in `PianiPanel`, aggiungere una piccola card riassuntiva:
+### Nuova tabella audit `seduta_modifica`
 
 ```text
-Totale piani paziente: € 2.450,00       Attivi: 2 · Completati: 1
+seduta_modifica:
+  id uuid PK
+  seduta_id uuid NOT NULL
+  modificata_da uuid NOT NULL
+  modificata_il timestamptz DEFAULT now()
+  campo text NOT NULL              (es. "note_cliniche", "prodotti_previsti")
+  valore_precedente jsonb
+  valore_nuovo jsonb
+  motivo text NOT NULL             (obbligatorio per modifiche oltre 48h)
+  oltre_48h boolean DEFAULT false
 ```
 
-Calcolo: somma `prezzo_finale` (fallback `prezzo_totale`) su tutti i piani con `stato !== 'annullato'`. Visualizzata solo se ci sono piani.
+RLS: insert da operatori attivi, select da operatori attivi, no update/delete (immutabile).
 
-### 4. Alert consenso globale (in alto, accanto ad allergie)
+### Trigger DB
 
-Estendere `CriticalBanner` in `src/routes/_authenticated/pazienti.$id.tsx`:
-- caricare in `load()` una nuova query: tutti i piani **non annullati** del paziente con relative voci, calcolando per ogni voce `puoEseguireTrattamento`. Per evitare un fan-out di chiamate, aggregare i `trattamento_id` distinti delle voci di piani attivi/sospesi e chiamare `puoEseguireTrattamento` una volta per ciascuno (cache locale). Risultato: lista di nomi trattamenti senza consenso valido.
-- se la lista non è vuota, aggiungere un nuovo banner DISTINTO da quello critico allergie/flag, con icona e colori diversi:
+- **`seduta_blocca_dopo_48h`**: trigger BEFORE UPDATE che, se `firmata_il` è più vecchio di 48h e l'utente non è medico, blocca le modifiche se `motivo` non è fornito (passato via session var o gestito lato app).
+- **`seduta_sync_diario`**: AFTER INSERT/UPDATE quando `completata = true` → upsert in `paziente_nota` con riassunto strutturato; salva l'id in `seduta.nota_diario_id`. AFTER UPDATE quando `completata` torna false → marca la nota come "annullata" o la elimina.
+- Trigger `piano_auto_stato` esistente continua a funzionare.
+
+## 2. UI - nuovo tab "Sedute"
+
+Aggiunto nella scheda paziente accanto a Diario / Piani / Anamnesi / Consensi.
+
+### Layout principale (`src/components/paziente/sedute-panel.tsx`)
 
 ```text
-[FileSignature icon] Consensi mancanti — banner ambra/warning
-"Il piano include 2 trattamenti senza consenso firmato:
-Botox glabella, Biostimolazione viso. Firma prima di iniziare."
+[ Card riepilogo                                              ]
+[ Programmate: 5 · Eseguite: 12 · In ritardo: 1               ]
+[                                       [+ Nuova seduta spot] ]
+
+[ Filtri: Tutte | Programmate | Eseguite | Per piano ▾        ]
+
+╔══ PROGRAMMATE ═════════════════════════════════════════════╗
+║ ⚠ Botox glabella · Piano "Ringiovanimento viso"           ║
+║   Prevista: 15 mag 2026 · zone: glabella, fronte           ║
+║   Prodotti previsti: Botox 50U · Consenso ✓                ║
+║   [Sposta data] [Esegui ora] [Annulla]                    ║
+╠════════════════════════════════════════════════════════════╣
+║ ⚠ Biostimolazione viso (2/3) · Consenso MANCANTE          ║
+║   [Firma consenso] [Sposta data] [Esegui ora]             ║
+╚════════════════════════════════════════════════════════════╝
+
+╔══ ESEGUITE ════════════════════════════════════════════════╗
+║ ✓ Filler labbra · 12 apr 2026 (registrata 13 apr)         ║
+║   Operatore: Dr. Rossi · zone: labbro sup/inf              ║
+║   Prodotti: Juvederm Volift 1ml                            ║
+║   [Vedi dettagli] [Modifica] (entro 48h)                   ║
+╚════════════════════════════════════════════════════════════╝
 ```
 
-Stile: `border-warning/40 bg-warning/10` con icona `FileSignature` (lucide) per distinguerlo visivamente dal banner allergie (`ShieldAlert` rosso). Posizione: dopo il banner critici, prima del banner blocchi consensi access-guard (che è più generico).
+### Dialog "Esegui seduta" (`src/components/paziente/sedute/esegui-seduta-dialog.tsx`)
 
-NB: il banner "Avvisi consensi" già esistente proviene da `access-guard` ed è basato sull'anamnesi/consensi generali; il nuovo è specificamente "questo paziente ha PIANI con voci senza consenso firmato". Sono complementari.
+```text
+┌─ Esegui seduta · Botox glabella ──────────────────────┐
+│ ⚠ Consenso mancante  [Firma ora]  (blocca salvataggio)│
+│                                                        │
+│ Data esecuzione *  [15/05/2026 ▾] (default: oggi)     │
+│ ℹ Inserisci data passata se stai registrando a poste- │
+│   riori. Sistema registrerà anche data di inserimento.│
+│                                                        │
+│ Operatore *        [Dr. Rossi ▾]                       │
+│ Durata (min)       [30]                                │
+│                                                        │
+│ Zone trattate                                          │
+│ Previste: glabella, fronte                             │
+│ [chip: glabella ✓] [chip: fronte ✓] [+ aggiungi]      │
+│                                                        │
+│ Prodotti utilizzati                                    │
+│ ┌────────────────────────────────────────┐            │
+│ │ Botox     [- 1 +]   lotto: [____]      │            │
+│ │ [+ aggiungi prodotto]                   │            │
+│ └────────────────────────────────────────┘            │
+│                                                        │
+│ Parametri tecnici (opzionale)                          │
+│ [textarea libero]                                      │
+│                                                        │
+│ Note cliniche                                          │
+│ [textarea]                                             │
+│                                                        │
+│ ☑ Aggiungi voce automatica al diario                  │
+│                                                        │
+│        [Annulla]  [Salva bozza]  [Firma e completa]   │
+└────────────────────────────────────────────────────────┘
+```
 
-### 5. File toccati
+### Dialog "Modifica seduta firmata"
 
-- `src/lib/piano-prezzo.ts` — fix `calcolaTotaleRighe`, export nuova `prezzoRiga`
-- `src/components/paziente/piani-panel.tsx` — riassunto prezzo per voce + riepilogo piano + card totale paziente
-- `src/routes/_authenticated/pazienti.$id.tsx` — caricamento voci piani + computazione consensi mancanti + nuovo banner in `CriticalBanner`
+Se `firmata_il < 48h` e utente è chi ha firmato → form normale, ogni campo cambiato salva entry in `seduta_modifica`.
 
-### 6. Nessuna migrazione DB
+Se `firmata_il > 48h` o utente diverso:
+- Solo medici possono procedere
+- Campo **"Motivo della modifica" obbligatorio**
+- Banner rosso: "Questa modifica verrà registrata permanentemente nell'audit"
+- Ogni delta salva entry in `seduta_modifica` con `oltre_48h = true`
 
-Non servono modifiche schema. I piani esistenti continuano a funzionare; il prezzo viene ricalcolato live dal `prezzo_indicativo` corrente del trattamento (piani vecchi salvati con il bug mostreranno comunque il valore corretto in vista perché ricalcolato).
+### Dialog "Nuova seduta spot"
 
-Eventuale ricalcolo retroattivo del campo `prezzo_finale` salvato nei piani esistenti: opzionale, da fare solo su esplicita richiesta (lasciamo i valori in DB invariati).
+Form rapido: trattamento, data esecuzione, operatore, zone, prodotti, note, consenso. Crea seduta con `piano_id = NULL`.
 
-### 7. Domanda aperta
+### Card "Sposta data"
 
-Per i trattamenti `tipo = "ciclo"` con `numero_sedute` MODIFICATO rispetto a `durata_ciclo_valore` (es. ciclo standard 3 sedute, paziente vuole 5): manteniamo prezzo_indicativo fisso? Proposta: sì, fisso = prezzo del ciclo a prescindere da quante sedute si pianificano. Se in futuro serve "prezzo per seduta extra" lo aggiungeremo come campo separato sul trattamento. Procedo con questa assunzione salvo diversa indicazione.
+Mini-popover con date picker per modificare `data_seduta` (data prevista) di una seduta non ancora completata. Disabilitato per sedute già firmate.
+
+## 3. Diario automatico
+
+Ogni seduta completata genera/aggiorna una `paziente_nota` con questo formato:
+
+```text
+[Data esecuzione - Trattamento]
+Operatore: Dr. X
+Zone: glabella, fronte
+Prodotti: Botox 50U
+Durata: 30 min
+Note cliniche: <testo>
+
+(registrata il <data_registrazione> se diversa da data esecuzione)
+```
+
+Tipo nota = `clinica`. La nota porta un riferimento alla seduta (campo `seduta_id` da aggiungere a `paziente_nota` via migrazione, nullable).
+
+Nel diario panel, le note auto-generate hanno un badge "🩺 Seduta" e sono cliccabili per aprire il dettaglio della seduta. Non sono modificabili direttamente (si modifica la seduta).
+
+## 4. Banner globali (estensione esistente)
+
+In `src/routes/_authenticated/pazienti.$id.tsx` aggiungo al `CriticalBanner`:
+
+- **Sedute in ritardo**: rosso, se ci sono sedute programmate con `data_seduta < oggi - 7gg` e non completate
+- **Sedute oggi senza consenso**: rosso, se ci sono sedute previste oggi con consenso mancante
+
+Il banner consenso esistente resta come è.
+
+## 5. File da creare/modificare
+
+**Nuovi:**
+- `supabase/migrations/<ts>_sedute_esecuzione.sql` - schema seduta + tabella audit + trigger
+- `src/components/paziente/sedute-panel.tsx` - tab principale
+- `src/components/paziente/sedute/esegui-seduta-dialog.tsx` - dialog esecuzione
+- `src/components/paziente/sedute/modifica-seduta-dialog.tsx` - dialog modifica con audit
+- `src/components/paziente/sedute/nuova-seduta-spot-dialog.tsx` - seduta libera
+- `src/components/paziente/sedute/sposta-data-popover.tsx` - reschedule
+- `src/components/paziente/sedute/seduta-card.tsx` - card riusabile
+- `src/lib/seduta-helpers.ts` - util (puoModificare, formatRiassuntoDiario, etc.)
+- `src/types/seduta.ts` - tipi estesi
+
+**Modificati:**
+- `src/routes/_authenticated/pazienti.$id.tsx` - nuovo tab + banner sedute in ritardo
+- `src/components/paziente/diario-panel.tsx` - badge "Seduta" per note auto-generate
+- `src/integrations/supabase/types.ts` - rigenerato dalle migrazioni
+- `src/types/trattamenti.ts` - aggiornare interfaccia `Seduta`
+
+## 6. Cosa NON faccio in questo turno
+
+- Calendario visuale completo (vista mese/settimana) - per ora solo lista cronologica con date editabili
+- Promemoria via email/SMS - servirà cron job dopo
+- Magazzino prodotti (scarico automatico lotti) - quando faremo magazzino
+- Followup post-seduta strutturato - tabella `followup` esiste ma resta scollegata fino a un turno dedicato
+- Firma digitale del paziente sulla seduta - per ora "firma" = operatore conferma esecuzione
+
+## Punto da confermare
+
+Sul **diario automatico** non hai risposto direttamente, ma dal tuo commento finale assumo: **scrittura automatica sempre, con riga nel diario non modificabile direttamente** (si modifica la seduta, la nota si aggiorna). Se preferisci la versione con checkbox opzionale "Aggiungi voce diario" prima di salvare, dimmelo prima dell'approvazione.
