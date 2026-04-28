@@ -1028,12 +1028,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           step={1}
                           value={r.numero_sedute}
                           onChange={(e) =>
-                            patchRiga(r.uid, {
-                              numero_sedute: Math.max(
-                                Math.max(1, r.numero_sedute_min),
-                                Math.floor(Number(e.target.value) || 1),
-                              ),
-                            })
+                            setNumeroSedute(r.uid, Number(e.target.value))
                           }
                         />
                         {r.numero_sedute_min > 0 && (
