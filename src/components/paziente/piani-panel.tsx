@@ -1063,76 +1063,177 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                       </div>
                     </div>
 
-                    {/* Prodotti previsti per singola seduta */}
+                    {/* Prodotti previsti */}
                     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
                           <Package className="h-3 w-3" />
-                          Prodotti per seduta (× {r.numero_sedute} sedute)
+                          {r.personalizzaPerSeduta
+                            ? `Prodotti per ciascuna seduta (${r.numero_sedute})`
+                            : `Prodotti per seduta (× ${r.numero_sedute} sedute)`}
                         </Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => aggiungiProdotto(r.uid)}
-                        >
-                          <Plus className="h-3 w-3" />
-                          Aggiungi
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Label
+                            htmlFor={`pers-${r.uid}`}
+                            className="text-[11px] text-muted-foreground"
+                          >
+                            Personalizza per seduta
+                          </Label>
+                          <Switch
+                            id={`pers-${r.uid}`}
+                            checked={r.personalizzaPerSeduta}
+                            onCheckedChange={(v) => togglePersonalizza(r.uid, v)}
+                            disabled={r.numero_sedute < 2}
+                          />
+                        </div>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Le quantità qui sotto si riferiscono a <strong>una singola seduta</strong>. Verranno
-                        replicate su ogni seduta del ciclo.
+                        {r.personalizzaPerSeduta
+                          ? "Definisci prodotti diversi per ciascuna seduta del ciclo (es. concentrazioni crescenti)."
+                          : "Le quantità qui sotto si riferiscono a una singola seduta e verranno replicate su ogni seduta del ciclo."}
                       </p>
 
-                      {r.prodotti.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          Nessun prodotto previsto.
-                        </p>
+                      {!r.personalizzaPerSeduta ? (
+                        <>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => aggiungiProdotto(r.uid)}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Aggiungi prodotto
+                            </Button>
+                          </div>
+                          {r.prodotti.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Nessun prodotto previsto.
+                            </p>
+                          ) : (
+                            <div className="space-y-1">
+                              {r.prodotti.map((p) => (
+                                <div key={p.uid} className="flex items-center gap-2">
+                                  <Select
+                                    value={p.prodotto_id || undefined}
+                                    onValueChange={(v) =>
+                                      patchProdotto(r.uid, p.uid, { prodotto_id: v })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 flex-1 text-xs">
+                                      <SelectValue placeholder="Seleziona prodotto…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {PRODOTTI_DEMO.map((prod) => (
+                                        <SelectItem key={prod.id} value={prod.id}>
+                                          {prod.nome}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    type="number"
+                                    step={1}
+                                    min={1}
+                                    className="h-8 w-20 text-xs"
+                                    value={p.quantita}
+                                    onChange={(e) =>
+                                      patchProdotto(r.uid, p.uid, {
+                                        quantita: Math.max(
+                                          1,
+                                          Math.floor(Number(e.target.value) || 1),
+                                        ),
+                                      })
+                                    }
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => rimuoviProdotto(r.uid, p.uid)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <div className="space-y-1">
-                          {r.prodotti.map((p) => (
-                            <div key={p.uid} className="flex items-center gap-2">
-                              <Select
-                                value={p.prodotto_id || undefined}
-                                onValueChange={(v) =>
-                                  patchProdotto(r.uid, p.uid, { prodotto_id: v })
-                                }
-                              >
-                                <SelectTrigger className="h-8 flex-1 text-xs">
-                                  <SelectValue placeholder="Seleziona prodotto…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {PRODOTTI_DEMO.map((prod) => (
-                                    <SelectItem key={prod.id} value={prod.id}>
-                                      {prod.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                type="number"
-                                step={1}
-                                min={1}
-                                className="h-8 w-20 text-xs"
-                                value={p.quantita}
-                                onChange={(e) =>
-                                  patchProdotto(r.uid, p.uid, {
-                                    quantita: Math.max(
-                                      1,
-                                      Math.floor(Number(e.target.value) || 1),
-                                    ),
-                                  })
-                                }
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => rimuoviProdotto(r.uid, p.uid)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                        <div className="space-y-3">
+                          {r.prodottiPerSeduta.map((arr, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-1 rounded-md border border-border/60 bg-background p-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Seduta {idx + 1}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => aggiungiProdottoSeduta(r.uid, idx)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Aggiungi
+                                </Button>
+                              </div>
+                              {arr.length === 0 ? (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Nessun prodotto.
+                                </p>
+                              ) : (
+                                arr.map((p) => (
+                                  <div key={p.uid} className="flex items-center gap-2">
+                                    <Select
+                                      value={p.prodotto_id || undefined}
+                                      onValueChange={(v) =>
+                                        patchProdottoSeduta(r.uid, idx, p.uid, {
+                                          prodotto_id: v,
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 flex-1 text-xs">
+                                        <SelectValue placeholder="Seleziona prodotto…" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {PRODOTTI_DEMO.map((prod) => (
+                                          <SelectItem key={prod.id} value={prod.id}>
+                                            {prod.nome}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      step={1}
+                                      min={1}
+                                      className="h-8 w-20 text-xs"
+                                      value={p.quantita}
+                                      onChange={(e) =>
+                                        patchProdottoSeduta(r.uid, idx, p.uid, {
+                                          quantita: Math.max(
+                                            1,
+                                            Math.floor(Number(e.target.value) || 1),
+                                          ),
+                                        })
+                                      }
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        rimuoviProdottoSeduta(r.uid, idx, p.uid)
+                                      }
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           ))}
                         </div>
