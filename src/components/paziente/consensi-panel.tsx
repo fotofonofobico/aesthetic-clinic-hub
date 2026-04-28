@@ -372,6 +372,10 @@ function NuovoConsensoDialog({
   const [esitoCartaceo, setEsitoCartaceo] = useState<"acconsento" | "non_acconsento">(
     "acconsento",
   );
+  // Esito tablet: nessuna preselezione, scelta esplicita richiesta
+  const [esitoTablet, setEsitoTablet] = useState<"acconsento" | "non_acconsento" | undefined>(
+    undefined,
+  );
   const sigRef = React.useRef<SignaturePadHandle>(null);
 
   const tpl = templates.find((t) => t.id === tplId) ?? null;
@@ -384,6 +388,7 @@ function NuovoConsensoDialog({
     setPdfFile(null);
     setDataFirmaCartaceo(new Date().toISOString().slice(0, 10));
     setEsitoCartaceo("acconsento");
+    setEsitoTablet(undefined);
     sigRef.current?.clear();
   }
 
