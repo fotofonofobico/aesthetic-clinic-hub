@@ -1138,3 +1138,72 @@ function FieldNote({
     </div>
   );
 }
+
+function CartaceoUploadDialog({
+  open,
+  onClose,
+  onConfirm,
+  saving,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (file: File, dataFirma: string) => Promise<boolean>;
+  saving: boolean;
+}) {
+  const [file, setFile] = React.useState<File | null>(null);
+  const [dataFirma, setDataFirma] = React.useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+  React.useEffect(() => {
+    if (!open) {
+      setFile(null);
+      setDataFirma(new Date().toISOString().slice(0, 10));
+    }
+  }, [open]);
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display">Carica anamnesi cartacea firmata</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-sm font-medium">PDF firmato *</p>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm"
+            />
+            {file && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-medium">Data firma *</p>
+            <input
+              type="date"
+              value={dataFirma}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDataFirma(e.target.value)}
+              className="block w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Annulla
+          </Button>
+          <Button
+            onClick={() => file && void onConfirm(file, dataFirma)}
+            disabled={!file || !dataFirma || saving}
+          >
+            {saving ? "Caricamento…" : "Conferma"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
