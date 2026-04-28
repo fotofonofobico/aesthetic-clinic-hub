@@ -87,7 +87,7 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
   }, [blob, onError, width]);
 
   return (
-    <div className={cn("relative h-full overflow-auto bg-muted", className)}>
+    <div data-pdf-print-pages className={cn("relative h-full overflow-auto bg-muted", className)}>
       <div ref={hostRef} className="min-h-full px-4 py-2" />
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted/80 text-sm text-muted-foreground">
