@@ -140,7 +140,7 @@ function PazienteDetailPage() {
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
-      <CriticalBanner flags={flags} alerts={alerts} />
+      <CriticalBanner flags={flags} alerts={alerts} access={access} />
 
       <Tabs defaultValue="diario" className="space-y-4">
         <TabsList>
