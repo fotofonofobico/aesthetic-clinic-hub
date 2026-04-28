@@ -78,23 +78,23 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       toast.error("Seleziona Acconsento o Non acconsento");
       return;
     }
+    // Firma del paziente SEMPRE obbligatoria (sia per acconsento sia per non_acconsento)
     let firmaPaz: string | null = null;
     let firmaMed: string | null = null;
-    if (scelta === "acconsento") {
-      const padPaz = sigPazRef.current;
-      if (!padPaz || padPaz.isEmpty()) {
-        toast.error("La firma del paziente è obbligatoria");
+    const padPaz = sigPazRef.current;
+    if (!padPaz || padPaz.isEmpty()) {
+      toast.error("La firma del paziente è obbligatoria");
+      return;
+    }
+    firmaPaz = padPaz.toDataURL();
+    // Firma medico richiesta solo se il template lo prevede
+    if (current.richiedeFirmaMedico) {
+      const padMed = sigMedRef.current;
+      if (!padMed || padMed.isEmpty()) {
+        toast.error("La firma del medico è obbligatoria per questo documento");
         return;
       }
-      firmaPaz = padPaz.toDataURL();
-      if (current.richiedeFirmaMedico) {
-        const padMed = sigMedRef.current;
-        if (!padMed || padMed.isEmpty()) {
-          toast.error("La firma del medico è obbligatoria per questo documento");
-          return;
-        }
-        firmaMed = padMed.toDataURL();
-      }
+      firmaMed = padMed.toDataURL();
     }
 
     const nextDocs = [...docs];
