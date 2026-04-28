@@ -27,7 +27,16 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature } from "lucide-react";
+import { Lock, FileSignature, History } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import { useRef } from "react";
 
 interface AnamnesiRow {
   id: string;
