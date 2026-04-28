@@ -752,25 +752,59 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           <Textarea
             rows={4}
             value={data.note_libere ?? ""}
-            onChange={(e) =>
-              setData((d) => (d ? { ...d, note_libere: e.target.value } : d))
-            }
+            onChange={(e) => void setNoteLibere(e.target.value)}
             placeholder="Annotazioni anamnestiche aggiuntive…"
           />
         </CardContent>
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button onClick={save} disabled={saving || isSigned} variant={isSigned ? "outline" : "default"}>
-          {saving ? "Salvataggio…" : isSigned ? "Anamnesi firmata (sola lettura)" : "Salva anamnesi"}
+        <Button onClick={save} disabled={saving || isSigned} variant="outline">
+          {saving ? "Salvataggio…" : isSigned ? "Firmata (modifica per nuova versione)" : "Salva bozza"}
         </Button>
         {!isSigned && (
-          <Button onClick={() => void firmaAnamnesi()} disabled={signing}>
+          <Button onClick={openSignDialog} disabled={signing || forking}>
             <FileSignature className="h-4 w-4" />
             {signing ? "Firma…" : "Firma e blocca"}
           </Button>
         )}
       </div>
+
+      {/* Dialog firma */}
+      <Dialog open={signDlgOpen} onOpenChange={setSignDlgOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Firma anamnesi v{data.versione_numero}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
+              <SignaturePad ref={sigPazRef} />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                Firma del medico <span className="text-muted-foreground">(opzionale)</span>
+              </p>
+              <SignaturePad ref={sigMedRef} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Firmando, il paziente conferma la veridicità delle informazioni. Il record diventerà
+              immutabile; modifiche future creeranno una nuova versione.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignDlgOpen(false)} disabled={signing}>
+              Annulla
+            </Button>
+            <Button onClick={confermaFirma} disabled={signing}>
+              <FileSignature className="h-4 w-4" />
+              {signing ? "Firma in corso…" : "Conferma e blocca"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cronologia */}
       <AnamnesiCronologia pazienteId={pazienteId} />
