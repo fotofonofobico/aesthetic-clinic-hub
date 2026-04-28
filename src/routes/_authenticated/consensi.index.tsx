@@ -96,7 +96,7 @@ function ConsensiPage() {
             <DialogTrigger asChild>
               <Button onClick={() => setEditing(null)}>
                 <Plus className="h-4 w-4" />
-                Nuovo modello
+                Nuovo template consenso
               </Button>
             </DialogTrigger>
             <TemplateDialog
