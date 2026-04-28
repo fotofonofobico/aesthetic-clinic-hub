@@ -750,6 +750,21 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     });
   }
 
+  // ---------- riepilogo paziente ----------
+  const totalePaziente = useMemo(() => {
+    let tot = 0;
+    let attivi = 0;
+    let completati = 0;
+    for (const p of piani) {
+      if (p.stato === "annullato") continue;
+      const v = typeof p.prezzo_finale === "number" ? p.prezzo_finale : (p.prezzo_totale ?? 0);
+      tot += Number(v) || 0;
+      if (p.stato === "attivo") attivi += 1;
+      else if (p.stato === "completato") completati += 1;
+    }
+    return { tot: Math.round(tot * 100) / 100, attivi, completati };
+  }, [piani]);
+
   // ---------- render ----------
   return (
     <div className="space-y-4">
@@ -765,6 +780,24 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           Nuovo piano
         </Button>
       </div>
+
+      {piani.length > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Totale piani paziente
+              </p>
+              <p className="font-display text-xl font-bold">
+                {formatEuro(totalePaziente.tot)}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Attivi: {totalePaziente.attivi} · Completati: {totalePaziente.completati}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog
         open={open}
