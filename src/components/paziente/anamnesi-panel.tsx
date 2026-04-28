@@ -112,6 +112,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [draftPdfBlob, setDraftPdfBlob] = React.useState<Blob | null>(null);
   const [draftPdfOpen, setDraftPdfOpen] = React.useState(false);
   const [annullando, setAnnullando] = React.useState(false);
+  // Sessione firma visita unificata (consensi GDPR/uso immagini + anamnesi)
+  const [visitaSession, setVisitaSession] = React.useState<SignatureSession | null>(null);
+  const [visitaOpen, setVisitaOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
