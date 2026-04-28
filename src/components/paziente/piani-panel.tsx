@@ -189,7 +189,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           (raw as { prodotti_previsti?: unknown }).prodotti_previsti,
         ),
       } as unknown as Seduta;
-      (sMap[s.piano_id] ??= []).push(s);
+      if (s.piano_id) (sMap[s.piano_id] ??= []).push(s);
     }
     setSedutePerPiano(sMap);
 
