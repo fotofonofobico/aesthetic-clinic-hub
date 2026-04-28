@@ -42,6 +42,7 @@ function PazienteDetailPage() {
   const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
+  const [access, setAccess] = useState<AccessEvaluation | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
