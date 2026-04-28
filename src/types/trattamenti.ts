@@ -132,6 +132,8 @@ export interface ConsensoStatoRow {
   stato: ConsensoStato;
 }
 
+export type ScontoTipo = "nessuno" | "euro" | "percento";
+
 export interface PianoTrattamento {
   id: string;
   paziente_id: string;
@@ -139,6 +141,9 @@ export interface PianoTrattamento {
   titolo: string;
   numero_sedute_previste: number;
   prezzo_totale: number | null;
+  prezzo_finale: number | null;
+  sconto_tipo: ScontoTipo;
+  sconto_valore: number;
   stato: PianoStato;
   note: string | null;
   created_at: string;
@@ -162,6 +167,7 @@ export interface PianoVoce {
   prezzo_riga: number;
   ordine: number;
   prodotti_previsti: ProdottoPrevisto[];
+  zone: string[];
   created_at: string;
 }
 
