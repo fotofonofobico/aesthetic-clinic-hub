@@ -261,10 +261,13 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       });
 
       const path = `${pazienteId}/${data.id}-v${data.versione_numero}.pdf`;
-      const { error: upErr } = await supabase.storage
+      const up = await supabase.storage
         .from("anamnesi-pdf")
         .upload(path, blob, { contentType: "application/pdf", upsert: true });
-      if (upErr) throw upErr;
+      if (up.error || !up.data?.path) {
+        console.error("[anamnesi-pdf upload] errore", up.error, "path:", path);
+        throw new Error(`Upload PDF anamnesi fallito: ${up.error?.message ?? "path vuoto"}`);
+      }
 
       const { error: updErr } = await supabase
         .from("anamnesi")
