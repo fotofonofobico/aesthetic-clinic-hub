@@ -764,18 +764,18 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
             .eq("id", r.voceId);
           if (error) throw error;
 
-          // aggiorna prodotti_previsti delle sedute non completate (ri-clona)
+          // aggiorna prodotti_previsti delle sedute non completate (per-seduta)
           const seduteVoce = sedute.filter((s) => s.voce_id === r.voceId);
           const completate = seduteVoce.filter((s) => s.completata);
           const programmate = seduteVoce.filter((s) => !s.completata);
-          const prodottiNuovi = (buildVocePayload(r, ordine).prodotti_previsti as unknown) as ProdottoPrevisto[];
 
-          // aggiorna prodotti su sedute future
+          // aggiorna prodotti su sedute future, in base al numero_seduta
           for (const s of programmate) {
+            const prodN = prodottiPerSedutaN(r, s.numero_seduta);
             await supabase
               .from("seduta")
               .update({
-                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+                prodotti_previsti: JSON.parse(JSON.stringify(prodN)),
                 trattamento_id: r.trattamento_id,
               } as never)
               .eq("id", s.id);
@@ -798,7 +798,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                 data_seduta: null,
                 operatore_id: user?.id,
                 completata: false,
-                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+                prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
               });
             }
             if (insertSed.length > 0) {
@@ -831,28 +831,22 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           const { data: vNew, error } = await supabase
             .from("piano_trattamento_voce")
             .insert({ piano_id: pianoId, ...buildVocePayload(r, ordine) } as never)
-            .select("id, trattamento_id, numero_sedute, prodotti_previsti")
+            .select("id")
             .single();
           if (error || !vNew) throw error ?? new Error("Errore creazione voce");
-          const v = vNew as {
-            id: string;
-            trattamento_id: string;
-            numero_sedute: number;
-            prodotti_previsti: unknown;
-          };
-          const prodotti = parseProdotti(v.prodotti_previsti);
+          const voceId = (vNew as { id: string }).id;
           const insertSed: Array<Record<string, unknown>> = [];
-          for (let n = 1; n <= v.numero_sedute; n++) {
+          for (let n = 1; n <= r.numero_sedute; n++) {
             insertSed.push({
               piano_id: pianoId,
               paziente_id: pazienteId,
-              trattamento_id: v.trattamento_id,
-              voce_id: v.id,
+              trattamento_id: r.trattamento_id,
+              voce_id: voceId,
               numero_seduta: n,
               data_seduta: null,
               operatore_id: user?.id,
               completata: false,
-              prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
+              prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
             });
           }
           if (insertSed.length > 0) {
