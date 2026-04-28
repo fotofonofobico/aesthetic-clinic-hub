@@ -1,1 +1,4 @@
 project_id = "hiroyuawcxkehicgrhar"
+
+[functions.share-consenso]
+verify_jwt = false
