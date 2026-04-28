@@ -197,11 +197,11 @@ function PazienteDetailPage() {
         onClose={() => setSessioneOpen(false)}
         onCompleted={() => {
           setSessioneOpen(false);
-          void load();
+          void load({ silent: true });
         }}
       />
 
-      <Tabs defaultValue="diario" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="diario">Diario</TabsTrigger>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
