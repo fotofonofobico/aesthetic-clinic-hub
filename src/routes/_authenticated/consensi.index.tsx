@@ -152,11 +152,15 @@ function ConsensiPage() {
                           {trat.nome}
                         </span>
                       )}
-                      {t.validita_mesi != null && (
+                      {t.durata_tipo === "sedute" && t.durata_sedute != null ? (
+                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] tracking-wide text-muted-foreground">
+                          Validità {t.durata_sedute} sedute
+                        </span>
+                      ) : t.validita_mesi != null ? (
                         <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] tracking-wide text-muted-foreground">
                           Validità {t.validita_mesi} mesi
                         </span>
-                      )}
+                      ) : null}
                       {!t.attivo && (
                         <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
                           Disattivato
@@ -250,12 +254,18 @@ function TemplateDialog({
   const [versione, setVersione] = useState(editing?.versione ?? "1.0");
   const [tipoUI, setTipoUI] = useState<TipoUI>(initialMap.tipo);
   const [modValidita, setModValidita] = useState<ModValidita>(initialMap.mod);
+  const [cicloDurataTipo, setCicloDurataTipo] = useState<"mesi" | "sedute">(
+    editing?.durata_tipo === "sedute" ? "sedute" : "mesi",
+  );
   const [cicloDurata, setCicloDurata] = useState<string>(
     editing?.categoria === "trattamento_ciclo"
-      ? String(editing.validita_mesi ?? 12)
+      ? String(
+          editing.durata_tipo === "sedute"
+            ? editing.durata_sedute ?? 3
+            : editing.validita_mesi ?? 12,
+        )
       : "12",
   );
-  const [cicloUnita, setCicloUnita] = useState<"giorni" | "mesi">("mesi");
   const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
   const [trattamentoId, setTrattamentoId] = useState<string>(
     editing?.trattamento_id ?? "",
@@ -275,12 +285,16 @@ function TemplateDialog({
     setVersione(editing?.versione ?? "1.0");
     setTipoUI(map.tipo);
     setModValidita(map.mod);
+    setCicloDurataTipo(editing?.durata_tipo === "sedute" ? "sedute" : "mesi");
     setCicloDurata(
       editing?.categoria === "trattamento_ciclo"
-        ? String(editing.validita_mesi ?? 12)
+        ? String(
+            editing.durata_tipo === "sedute"
+              ? editing.durata_sedute ?? 3
+              : editing.validita_mesi ?? 12,
+          )
         : "12",
     );
-    setCicloUnita("mesi");
     setDescrizione(editing?.descrizione ?? "");
     setTrattamentoId(editing?.trattamento_id ?? "");
     setLegacyAnamnesi(editing?.categoria === "anamnesi");
@@ -309,6 +323,8 @@ function TemplateDialog({
 
     let categoriaSalvata: ConsensoCategoria;
     let validitaMesiSalvata: number | null;
+    let duratSeduteSalvata: number | null = null;
+    let duratTipoSalvato: "mesi" | "sedute" = "mesi";
     let trattamentoIdSalvato: string | null = null;
 
     if (tipoUI === "trattamento") {
@@ -327,8 +343,14 @@ function TemplateDialog({
           return;
         }
         categoriaSalvata = "trattamento_ciclo";
-        validitaMesiSalvata =
-          cicloUnita === "mesi" ? Math.round(n) : Math.max(1, Math.ceil(n / 30));
+        if (cicloDurataTipo === "sedute") {
+          duratTipoSalvato = "sedute";
+          duratSeduteSalvata = Math.max(1, Math.round(n));
+          validitaMesiSalvata = null;
+        } else {
+          duratTipoSalvato = "mesi";
+          validitaMesiSalvata = Math.max(1, Math.round(n));
+        }
       }
     } else if (tipoUI === "gdpr") {
       categoriaSalvata = "gdpr";
@@ -348,6 +370,8 @@ function TemplateDialog({
       versione: versione.trim() || "1.0",
       categoria: categoriaSalvata,
       validita_mesi: validitaMesiSalvata,
+      durata_tipo: duratTipoSalvato,
+      durata_sedute: duratSeduteSalvata,
       descrizione: descrizione.trim() || null,
       trattamento_id: trattamentoIdSalvato,
     };
@@ -456,9 +480,13 @@ function TemplateDialog({
                   Validità legata alla singola seduta: serve un nuovo consenso ogni volta.
                 </p>
               ) : (
-                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_140px]">
+                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_160px]">
                   <div>
-                    <Label>Durata *</Label>
+                    <Label>
+                      {cicloDurataTipo === "sedute"
+                        ? "Numero sedute *"
+                        : "Durata (mesi) *"}
+                    </Label>
                     <Input
                       type="number"
                       min="1"
@@ -469,21 +497,24 @@ function TemplateDialog({
                   <div>
                     <Label>Unità</Label>
                     <Select
-                      value={cicloUnita}
-                      onValueChange={(v) => setCicloUnita(v as "giorni" | "mesi")}
+                      value={cicloDurataTipo}
+                      onValueChange={(v) =>
+                        setCicloDurataTipo(v as "mesi" | "sedute")
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="giorni">Giorni</SelectItem>
+                        <SelectItem value="sedute">Sedute</SelectItem>
                         <SelectItem value="mesi">Mesi</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <p className="text-[11px] text-muted-foreground md:col-span-2">
-                    La durata del ciclo viene salvata in mesi (i giorni vengono convertiti
-                    arrotondando per eccesso).
+                    {cicloDurataTipo === "sedute"
+                      ? "Il consenso resta valido finché non si raggiunge questo numero di sedute eseguite."
+                      : "Il consenso scade al termine del periodo indicato (in mesi) dalla data di firma."}
                   </p>
                 </div>
               )}

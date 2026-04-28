@@ -32,7 +32,6 @@ import {
   type TrattamentoCategoria,
   TRATTAMENTO_CATEGORIE,
   TRATTAMENTO_CATEGORIA_LABELS,
-  DURATA_UNITA_LABELS,
 } from "@/types/trattamenti";
 
 export const Route = createFileRoute("/_authenticated/trattamenti/")({
@@ -177,8 +176,7 @@ function TrattamentiPage() {
                       )}
                       {t.tipo === "ciclo" && (
                         <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] uppercase tracking-wide">
-                          Ciclo {t.durata_ciclo_valore}
-                          {t.durata_ciclo_unita ? ` ${t.durata_ciclo_unita}` : ""}
+                          Ciclo {t.durata_ciclo_valore ?? "?"} sedute
                         </span>
                       )}
                       {!t.attivo && (
@@ -251,9 +249,8 @@ function TrattamentoDialog({
   const [duratValore, setDuratValore] = useState<string>(
     editing?.durata_ciclo_valore?.toString() ?? "",
   );
-  const [duratUnita, setDuratUnita] = useState<DurataUnita | "">(
-    (editing?.durata_ciclo_unita as DurataUnita | null) ?? "",
-  );
+  // (Le precedenti unità mesi/settimane/giorni non sono più gestibili dalla UI:
+  //  per i nuovi cicli salviamo sempre l'unità "sedute".)
   const [categoria, setCategoria] = useState<TrattamentoCategoria | "">(
     (editing?.categoria as TrattamentoCategoria | null) ?? "",
   );
@@ -266,7 +263,6 @@ function TrattamentoDialog({
     setNome(editing?.nome ?? "");
     setTipo((editing?.tipo as TrattamentoTipo | null) ?? "");
     setDuratValore(editing?.durata_ciclo_valore?.toString() ?? "");
-    setDuratUnita((editing?.durata_ciclo_unita as DurataUnita | null) ?? "");
     setCategoria((editing?.categoria as TrattamentoCategoria | null) ?? "");
     setConsensoId(editing?.consenso_template_id ?? "");
     setDurata(editing?.durata_minuti?.toString() ?? "");
@@ -287,15 +283,11 @@ function TrattamentoDialog({
     if (tipo === "ciclo") {
       const n = Number(duratValore);
       if (!duratValore || !Number.isFinite(n) || n <= 0) {
-        toast.error("Inserisci la durata del ciclo");
-        return;
-      }
-      if (duratUnita !== "giorni" && duratUnita !== "settimane" && duratUnita !== "mesi") {
-        toast.error("Seleziona l'unità di durata");
+        toast.error("Inserisci il numero di sedute previste");
         return;
       }
       durValN = Math.floor(n);
-      durUnitN = duratUnita;
+      durUnitN = "sedute";
     }
     if (!categoria) {
       toast.error("Seleziona la categoria");
@@ -371,34 +363,19 @@ function TrattamentoDialog({
         </div>
 
         {tipo === "ciclo" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Durata ciclo *</Label>
-              <Input
-                type="number"
-                min="1"
-                value={duratValore}
-                onChange={(e) => setDuratValore(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Unità *</Label>
-              <Select
-                value={duratUnita}
-                onValueChange={(v) => setDuratUnita(v as DurataUnita)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(DURATA_UNITA_LABELS) as DurataUnita[]).map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {DURATA_UNITA_LABELS[u]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label>Numero sedute previste *</Label>
+            <Input
+              type="number"
+              min="1"
+              value={duratValore}
+              onChange={(e) => setDuratValore(e.target.value)}
+              placeholder="Es. 3"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento
+              di questo numero di sedute.
+            </p>
           </div>
         )}
 
@@ -494,9 +471,9 @@ function TrattamentoDialog({
             Il consenso sarà richiesto a ogni seduta.
           </p>
         )}
-        {tipo === "ciclo" && duratValore && duratUnita && (
+        {tipo === "ciclo" && duratValore && (
           <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
-            Il consenso sarà valido per {duratValore} {DURATA_UNITA_LABELS[duratUnita].toLowerCase()}.
+            Il consenso sarà valido per {duratValore} sedute (poi sarà richiesto un nuovo consenso).
           </p>
         )}
       </div>

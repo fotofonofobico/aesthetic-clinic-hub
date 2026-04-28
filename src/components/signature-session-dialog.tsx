@@ -382,6 +382,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
             versione_snapshot: doc.versione,
             categoria_snapshot: categoria,
             validita_mesi_snapshot: doc.validitaMesi,
+            durata_tipo_snapshot: doc.durataTipo,
+            durata_sedute_snapshot: doc.duratSedute,
+            sedute_max_snapshot:
+              doc.durataTipo === "sedute" ? doc.duratSedute : null,
             modalita_firma: "tablet",
             firma_immagine: doc.firmaPaziente ?? null,
             firma_medico_immagine: doc.firmaMedico ?? null,
