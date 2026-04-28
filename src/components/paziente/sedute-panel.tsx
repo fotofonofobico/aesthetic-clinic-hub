@@ -545,9 +545,13 @@ function SedutaCard({
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {seduta.completata ? `Eseguita: ${fmtData(dataEff)}` : `Prevista: ${fmtData(seduta.data_seduta)}`}
+              {seduta.completata
+                ? `Eseguita: ${dataEff ? fmtData(dataEff) : "—"}`
+                : seduta.data_seduta
+                  ? `Prevista: ${fmtData(seduta.data_seduta)}`
+                  : "Data da definire"}
             </span>
-            {seduta.completata &&
+            {seduta.completata && dataEff &&
               new Date(seduta.data_registrazione).toDateString() !==
                 new Date(dataEff).toDateString() && (
                 <span className="italic">
