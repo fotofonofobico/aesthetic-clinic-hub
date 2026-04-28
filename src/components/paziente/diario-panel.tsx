@@ -170,15 +170,16 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
       }),
     );
 
-    (sdRes.data ?? []).forEach((r) =>
+    (sdRes.data ?? []).forEach((r) => {
+      if (!r.data_seduta) return;
       ev.push({
         id: `sd-${r.id}`,
         ts: r.data_seduta,
         kind: "seduta",
         title: `Seduta #${r.numero_seduta}${r.completata ? "" : " (programmata)"}`,
         detail: r.note_cliniche ?? undefined,
-      }),
-    );
+      });
+    });
 
     (fuRes.data ?? []).forEach((r) => {
       ev.push({
