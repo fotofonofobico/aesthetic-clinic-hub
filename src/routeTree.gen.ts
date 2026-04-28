@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedPdfViewerRouteImport } from './routes/_authenticated/pdf-viewer'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedTrattamentiIndexRouteImport } from './routes/_authenticated/trattamenti.index'
 import { Route as AuthenticatedPazientiIndexRouteImport } from './routes/_authenticated/pazienti.index'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPdfViewerRoute = AuthenticatedPdfViewerRouteImport.update({
+  id: '/pdf-viewer',
+  path: '/pdf-viewer',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi/': typeof AuthenticatedConsensiIndexRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi': typeof AuthenticatedConsensiIndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/_authenticated/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/_authenticated/consensi/': typeof AuthenticatedConsensiIndexRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/pdf-viewer'
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi/'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/pdf-viewer'
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/pdf-viewer'
     | '/_authenticated/pazienti/$id'
     | '/share/consenso/$token'
     | '/_authenticated/consensi/'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/pdf-viewer': {
+      id: '/_authenticated/pdf-viewer'
+      path: '/pdf-viewer'
+      fullPath: '/pdf-viewer'
+      preLoaderRoute: typeof AuthenticatedPdfViewerRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
@@ -244,6 +263,7 @@ const AuthenticatedPazientiIdRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPdfViewerRoute: typeof AuthenticatedPdfViewerRoute
   AuthenticatedPazientiIdRoute: typeof AuthenticatedPazientiIdRouteWithChildren
   AuthenticatedConsensiIndexRoute: typeof AuthenticatedConsensiIndexRoute
   AuthenticatedPazientiIndexRoute: typeof AuthenticatedPazientiIndexRoute
@@ -252,6 +272,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPdfViewerRoute: AuthenticatedPdfViewerRoute,
   AuthenticatedPazientiIdRoute: AuthenticatedPazientiIdRouteWithChildren,
   AuthenticatedConsensiIndexRoute: AuthenticatedConsensiIndexRoute,
   AuthenticatedPazientiIndexRoute: AuthenticatedPazientiIndexRoute,
@@ -271,12 +292,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

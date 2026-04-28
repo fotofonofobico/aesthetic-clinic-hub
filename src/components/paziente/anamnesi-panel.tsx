@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
-import { renderPdfInWindow } from "@/lib/pdf-viewer";
+import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 
 type ReactNode = React.ReactNode;
 
@@ -106,6 +106,8 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [forking, setForking] = React.useState(false);
   const [signDlgOpen, setSignDlgOpen] = React.useState(false);
   const [cartaceoDlgOpen, setCartaceoDlgOpen] = React.useState(false);
+  const [draftPdfBlob, setDraftPdfBlob] = React.useState<Blob | null>(null);
+  const [draftPdfOpen, setDraftPdfOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
@@ -372,15 +374,6 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   /** Stampa anamnesi senza firme per workflow cartaceo. */
   async function stampaAnamnesi() {
     if (!data) return;
-    const pdfWindow = window.open("", "_blank");
-    if (!pdfWindow) {
-      toast.error("Abilita i popup per aprire la stampa bozza.");
-      return;
-    }
-    pdfWindow.opener = null;
-    pdfWindow.document.write(
-      '<!doctype html><html lang="it"><head><title>Generazione PDF…</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">Generazione PDF…</body></html>',
-    );
     try {
       const { data: paz, error: pazErr } = await supabase
         .from("pazienti")
@@ -409,9 +402,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         operatoreNome: null,
         modalita: "cartaceo",
       });
-      await renderPdfInWindow(pdfWindow, blob, "Bozza anamnesi");
+      setDraftPdfBlob(blob);
+      setDraftPdfOpen(true);
     } catch (e) {
-      pdfWindow.close();
       toast.error(`Errore stampa: ${(e as Error).message}`);
     }
   }
@@ -553,6 +546,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         onClose={() => setCartaceoDlgOpen(false)}
         onConfirm={(file, dataFirma) => caricaCartaceo(file, dataFirma)}
         saving={signing}
+      />
+
+      <PdfBlobDialog
+        open={draftPdfOpen}
+        onOpenChange={(open) => {
+          setDraftPdfOpen(open);
+          if (!open) setDraftPdfBlob(null);
+        }}
+        blob={draftPdfBlob}
+        title="Bozza anamnesi"
+        filename="bozza-anamnesi.pdf"
       />
 
       {/* === 1. GENERALE === */}

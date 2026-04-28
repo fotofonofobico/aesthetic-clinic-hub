@@ -154,3 +154,28 @@
     letter-spacing: -0.01em;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-pdf-print-pages],
+  [data-pdf-print-pages] * {
+    visibility: visible;
+  }
+
+  [data-pdf-print-pages] {
+    position: absolute;
+    inset: 0;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  [data-pdf-print-pages] canvas {
+    max-width: 100% !important;
+    break-after: page;
+    box-shadow: none !important;
+  }
+}
