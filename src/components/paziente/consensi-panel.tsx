@@ -501,7 +501,11 @@ function NuovoConsensoDialog({
   function calcValidoFinoA(t: ConsensoTemplate, firmatoIl: Date): string | null {
     // Trattamento singolo: validità legata alla seduta, nessuna scadenza temporale
     if (t.categoria === "trattamento_singolo") return null;
-    // Cicli: forza default 12 mesi se non valorizzato
+    // Ciclo a sedute: nessuna scadenza temporale (gestita dal contatore sedute_consumate)
+    if (t.categoria === "trattamento_ciclo" && t.durata_tipo === "sedute") {
+      return null;
+    }
+    // Ciclo a mesi: default 12 se non valorizzato
     if (t.categoria === "trattamento_ciclo") {
       const mesi = t.validita_mesi && t.validita_mesi > 0 ? t.validita_mesi : 12;
       const d = new Date(firmatoIl);
@@ -647,6 +651,10 @@ function NuovoConsensoDialog({
       versione_snapshot: tpl.versione,
       categoria_snapshot: tpl.categoria,
       validita_mesi_snapshot: tpl.validita_mesi,
+      durata_tipo_snapshot: tpl.durata_tipo ?? "mesi",
+      durata_sedute_snapshot: tpl.durata_sedute,
+      sedute_max_snapshot:
+        tpl.durata_tipo === "sedute" ? tpl.durata_sedute : null,
       modalita_firma: modalita,
       firma_immagine: firmaImmagine,
       pdf_url: pdfPath,
