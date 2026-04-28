@@ -145,17 +145,33 @@ function PazienteDetailPage() {
             {paziente.codice_fiscale ? ` · ${paziente.codice_fiscale}` : ""}
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
-        >
-          <Pencil className="h-4 w-4" />
-          Modifica anagrafica
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={avviaFirmaVisita}>
+            <FileSignature className="h-4 w-4" />
+            Firma visita
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
+          >
+            <Pencil className="h-4 w-4" />
+            Modifica anagrafica
+          </Button>
+        </div>
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
       <CriticalBanner flags={flags} alerts={alerts} access={access} />
+
+      <SignatureSessionDialog
+        open={sessioneOpen}
+        session={sessione}
+        onClose={() => setSessioneOpen(false)}
+        onCompleted={() => {
+          setSessioneOpen(false);
+          void load();
+        }}
+      />
 
       <Tabs defaultValue="diario" className="space-y-4">
         <TabsList>
