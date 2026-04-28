@@ -361,6 +361,84 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     );
   }
 
+  // ---------- personalizzazione per seduta ----------
+  function togglePersonalizza(rUid: string, on: boolean) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        if (on) {
+          return {
+            ...r,
+            personalizzaPerSeduta: true,
+            prodottiPerSeduta: allineaProdottiPerSeduta(
+              r.prodottiPerSeduta,
+              r.numero_sedute,
+              r.prodotti,
+            ),
+          };
+        }
+        return { ...r, personalizzaPerSeduta: false };
+      }),
+    );
+  }
+
+  function setNumeroSedute(rUid: string, n: number) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const nuovo = Math.max(Math.max(1, r.numero_sedute_min), Math.floor(n || 1));
+        return {
+          ...r,
+          numero_sedute: nuovo,
+          prodottiPerSeduta: r.personalizzaPerSeduta
+            ? allineaProdottiPerSeduta(r.prodottiPerSeduta, nuovo, r.prodotti)
+            : r.prodottiPerSeduta,
+        };
+      }),
+    );
+  }
+
+  function aggiungiProdottoSeduta(rUid: string, idx: number) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? [...arr, { uid: uid(), prodotto_id: "", quantita: 1 }] : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
+      }),
+    );
+  }
+
+  function rimuoviProdottoSeduta(rUid: string, idx: number, pUid: string) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? arr.filter((p) => p.uid !== pUid) : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
+      }),
+    );
+  }
+
+  function patchProdottoSeduta(
+    rUid: string,
+    idx: number,
+    pUid: string,
+    patch: Partial<{ prodotto_id: string; quantita: number }>,
+  ) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? arr.map((p) => (p.uid === pUid ? { ...p, ...patch } : p)) : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
+      }),
+    );
+  }
+
   // ---------- totale calcolato live ----------
   const totaleBase = useMemo(
     () => calcolaTotaleRighe(righe, trattamenti),
