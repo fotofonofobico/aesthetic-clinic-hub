@@ -722,6 +722,7 @@ export type Database = {
           piano_id: string
           prezzo_riga: number
           prezzo_unitario: number
+          prodotti_previsti: Json
           trattamento_id: string
         }
         Insert: {
@@ -733,6 +734,7 @@ export type Database = {
           piano_id: string
           prezzo_riga?: number
           prezzo_unitario?: number
+          prodotti_previsti?: Json
           trattamento_id: string
         }
         Update: {
@@ -744,6 +746,7 @@ export type Database = {
           piano_id?: string
           prezzo_riga?: number
           prezzo_unitario?: number
+          prodotti_previsti?: Json
           trattamento_id?: string
         }
         Relationships: []
@@ -800,6 +803,7 @@ export type Database = {
           parametri_tecnici: Json
           paziente_id: string
           piano_id: string
+          prodotti_previsti: Json
           trattamento_id: string | null
           updated_at: string
           voce_id: string | null
@@ -816,6 +820,7 @@ export type Database = {
           parametri_tecnici?: Json
           paziente_id: string
           piano_id: string
+          prodotti_previsti?: Json
           trattamento_id?: string | null
           updated_at?: string
           voce_id?: string | null
@@ -832,6 +837,7 @@ export type Database = {
           parametri_tecnici?: Json
           paziente_id?: string
           piano_id?: string
+          prodotti_previsti?: Json
           trattamento_id?: string | null
           updated_at?: string
           voce_id?: string | null

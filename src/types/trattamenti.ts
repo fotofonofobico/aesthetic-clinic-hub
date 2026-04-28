@@ -145,6 +145,26 @@ export interface PianoTrattamento {
   updated_at: string;
 }
 
+export interface ProdottoPrevisto {
+  nome: string;
+  quantita: number;
+  trattamento_id?: string | null;
+  prodotto_id?: string | null;
+}
+
+export interface PianoVoce {
+  id: string;
+  piano_id: string;
+  trattamento_id: string;
+  pacchetto_id: string | null;
+  numero_sedute: number;
+  prezzo_unitario: number;
+  prezzo_riga: number;
+  ordine: number;
+  prodotti_previsti: ProdottoPrevisto[];
+  created_at: string;
+}
+
 export interface Seduta {
   id: string;
   piano_id: string;
@@ -156,6 +176,9 @@ export interface Seduta {
   parametri_tecnici: Record<string, unknown>;
   note_cliniche: string | null;
   completata: boolean;
+  trattamento_id?: string | null;
+  voce_id?: string | null;
+  prodotti_previsti: ProdottoPrevisto[];
   created_at: string;
   updated_at: string;
 }

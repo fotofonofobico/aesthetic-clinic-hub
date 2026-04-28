@@ -1,121 +1,165 @@
-# Piano — Firma visita unificata + annulla modifiche + stampa modulo vuoto
+## Refactor Piani di Trattamento
 
-## Obiettivi
-1. Sessione firma "Visita" come wizard a **2 step**: STEP 1 GDPR+Uso immagini con UNA firma sola; STEP 2 anamnesi con firma separata.
-2. Pulsante "Annulla modifiche" sull'anamnesi: cancella la draft e ripristina l'ultima signed senza richiedere firma.
-3. Nel dialog "Nuovo consenso" aggiungere due pulsanti di stampa: "Stampa per questo paziente" (precompilato con anagrafica) e "Stampa modulo generico vuoto".
+Trasformazione del pannello "Piani" da blocco singolo a struttura clinica `Piano → Righe trattamento → Sedute → Prodotti previsti`.
 
-Regole confermate dall'utente:
-- 1 immagine di firma → 2 record `consenso_firmato` (GDPR + uso_immagini), stesso timestamp e stessa firma.
-- GDPR rifiutato = blocca avanzamento; uso immagini rifiutato = OK, prosegue.
-- Stampa: due pulsanti distinti.
+### Decisioni chiave (confermate)
 
----
+- **Titolo piano**: auto-generato come `Piano <dd/mm/yyyy> — <Trattamento1>, <Trattamento2>` (colonna `piano_trattamento.titolo` resta NOT NULL, popolata in scrittura).
+- **Prodotti**: persistiti come JSONB sia su `piano_trattamento_voce.prodotti_previsti` sia su `seduta.prodotti_previsti` (copia per valore — nessuna mutazione condivisa).
+- **Stato seduta**: nessuna nuova colonna; `completata=false` = "programmata", derivato in UI.
+- **Consensi DB**: invariati. Riuso `puoEseguireTrattamento` / `has_consenso_valido`.
 
-## STEP 1 — Wizard firma a 2 fasi
+### 1. Migrazione DB (minimale)
 
-### Modifiche a `src/components/signature-session-dialog.tsx`
-Sostituire il loop documento-per-documento con due "fasi" ben definite quando `session.tipo === "visita"`:
+Una sola migrazione SQL:
 
-**Fase A — Consensi combinati** (visibile solo se nella sessione esistono doc `gdpr` e/o `uso_immagini`):
-- Una sola schermata che mostra in due card affiancate (verticali su mobile) il testo di GDPR e Uso immagini, ciascuno con il proprio RadioGroup Acconsento/Non acconsento (scelte indipendenti).
-- UN SOLO `SignaturePad` in fondo, etichettato "Firma del paziente — vale per entrambi i consensi sopra".
-- Al click "Conferma e prosegui":
-  - validazioni: entrambe le scelte selezionate, firma non vuota.
-  - **se GDPR = `non_acconsento` → toast di errore bloccante** ("Il consenso GDPR è obbligatorio per proseguire la visita") e si rimane sulla schermata.
-  - altrimenti la stessa `firmaPaziente` (dataURL) viene applicata ai SessionDoc dei due consensi e si passa alla fase B.
-
-**Fase B — Anamnesi** (solo se presente nella sessione):
-- Identica schermata attuale (testo + scelta + signature pad). Firma indipendente.
-
-**Salvataggio (`salvaTutto`)**: già scrive un record `consenso_firmato` per documento. Niente da cambiare lato DB: i due record GDPR/Uso immagini condivideranno semplicemente `firma_immagine`, `firmato_il` e (best-effort) lo stesso `hash_integrita` finale. Aggiungere un secondo flag interno `firmaCondivisa: true` solo per UX (es. log), non necessario in DB.
-
-**Stato componente**: introdurre `phase: "consensi" | "anamnesi" | "salvataggio" | "fatto"` invece di `step` numerico. Mantenere `Progress` calcolato come `phase === "consensi" ? 50 : 100`.
-
-**Rimanere retrocompatibile**: se `session.tipo === "trattamento"` (firma trattamenti) il flusso resta documento-per-documento come ora — non viene toccato.
-
-### Eventuale ritocco a `src/lib/signature-session.ts`
-- `buildVisitaSession` resta com'è (produce SessionDoc separati GDPR / uso_immagini / anamnesi).
-- Garantire l'ordine: GDPR prima, poi uso_immagini, poi anamnesi (già rispettato).
-
----
-
-## STEP 2 — "Annulla modifiche" sull'anamnesi
-
-### Modifiche a `src/components/paziente/anamnesi-panel.tsx`
-
-Aggiungere bottone in fondo al pannello, visibile **solo** quando esiste una `draft` E una `signed` precedente per lo stesso paziente.
-
-Logica:
-1. Caricare in `load()` non solo il record corrente ma anche l'ultima `signed` (memorizzare `lastSigned: AnamnesiRow | null`).
-2. Mostrare bottone "Annulla modifiche" rosso outline accanto a "Salva bozza" se `data.stato === "draft" && lastSigned`.
-3. Handler `annullaModifiche()`:
-   - `confirm("Eliminare le modifiche e tornare all'ultima versione firmata v{n}?")`.
-   - `DELETE` della draft corrente: `supabase.from("anamnesi").delete().eq("id", data.id)`.
-   - Ricaricare → `setData(lastSigned)`.
-   - Toast "Modifiche annullate, ripristinata v{n}".
-   - Chiamare `onSaved()` per refresh badge esterni.
-
-**Verifica RLS**: la tabella `anamnesi` non ha policy DELETE → operatori non possono cancellare. Va aggiunta una policy DELETE limitata alle draft.
-
-### Migration richiesta
 ```sql
-CREATE POLICY "Draft anamnesi eliminabili da operatori attivi"
-ON public.anamnesi
-FOR DELETE
-TO authenticated
-USING (is_active_operator(auth.uid()) AND stato = 'draft');
+ALTER TABLE public.piano_trattamento_voce
+  ADD COLUMN IF NOT EXISTS prodotti_previsti jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE public.seduta
+  ADD COLUMN IF NOT EXISTS prodotti_previsti jsonb NOT NULL DEFAULT '[]'::jsonb;
 ```
 
----
+Forma JSONB:
+```json
+[{ "nome": "Hyalual 1.8%", "quantita": 1, "trattamento_id": "uuid-opzionale" }]
+```
 
-## STEP 3 — Stampa modulo vuoto nel "Nuovo consenso"
+Nessun cambio enum, nessuna nuova tabella, nessun trigger.
 
-### Modifiche a `src/components/paziente/consensi-panel.tsx` (`NuovoConsensoDialog`)
+### 2. Mock prodotti (FASE 2)
 
-Stato attuale: c'è già una funzione `stampaTemplate()` che apre `window.open("")` con HTML inline → stesso pattern problematico già abbandonato per i PDF firmati.
+Nuovo file `src/lib/prodotti-demo.ts`:
+- Array statico `PRODOTTI_DEMO` con ~10 voci coerenti coi trattamenti già a DB (Vistabex, Hyalual 1.8%, filler vari, biostimolanti).
+- Esportata anche una funzione di filtro per trattamento (anche se per ora ritorna tutto).
+- Commento esplicito: "PLACEHOLDER — sostituire con tabella `prodotti` quando si introdurrà il magazzino".
 
-Riscriverla generando un PDF con `jsPDF` (riusando i renderer di `src/lib/pdf-template.ts`) e mostrarlo nel `PdfBlobDialog` esistente — coerente con la nuova architettura PDF interna.
+### 3. Refactor `src/components/paziente/piani-panel.tsx`
 
-Due pulsanti nel dialog (visibili solo quando un template è selezionato):
+#### Stato dialog "Nuovo piano"
+Sostituire campi `titolo / tratId / numSedute / prezzo / note` con:
 
-1. **"Stampa per questo paziente"** — carica anagrafica del paziente corrente (`pazienti.nome/cognome/codice_fiscale/data_nascita`) e genera PDF con header precompilato.
-2. **"Stampa modulo generico vuoto"** — passa anagrafica vuota (`{ nome: "_______", cognome: "_______", codice_fiscale: "_______", data_nascita: null }`) — sempre disponibile.
+```ts
+type RigaForm = {
+  uid: string;                // uuid client-side per react key
+  trattamento_id: string;     // obbligatorio
+  numero_sedute: number;      // default da tipo trattamento
+  prodotti: { uid: string; nome: string; quantita: number }[];
+  consensoOk: boolean | null; // null = non ancora valutato
+  consensoLoading: boolean;
+};
 
-### Nuova helper `src/lib/pdf-consenso-vuoto.ts`
-Funzione `generaPdfModuloVuoto({ paziente, titolo, testo, versione })` che produce un PDF con:
-- intestazione paziente (riusa `renderHeaderPaziente`)
-- titolo + versione
-- testo del consenso
-- riga "Data: ____________________"
-- due checkbox: ☐ Acconsento  ☐ Non acconsento (disegnati come quadrati vuoti)
-- due blocchi firma vuoti: "Firma paziente ____________________" / "Firma medico ____________________"
+const [righe, setRighe] = useState<RigaForm[]>([]);
+```
 
-Il PDF viene mostrato nel `PdfBlobDialog` (preview canvas + bottoni Stampa / Scarica). **Non viene salvato in storage e non crea record DB**.
+#### UI dialog
+- `Dialog` allargato a `max-w-2xl`, `max-h-[85vh]` con scroll.
+- Bottone full-width `+ Aggiungi trattamento al piano` (apre nuova riga vuota).
+- Per ogni riga, una `Card` interna con:
+  - Header: `Select` trattamento (no "— Nessuno —"), bottone trash per rimuovere riga.
+  - Riga 2: `Input number` "Sedute" + badge stato consenso + bottone "Firma consenso" (disabled se trattamento non scelto o consenso ok).
+  - Sezione "Prodotti previsti": lista righe `[Select prodotto] [Input quantita step=0.1] [trash]` + bottone `+ Aggiungi prodotto`.
+- Default `numero_sedute` calcolato `onChange` del trattamento:
+  - `tipo === 'ciclo'` → `durata_ciclo_valore ?? 3`
+  - altrimenti → `1`
 
----
+#### Stato consenso inline
+- `useEffect` dipendente da `riga.trattamento_id`: chiama `puoEseguireTrattamento(pazienteId, trattamento_id)` e popola `consensoOk` + tooltip motivi.
+- Badge: `🟢 Consenso valido` / `🔴 Consenso mancante` / `…` durante loading.
 
-## File toccati
+#### Bottone "Firma consenso" per riga
+- Apre il `SignatureSessionDialog` esistente in modalità "trattamento" passando `trattamentoId` della riga (riuso `firma-trattamento-launcher` come pattern di riferimento, **senza modificare** `signature-session-dialog`).
+- Alla chiusura del dialog firma, ri-valutare `puoEseguireTrattamento` per quella riga.
+
+#### Validazione + salvataggio
+`creaPiano()` riscritto:
+1. Blocca se `righe.length === 0` → toast `"Aggiungi almeno un trattamento al piano"`.
+2. Blocca se qualche riga ha `trattamento_id` vuoto.
+3. Warning (non blocco) se una riga ha `prodotti.length === 0` → `toast.warning`.
+4. Calcola titolo auto: `` `Piano ${dd/mm/yyyy} — ${nomi.join(", ")}` ``.
+5. `INSERT` su `piano_trattamento` con: `paziente_id`, `titolo`, `numero_sedute_previste = somma sedute righe`, `trattamento_id = null` (multi-trattamento), `created_by`.
+6. Per ogni riga, `INSERT` su `piano_trattamento_voce`: `piano_id`, `trattamento_id`, `numero_sedute`, `prezzo_unitario=0`, `prezzo_riga=0`, `ordine=i`, `prodotti_previsti = JSON delle righe prodotti`.
+7. Per ogni riga, generare N record `seduta` con: `piano_id`, `paziente_id`, `trattamento_id`, `voce_id`, `numero_seduta = 1..N`, `prodotti_previsti = copia JSON dalla voce` (deep clone per garantire indipendenza), `completata=false`.
+
+Tutte le insert dentro un blocco try/catch con toast d'errore singolo. Nessuna transazione (Supabase JS non la supporta lato client) — accettiamo idempotenza best-effort, in errore mostriamo messaggio chiaro.
+
+#### Visualizzazione piani esistenti (FASE 6 + FASE 9 backward compatibility)
+Caricare anche `piano_trattamento_voce` (con il loro `prodotti_previsti`) accanto ai piani:
+
+```ts
+const [vociPerPiano, setVociPerPiano] = useState<Record<string, VoceConProdotti[]>>({});
+```
+
+Render espanso del piano:
+- Se `voci.length > 0` → render multi-riga: per ogni voce mostra `Trattamento`, `N sedute (X completate)`, badge consenso (calcolato lazy on-expand), lista prodotti previsti.
+- Se `voci.length === 0` (piani vecchi, "fallback semplice") → render attuale legacy basato su `piano.trattamento_id` + sedute, **senza crash**, senza sezione prodotti.
+
+Mantenere bottoni esistenti `Aggiungi seduta` (resta valido, aggiunge a fine lista; per piani nuovi assocerà alla prima voce o richiede selezione voce — per ora lo lasciamo legato al `piano_id` come oggi).
+
+### 4. Tipi TS
+
+Aggiungere a `src/types/trattamenti.ts`:
+
+```ts
+export interface ProdottoPrevisto {
+  nome: string;
+  quantita: number;
+  trattamento_id?: string | null;
+}
+
+export interface PianoVoce {
+  id: string;
+  piano_id: string;
+  trattamento_id: string;
+  pacchetto_id: string | null;
+  numero_sedute: number;
+  prezzo_unitario: number;
+  prezzo_riga: number;
+  ordine: number;
+  prodotti_previsti: ProdottoPrevisto[];
+  created_at: string;
+}
+```
+
+E aggiungere `prodotti_previsti: ProdottoPrevisto[]` a `Seduta`. (Dopo la migrazione `src/integrations/supabase/types.ts` viene rigenerato in automatico, ma il tipo applicativo locale serve per i parsing JSON.)
+
+### 5. Cosa NON cambia
+
+- `signature-session-dialog.tsx`: invariato.
+- `consensi-engine`, `access-guard`, RLS, RPC, triggers consensi: invariati.
+- Nessuna nuova tabella, nessun magazzino, nessun collegamento a stock.
+- `consensi-panel`, `anamnesi-panel`: invariati.
+
+### 6. Diagramma flusso "Nuovo piano"
 
 ```text
-NUOVI
-- src/lib/pdf-consenso-vuoto.ts             (helper generazione PDF vuoto)
-- supabase migration                         (policy DELETE su anamnesi draft)
-
-MODIFICATI
-- src/components/signature-session-dialog.tsx  (wizard 2-fasi per visita)
-- src/components/paziente/anamnesi-panel.tsx   (bottone "Annulla modifiche" + load lastSigned)
-- src/components/paziente/consensi-panel.tsx   (NuovoConsensoDialog: 2 pulsanti stampa via PdfBlobDialog)
+[+ Aggiungi trattamento]
+   │
+   ▼
+┌─────────────────────────────────────────┐
+│ Riga 1                            [🗑]  │
+│ Trattamento: [Filler XYZ        ▼]     │
+│ Sedute: [1]    🟢 Consenso valido      │
+│                       [Firma consenso] │
+│ Prodotti previsti:                     │
+│   • Hyalual 1.8%   qta [1.0]   [🗑]    │
+│   • Filler XYZ     qta [1.0]   [🗑]    │
+│   [+ Aggiungi prodotto]                │
+└─────────────────────────────────────────┘
+[+ Aggiungi trattamento]
+                                 [Crea piano]
 ```
 
-Nessuna modifica a `signature-session.ts`, `pdf-consenso.ts`, schema DB (eccetto policy), routing.
+### 7. File toccati
 
----
+- `supabase/migrations/<timestamp>_piano_voce_prodotti.sql` (nuovo)
+- `src/lib/prodotti-demo.ts` (nuovo)
+- `src/types/trattamenti.ts` (aggiunte tipi `ProdottoPrevisto`, `PianoVoce`, campo su `Seduta`)
+- `src/components/paziente/piani-panel.tsx` (refactor profondo, dialog + render)
 
-## Note tecniche
+### 8. Rischi & mitigazioni
 
-- **Stessa firma su 2 record consenso**: l'hash di integrità rimane individuale per record (include titolo/testo/versione del singolo consenso) — corretto per la storicizzazione separata. La condivisione è solo a livello di `firma_immagine` + `firmato_il`.
-- **GDPR obbligatorio**: il blocco è solo client-side nel wizard. Lato dato resta possibile salvare un GDPR rifiutato da altri flussi (è già così oggi).
-- **Annulla modifiche**: limitato alle draft per design — la policy USING `stato = 'draft'` impedisce a chiunque di cancellare versioni firmate, in linea con il trigger `anamnesi_signed_protect`.
-- **Stampa vuoto**: PDF generato client-side, mai uploadato. Il `PdfBlobDialog` già gestisce print + download.
-- **Mobile (viewport 867×762)**: nella Fase A le 2 card consensi vanno in `grid md:grid-cols-2 gap-3` — su mobile stacked, su desktop affiancate. Il signature pad in fondo full-width.
+- **Race insert voci/sedute**: se l'insert sedute fallisce dopo le voci, il piano resta inconsistente. Mitigazione: log su console + toast `"Piano creato ma errore generazione sedute: riprovare aggiunta seduta manualmente"`. Accettabile perché la struttura voci basta per ricostruire.
+- **Tipi Supabase rigenerati**: dopo migrazione i tipi auto-generati conterranno `prodotti_previsti: Json`. Casteremo localmente a `ProdottoPrevisto[]` con un parser difensivo.
+- **Piani vecchi senza voci**: il blocco "fallback legacy" garantisce zero crash; verificato che `vociPerPiano[id] ?? []` produce render alternativo.
