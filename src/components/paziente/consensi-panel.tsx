@@ -332,11 +332,28 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                       bucket="consensi-pdf"
                       path={viewing.pdf_url}
                       label="Apri PDF firmato"
+                      onMissing={() => {
+                        if (viewing.firma_immagine) void rigeneraPdf(viewing);
+                      }}
                     />
+                  ) : viewing.firma_immagine ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        PDF non disponibile (record antecedente alla generazione automatica).
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void rigeneraPdf(viewing)}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Rigenera PDF firmato
+                      </Button>
+                    </div>
                   ) : (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      PDF non disponibile per questo consenso (record antecedente alla
-                      generazione automatica)
+                      PDF non disponibile e firma originale assente: ricaricare manualmente il
+                      cartaceo.
                     </p>
                   )}
                 </div>
