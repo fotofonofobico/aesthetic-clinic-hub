@@ -43,6 +43,7 @@ import {
   type ConsensoModalitaFirma,
 } from "@/types/trattamenti";
 import { STATO_BADGE } from "@/lib/consensi-engine";
+import { ShareConsensoButton } from "@/components/share-consenso-button";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
@@ -294,17 +295,20 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                   </p>
                 )}
 
-                {isMedico && !viewing.revocato_il && (
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void revoca(viewing)}
-                      className="text-destructive"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Revoca consenso
-                    </Button>
+                {!viewing.revocato_il && (
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                    <ShareConsensoButton consensoId={viewing.id} />
+                    {isMedico && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void revoca(viewing)}
+                        className="text-destructive"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Revoca consenso
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
