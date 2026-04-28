@@ -516,7 +516,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         numero_sedute: number;
         prodotti_previsti: unknown;
       }>) {
-        const prodotti = parseProdotti(v.prodotti_previsti);
+        const prodottiBase = parseProdotti(v.prodotti_previsti);
         for (let n = 1; n <= v.numero_sedute; n++) {
           sedutePayload.push({
             piano_id: pianoId,
@@ -524,9 +524,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
             trattamento_id: v.trattamento_id,
             voce_id: v.id,
             numero_seduta: n,
+            data_seduta: null, // data da definire
             operatore_id: user?.id,
             completata: false,
-            prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
+            prodotti_previsti: JSON.parse(JSON.stringify(prodottiBase)),
           });
         }
       }
