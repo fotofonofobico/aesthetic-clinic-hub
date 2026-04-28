@@ -658,35 +658,27 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       if (pianoErr || !pianoData) throw pianoErr ?? new Error("Errore creazione piano");
       const pianoId = (pianoData as { id: string }).id;
 
-      const vociPayload = righe.map((r, i) => ({
-        piano_id: pianoId,
-        ...buildVocePayload(r, i),
-      }));
-      const { data: vociData, error: vociErr } = await supabase
-        .from("piano_trattamento_voce")
-        .insert(vociPayload as never)
-        .select("id, trattamento_id, numero_sedute, prodotti_previsti");
-      if (vociErr || !vociData) throw vociErr ?? new Error("Errore creazione voci");
-
       const sedutePayload: Array<Record<string, unknown>> = [];
-      for (const v of vociData as Array<{
-        id: string;
-        trattamento_id: string;
-        numero_sedute: number;
-        prodotti_previsti: unknown;
-      }>) {
-        const prodottiBase = parseProdotti(v.prodotti_previsti);
-        for (let n = 1; n <= v.numero_sedute; n++) {
+      for (let i = 0; i < righe.length; i++) {
+        const r = righe[i];
+        const { data: vNew, error: vErr } = await supabase
+          .from("piano_trattamento_voce")
+          .insert({ piano_id: pianoId, ...buildVocePayload(r, i) } as never)
+          .select("id")
+          .single();
+        if (vErr || !vNew) throw vErr ?? new Error("Errore creazione voce");
+        const voceId = (vNew as { id: string }).id;
+        for (let n = 1; n <= r.numero_sedute; n++) {
           sedutePayload.push({
             piano_id: pianoId,
             paziente_id: pazienteId,
-            trattamento_id: v.trattamento_id,
-            voce_id: v.id,
+            trattamento_id: r.trattamento_id,
+            voce_id: voceId,
             numero_seduta: n,
             data_seduta: null, // data da definire
             operatore_id: user?.id,
             completata: false,
-            prodotti_previsti: JSON.parse(JSON.stringify(prodottiBase)),
+            prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
           });
         }
       }
