@@ -1343,16 +1343,26 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                               )}
 
                               {v.prodotti_previsti.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {v.prodotti_previsti.map((prod, i) => (
-                                    <span
-                                      key={i}
-                                      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
-                                    >
-                                      <Package className="h-3 w-3" />
-                                      {prod.nome} × {prod.quantita}
-                                    </span>
-                                  ))}
+                                <div className="space-y-1">
+                                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                    Prodotti per seduta
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {v.prodotti_previsti.map((prod, i) => (
+                                      <span
+                                        key={i}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
+                                      >
+                                        <Package className="h-3 w-3" />
+                                        {prod.nome} × {prod.quantita}
+                                        {v.numero_sedute > 1 && (
+                                          <span className="text-muted-foreground">
+                                            (tot ciclo: {prod.quantita * v.numero_sedute})
+                                          </span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
