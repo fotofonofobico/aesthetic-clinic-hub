@@ -286,15 +286,11 @@ function TrattamentoDialog({
     if (tipo === "ciclo") {
       const n = Number(duratValore);
       if (!duratValore || !Number.isFinite(n) || n <= 0) {
-        toast.error("Inserisci la durata del ciclo");
-        return;
-      }
-      if (duratUnita !== "giorni" && duratUnita !== "settimane" && duratUnita !== "mesi") {
-        toast.error("Seleziona l'unità di durata");
+        toast.error("Inserisci il numero di sedute previste");
         return;
       }
       durValN = Math.floor(n);
-      durUnitN = duratUnita;
+      durUnitN = "sedute";
     }
     if (!categoria) {
       toast.error("Seleziona la categoria");
@@ -370,34 +366,19 @@ function TrattamentoDialog({
         </div>
 
         {tipo === "ciclo" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Durata ciclo *</Label>
-              <Input
-                type="number"
-                min="1"
-                value={duratValore}
-                onChange={(e) => setDuratValore(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Unità *</Label>
-              <Select
-                value={duratUnita}
-                onValueChange={(v) => setDuratUnita(v as DurataUnita)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(DURATA_UNITA_LABELS) as DurataUnita[]).map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {DURATA_UNITA_LABELS[u]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label>Numero sedute previste *</Label>
+            <Input
+              type="number"
+              min="1"
+              value={duratValore}
+              onChange={(e) => setDuratValore(e.target.value)}
+              placeholder="Es. 3"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento
+              di questo numero di sedute.
+            </p>
           </div>
         )}
 
@@ -493,9 +474,9 @@ function TrattamentoDialog({
             Il consenso sarà richiesto a ogni seduta.
           </p>
         )}
-        {tipo === "ciclo" && duratValore && duratUnita && (
+        {tipo === "ciclo" && duratValore && (
           <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
-            Il consenso sarà valido per {duratValore} {DURATA_UNITA_LABELS[duratUnita].toLowerCase()}.
+            Il consenso sarà valido per {duratValore} sedute (poi sarà richiesto un nuovo consenso).
           </p>
         )}
       </div>
