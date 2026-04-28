@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Props {
-  bucket: string;
+  bucket: "anamnesi-pdf" | "consensi-pdf";
   path: string;
   label?: string;
   /** Callback opzionale: invocato se al click rileviamo che il file non esiste in storage. */
