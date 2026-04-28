@@ -466,18 +466,80 @@ function NuovoConsensoDialog({
 
     if (modalita === "tablet") {
       firmaImmagine = sigRef.current!.toDataURL();
+      // Genera PDF anche per firma tablet (header paziente + metadata + firma)
+      try {
+        const { data: paz, error: pazErr } = await supabase
+          .from("pazienti")
+          .select("nome, cognome, data_nascita, codice_fiscale")
+          .eq("id", pazienteId)
+          .single();
+        if (pazErr || !paz) throw new Error(pazErr?.message ?? "Paziente non trovato");
+
+        let operatoreNome: string | null = null;
+        if (user?.id) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("nome, cognome")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (prof) {
+            operatoreNome = `${prof.cognome ?? ""} ${prof.nome ?? ""}`.trim() || null;
+          }
+        }
+
+        const { blob } = await generaPdfConsenso({
+          paziente: {
+            nome: paz.nome,
+            cognome: paz.cognome,
+            data_nascita: paz.data_nascita ?? null,
+            codice_fiscale: paz.codice_fiscale ?? null,
+          },
+          titolo: tpl.titolo,
+          testo: tpl.testo,
+          versione: tpl.versione,
+          categoria: tpl.categoria,
+          firmatoIl,
+          validoFinoA: validoFinoA ? new Date(validoFinoA) : null,
+          modalitaFirma: "tablet",
+          firmaPazienteDataUrl: firmaImmagine,
+          firmaMedicoDataUrl: null,
+          operatoreNome,
+          rifiutato: false,
+          note: note.trim() || null,
+        });
+        const path = `${pazienteId}/manuale/${Date.now()}-${crypto.randomUUID()}.pdf`;
+        const upPdf = await supabase.storage
+          .from("consensi-pdf")
+          .upload(path, blob, { contentType: "application/pdf" });
+        if (upPdf.error || !upPdf.data?.path) {
+          console.error("[consensi-pdf upload] tablet errore", upPdf.error);
+          throw new Error(`Upload PDF fallito: ${upPdf.error?.message ?? "path vuoto"}`);
+        }
+        pdfPath = path;
+      } catch (e) {
+        toast.error(`Errore generazione PDF: ${(e as Error).message}`);
+        setSaving(false);
+        return;
+      }
     } else if (pdfFile) {
       const ext = pdfFile.name.split(".").pop()?.toLowerCase() ?? "pdf";
       const path = `${pazienteId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
       const up = await supabase.storage
         .from("consensi-pdf")
         .upload(path, pdfFile, { contentType: pdfFile.type });
-      if (up.error) {
-        toast.error(`Errore upload: ${up.error.message}`);
+      if (up.error || !up.data?.path) {
+        console.error("[consensi-pdf upload] cartaceo errore", up.error);
+        toast.error(`Errore upload: ${up.error?.message ?? "path vuoto"}`);
         setSaving(false);
         return;
       }
       pdfPath = path;
+    }
+
+    if (!pdfPath) {
+      toast.error("PDF mancante: impossibile salvare il consenso");
+      setSaving(false);
+      return;
     }
 
     const integrita = await sha256Hex(
