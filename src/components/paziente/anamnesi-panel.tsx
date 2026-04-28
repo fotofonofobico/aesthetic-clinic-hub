@@ -370,6 +370,103 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     void firmaAnamnesi(firmaPaz, firmaMed);
   }
 
+  /** Stampa anamnesi senza firme per workflow cartaceo. */
+  async function stampaAnamnesi() {
+    if (!data) return;
+    try {
+      const { data: paz, error: pazErr } = await supabase
+        .from("pazienti")
+        .select("nome, cognome, codice_fiscale, data_nascita")
+        .eq("id", pazienteId)
+        .single();
+      if (pazErr || !paz) throw new Error(pazErr?.message ?? "Paziente non trovato");
+      const { blob } = await generaPdfAnamnesi({
+        paziente: {
+          nome: paz.nome,
+          cognome: paz.cognome,
+          codice_fiscale: paz.codice_fiscale ?? null,
+          data_nascita: paz.data_nascita ?? null,
+        },
+        versioneNumero: data.versione_numero ?? 1,
+        firmataIl: new Date(),
+        payload: {
+          generale: (data.generale ?? {}) as Record<string, unknown>,
+          patologica: (data.patologica ?? {}) as Record<string, unknown>,
+          farmacologica: (data.farmacologica ?? {}) as Record<string, unknown>,
+          estetica: (data.estetica ?? {}) as Record<string, unknown>,
+          note_libere: data.note_libere,
+        },
+        firmaPazienteDataUrl: null,
+        firmaMedicoDataUrl: null,
+        operatoreNome: null,
+        modalita: "cartaceo",
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast.error(`Errore stampa: ${(e as Error).message}`);
+    }
+  }
+
+  /** Carica PDF cartaceo già firmato. */
+  async function caricaCartaceo(file: File, dataFirma: string): Promise<boolean> {
+    if (!data) return false;
+    if (data.stato === "signed") {
+      toast.error("Già firmata. Modifica un campo per creare una nuova versione.");
+      return false;
+    }
+    setSigning(true);
+    try {
+      const firmataIl = new Date(`${dataFirma}T12:00:00`);
+      if (isNaN(firmataIl.getTime()) || firmataIl > new Date()) {
+        throw new Error("Data firma non valida");
+      }
+      const path = `${pazienteId}/${data.id}-v${data.versione_numero}-cartaceo.pdf`;
+      const up = await supabase.storage
+        .from("anamnesi-pdf")
+        .upload(path, file, { contentType: file.type || "application/pdf", upsert: true });
+      if (up.error || !up.data?.path) {
+        console.error("[anamnesi-pdf cartaceo] upload errore", up.error);
+        throw new Error(`Upload PDF fallito: ${up.error?.message ?? "path vuoto"}`);
+      }
+      const enc = new TextEncoder().encode(
+        `cartaceo|${file.name}|${file.size}|${firmataIl.toISOString()}`,
+      );
+      const buf = await crypto.subtle.digest("SHA-256", enc);
+      const hash = Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const { error: updErr } = await supabase
+        .from("anamnesi")
+        .update({
+          stato: "signed",
+          firmata_il: firmataIl.toISOString(),
+          firmata_da_medico: user?.id ?? null,
+          firma_paziente: null,
+          firma_medico: null,
+          hash_integrita: hash,
+          pdf_url: path,
+        })
+        .eq("id", data.id);
+      if (updErr) throw updErr;
+      toast.success("Anamnesi cartacea archiviata");
+      setCartaceoDlgOpen(false);
+      await load();
+      onSaved();
+      return true;
+    } catch (e) {
+      toast.error(`Errore: ${(e as Error).message}`);
+      return false;
+    } finally {
+      setSigning(false);
+    }
+  }
+
+  function isCartaceo(row: AnamnesiRow): boolean {
+    return row.stato === "signed" && !row.firma_paziente && !!row.pdf_url;
+  }
+
   if (loading || !data) {
     return <p className="text-sm text-muted-foreground">Caricamento…</p>;
   }
