@@ -177,8 +177,7 @@ function TrattamentiPage() {
                       )}
                       {t.tipo === "ciclo" && (
                         <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] uppercase tracking-wide">
-                          Ciclo {t.durata_ciclo_valore}
-                          {t.durata_ciclo_unita ? ` ${t.durata_ciclo_unita}` : ""}
+                          Ciclo {t.durata_ciclo_valore ?? "?"} sedute
                         </span>
                       )}
                       {!t.attivo && (
