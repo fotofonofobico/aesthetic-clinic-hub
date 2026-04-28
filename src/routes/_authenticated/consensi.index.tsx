@@ -311,12 +311,28 @@ function TemplateDialog({
   }, [editing]);
 
   // Auto-titolo se l'utente non l'ha modificato manualmente
-  const trattamentoNome = trattamenti.find((t) => t.id === trattamentoId)?.nome ?? null;
+  const trattamentoSelezionato = trattamenti.find((t) => t.id === trattamentoId) ?? null;
+  const trattamentoNome = trattamentoSelezionato?.nome ?? null;
   React.useEffect(() => {
     if (titoloDirty) return;
     const auto = titoloAuto(tipoUI, trattamentoNome);
     if (auto) setTitolo(auto);
   }, [tipoUI, trattamentoNome, titoloDirty]);
+
+  // Auto-precompila durata sedute quando si seleziona un trattamento ciclo
+  // (solo in creazione, non in modifica di un template esistente)
+  React.useEffect(() => {
+    if (editing) return;
+    if (tipoUI !== "trattamento") return;
+    if (modValidita !== "ciclo") return;
+    if (cicloDurataTipo !== "sedute") return;
+    if (!trattamentoSelezionato) return;
+    const n = trattamentoSelezionato.durata_ciclo_valore;
+    if (typeof n === "number" && n > 0) {
+      setCicloDurata(String(n));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trattamentoId, tipoUI, modValidita, cicloDurataTipo]);
 
   function changeTipo(t: TipoUI) {
     setTipoUI(t);
