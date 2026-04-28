@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import * as React from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import type { SignaturePadHandle } from "@/components/signature-pad";
+
+type ReactNode = React.ReactNode;
+
+// Lazy-load SignaturePad: la lib (react-signature-canvas alpha) viene importata
+// solo quando il dialog di firma si apre, riducendo la superficie di errori al mount.
+const SignaturePad = React.lazy(() =>
+  import("@/components/signature-pad").then((m) => ({ default: m.SignaturePad })),
+);
 
 
 interface AnamnesiRow {
