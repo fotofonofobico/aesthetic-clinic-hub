@@ -27,7 +27,7 @@ import { Plus, FileSignature, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
 import {
   CATEGORIA_LABELS,
-  CATEGORIA_VALIDITA_DEFAULT,
+  
   type ConsensoCategoria,
   type ConsensoTemplate,
   type Trattamento,
