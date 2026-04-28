@@ -124,10 +124,11 @@ export async function registraModificheSeduta(
 /**
  * Stato programmazione per ordinamento e badge.
  */
-export type StatoSeduta = "in_ritardo" | "oggi" | "futura" | "eseguita";
+export type StatoSeduta = "in_ritardo" | "oggi" | "futura" | "eseguita" | "da_definire";
 
 export function statoSeduta(s: Pick<Seduta, "completata" | "data_seduta" | "data_esecuzione_effettiva">): StatoSeduta {
   if (s.completata) return "eseguita";
+  if (!s.data_seduta) return "da_definire";
   const data = new Date(s.data_seduta);
   const oggi = new Date();
   oggi.setHours(0, 0, 0, 0);
@@ -140,8 +141,9 @@ export function statoSeduta(s: Pick<Seduta, "completata" | "data_seduta" | "data
 
 /**
  * Data clinica reale: usa data_esecuzione_effettiva se presente, altrimenti data_seduta.
+ * Restituisce null se nessuna delle due è disponibile.
  */
-export function dataClinica(s: Pick<Seduta, "data_seduta" | "data_esecuzione_effettiva">): string {
+export function dataClinica(s: Pick<Seduta, "data_seduta" | "data_esecuzione_effettiva">): string | null {
   return s.data_esecuzione_effettiva ?? s.data_seduta;
 }
 
