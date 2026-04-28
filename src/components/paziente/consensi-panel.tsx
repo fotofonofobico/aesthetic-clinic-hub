@@ -664,12 +664,42 @@ function NuovoConsensoDialog({
         </div>
 
         {modalita === "tablet" ? (
-          <div>
-            <Label>Firma del paziente *</Label>
-            <SignaturePad
-              ref={sigRef}
-              onChange={(empty) => setSigned(!empty)}
-            />
+          <div className="space-y-3">
+            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <Label className="text-sm font-semibold">Scelta del paziente *</Label>
+              <RadioGroup
+                value={esitoTablet ?? ""}
+                onValueChange={(v) =>
+                  setEsitoTablet(v as "acconsento" | "non_acconsento")
+                }
+                className="grid gap-2"
+              >
+                <label
+                  htmlFor="esito-tablet-acc"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
+                  <RadioGroupItem value="acconsento" id="esito-tablet-acc" />
+                  <span className="text-sm leading-none">Acconsento</span>
+                </label>
+                <label
+                  htmlFor="esito-tablet-nacc"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
+                  <RadioGroupItem value="non_acconsento" id="esito-tablet-nacc" />
+                  <span className="text-sm leading-none">Non acconsento</span>
+                </label>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label>Firma del paziente *</Label>
+              <p className="mb-1 text-xs text-muted-foreground">
+                La firma è sempre obbligatoria, anche in caso di "Non acconsento".
+              </p>
+              <SignaturePad
+                ref={sigRef}
+                onChange={(empty) => setSigned(!empty)}
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
