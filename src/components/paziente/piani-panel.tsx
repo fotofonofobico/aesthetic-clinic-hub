@@ -590,16 +590,23 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     return `Piano ${formatDateIT(new Date())} — ${nomi.join(", ")}`;
   }
 
-  function buildVocePayload(r: RigaForm, ordine: number) {
-    const prodotti: ProdottoPrevisto[] = r.prodotti.map((p) => {
+  function mapProdottiForm(list: ProdottoForm[], trattamentoId: string): ProdottoPrevisto[] {
+    return list.map((p) => {
       const prod = PRODOTTI_DEMO.find((x) => x.id === p.prodotto_id);
       return {
         nome: prod?.nome ?? p.prodotto_id,
         quantita: Math.max(1, Math.floor(p.quantita)),
         prodotto_id: p.prodotto_id,
-        trattamento_id: r.trattamento_id,
+        trattamento_id: trattamentoId,
       };
     });
+  }
+
+  function buildVocePayload(r: RigaForm, ordine: number) {
+    const prodotti = mapProdottiForm(r.prodotti, r.trattamento_id);
+    const pps = r.personalizzaPerSeduta
+      ? r.prodottiPerSeduta.map((arr) => mapProdottiForm(arr, r.trattamento_id))
+      : null;
     return {
       trattamento_id: r.trattamento_id,
       numero_sedute: r.numero_sedute,
@@ -607,8 +614,18 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       prezzo_riga: 0,
       ordine,
       prodotti_previsti: prodotti as unknown as never,
+      prodotti_per_seduta: (pps as unknown) as never,
       zone: r.zone as unknown as never,
     };
+  }
+
+  /** Ritorna la lista prodotti da assegnare alla seduta numero `n` (1-based). */
+  function prodottiPerSedutaN(r: RigaForm, n: number): ProdottoPrevisto[] {
+    if (r.personalizzaPerSeduta) {
+      const arr = r.prodottiPerSeduta[n - 1];
+      if (arr) return mapProdottiForm(arr, r.trattamento_id);
+    }
+    return mapProdottiForm(r.prodotti, r.trattamento_id);
   }
 
   // ---------- creazione piano ----------
