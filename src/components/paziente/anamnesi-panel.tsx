@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
+import { renderPdfInWindow } from "@/lib/pdf-viewer";
 
 type ReactNode = React.ReactNode;
 
@@ -408,11 +409,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         operatoreNome: null,
         modalita: "cartaceo",
       });
-      const pdfBlob =
-        blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
-      const url = URL.createObjectURL(pdfBlob);
-      pdfWindow.location.replace(url);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await renderPdfInWindow(pdfWindow, blob, "Bozza anamnesi");
     } catch (e) {
       pdfWindow.close();
       toast.error(`Errore stampa: ${(e as Error).message}`);

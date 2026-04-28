@@ -2,6 +2,7 @@ import * as React from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { renderPdfInWindow } from "@/lib/pdf-viewer";
 
 interface Props {
   bucket: string;
@@ -62,11 +63,7 @@ export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMiss
         pdfWindow.close();
         return;
       }
-      const blob =
-        data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      pdfWindow.location.replace(url);
-      window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
+      await renderPdfInWindow(pdfWindow, data, label);
     } finally {
       busyRef.current = false;
       setBusy(false);
