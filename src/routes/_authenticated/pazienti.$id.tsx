@@ -46,6 +46,19 @@ function PazienteDetailPage() {
   const [flags, setFlags] = useState<FlagRischio[]>([]);
   const [access, setAccess] = useState<AccessEvaluation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessione, setSessione] = useState<SignatureSession | null>(null);
+  const [sessioneOpen, setSessioneOpen] = useState(false);
+
+  async function avviaFirmaVisita() {
+    if (!paziente) return;
+    const s = await buildVisitaSession(paziente.id);
+    if (!s) {
+      toast.success("Tutto in regola: nessuna firma necessaria");
+      return;
+    }
+    setSessione(s);
+    setSessioneOpen(true);
+  }
 
   useEffect(() => {
     if (isChildRoute) {
