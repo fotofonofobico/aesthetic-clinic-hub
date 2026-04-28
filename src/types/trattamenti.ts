@@ -1,26 +1,39 @@
 export type PianoStato = "attivo" | "completato" | "sospeso" | "annullato";
 
 export type ConsensoCategoria =
-  | "gdpr_generale"
+  | "gdpr"
+  | "uso_immagini"
+  | "anamnesi"
   | "trattamento_singolo"
-  | "trattamento_continuativo"
+  | "trattamento_ciclo"
   | "altro";
 
 export type ConsensoModalitaFirma = "tablet" | "pdf_caricato";
 
-export type ConsensoStato = "valido" | "scaduto" | "obsoleto" | "revocato";
+export type ConsensoStato =
+  | "valid"
+  | "expiring"
+  | "expired"
+  | "obsolete"
+  | "revoked"
+  | "rifiutato"
+  | "missing";
 
 export const CATEGORIA_LABELS: Record<ConsensoCategoria, string> = {
-  gdpr_generale: "GDPR / Privacy",
+  gdpr: "GDPR / Privacy",
+  uso_immagini: "Uso immagini",
+  anamnesi: "Anamnesi",
   trattamento_singolo: "Trattamento singolo",
-  trattamento_continuativo: "Trattamento continuativo",
+  trattamento_ciclo: "Ciclo di trattamento",
   altro: "Altro",
 };
 
 export const CATEGORIA_VALIDITA_DEFAULT: Record<ConsensoCategoria, number | null> = {
-  gdpr_generale: null, // fino a revoca/aggiornamento
-  trattamento_singolo: null, // valido per la singola seduta
-  trattamento_continuativo: 12,
+  gdpr: null,
+  uso_immagini: null,
+  anamnesi: null,
+  trattamento_singolo: null,
+  trattamento_ciclo: 12,
   altro: null,
 };
 

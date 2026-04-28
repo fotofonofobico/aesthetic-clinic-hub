@@ -37,33 +37,14 @@ import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pa
 import { sha256Hex } from "@/lib/hash";
 import {
   CATEGORIA_LABELS,
-  type ConsensoCategoria,
   type ConsensoFirmato,
   type ConsensoStato,
   type ConsensoTemplate,
   type ConsensoModalitaFirma,
 } from "@/types/trattamenti";
+import { STATO_BADGE } from "@/lib/consensi-engine";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
-
-const STATO_BADGE: Record<ConsensoStato, { label: string; cls: string }> = {
-  valido: {
-    label: "Valido",
-    cls: "border-success/40 bg-success/15 text-success-foreground",
-  },
-  scaduto: {
-    label: "Scaduto",
-    cls: "border-warning/40 bg-warning/15",
-  },
-  obsoleto: {
-    label: "Obsoleto",
-    cls: "border-muted-foreground/40 bg-muted text-muted-foreground",
-  },
-  revocato: {
-    label: "Revocato",
-    cls: "border-destructive/40 bg-destructive/10 text-destructive",
-  },
-};
 
 export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   const { user, hasRole } = useAuth();
@@ -176,7 +157,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
       ) : (
         <div className="space-y-2">
           {firmati.map((c) => {
-            const stato = stati[c.id] ?? "valido";
+            const stato: ConsensoStato = stati[c.id] ?? "valid";
             const badge = STATO_BADGE[stato];
             return (
               <Card
@@ -187,7 +168,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {stato === "valido" ? (
+                      {stato === "valid" ? (
                         <ShieldCheck className="h-4 w-4 text-success-foreground" />
                       ) : (
                         <ShieldAlert className="h-4 w-4 text-warning" />
@@ -258,7 +239,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                     {CATEGORIA_LABELS[viewing.categoria_snapshot]}
                   </span>
                   {(() => {
-                    const s = stati[viewing.id] ?? "valido";
+                    const s: ConsensoStato = stati[viewing.id] ?? "valid";
                     const b = STATO_BADGE[s];
                     return (
                       <span
