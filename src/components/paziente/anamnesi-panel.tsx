@@ -548,6 +548,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         saving={signing}
       />
 
+      <PdfBlobDialog
+        open={draftPdfOpen}
+        onOpenChange={(open) => {
+          setDraftPdfOpen(open);
+          if (!open) setDraftPdfBlob(null);
+        }}
+        blob={draftPdfBlob}
+        title="Bozza anamnesi"
+        filename="bozza-anamnesi.pdf"
+      />
+
       {/* === 1. GENERALE === */}
       <Card>
         <CardHeader>
