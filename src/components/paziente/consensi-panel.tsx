@@ -596,18 +596,59 @@ function NuovoConsensoDialog({
             />
           </div>
         ) : (
-          <div>
-            <Label>PDF firmato *</Label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label>PDF firmato a mano *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={stampaTemplate}
+                disabled={!tpl}
+              >
+                <FileText className="h-4 w-4" />
+                Stampa modulo vuoto
+              </Button>
+            </div>
             <Input
               type="file"
               accept="application/pdf,image/*"
               onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
             />
             {pdfFile && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {pdfFile.name} · {(pdfFile.size / 1024).toFixed(0)} KB
               </p>
             )}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label>Data firma *</Label>
+                <Input
+                  type="date"
+                  value={dataFirmaCartaceo}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDataFirmaCartaceo(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Esito *</Label>
+                <Select
+                  value={esitoCartaceo}
+                  onValueChange={(v) => setEsitoCartaceo(v as "acconsento" | "non_acconsento")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="acconsento">Acconsento</SelectItem>
+                    <SelectItem value="non_acconsento">Non acconsento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cartaceo e digitale hanno lo stesso valore: stati, scadenze e blocchi vengono applicati allo stesso modo.
+            </p>
           </div>
         )}
 
