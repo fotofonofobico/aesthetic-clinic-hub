@@ -21,6 +21,7 @@ import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/type
 import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
+import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
