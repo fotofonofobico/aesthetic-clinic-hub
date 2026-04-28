@@ -231,7 +231,11 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
           const up = await supabase.storage
             .from("consensi-pdf")
             .upload(pdfPath, blob, { contentType: "application/pdf" });
-          if (up.error) throw up.error;
+          if (up.error || !up.data?.path) {
+            console.error("[consensi-pdf upload] errore", up.error, "path:", pdfPath);
+            throw new Error(`Upload PDF consenso fallito: ${up.error?.message ?? "path vuoto"}`);
+          }
+          if (!pdfPath) throw new Error("pdf_url vuoto, abort");
           uploadedPaths.push(`consensi-pdf:${pdfPath}`);
 
           // Hash extra includendo firma + esito (compatibile con l'engine esistente)
