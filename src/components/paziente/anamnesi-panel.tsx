@@ -502,12 +502,12 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => void stampaAnamnesi()}>
-            <Printer className="h-4 w-4" />
-            Stampa anamnesi
-          </Button>
           {!isSigned && (
             <>
+              <Button size="sm" variant="outline" onClick={() => void stampaAnamnesi()}>
+                <Printer className="h-4 w-4" />
+                Stampa bozza
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setCartaceoDlgOpen(true)} disabled={signing || forking}>
                 <Upload className="h-4 w-4" />
                 Carica PDF firmato
