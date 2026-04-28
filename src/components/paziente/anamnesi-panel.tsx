@@ -38,6 +38,11 @@ interface AnamnesiRow {
   estetica: AnamnesiEstetica | null;
   note_libere: string | null;
   updated_at: string;
+  stato: "draft" | "signed" | "superseded";
+  versione_numero: number;
+  firmata_il: string | null;
+  pdf_url: string | null;
+  hash_integrita: string | null;
 }
 
 const PATOLOGIE = [
