@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -280,12 +281,23 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
 
   function onTrattamentoChange(rUid: string, trattamentoId: string) {
     const t = trattamenti.find((x) => x.id === trattamentoId);
-    patchRiga(rUid, {
-      trattamento_id: trattamentoId,
-      numero_sedute: defaultSedute(t),
-      consensoOk: null,
-      consensoMotivi: [],
-    });
+    const nuoveSedute = defaultSedute(t);
+    setRighe((cur) =>
+      cur.map((r) =>
+        r.uid === rUid
+          ? {
+              ...r,
+              trattamento_id: trattamentoId,
+              numero_sedute: nuoveSedute,
+              prodottiPerSeduta: r.personalizzaPerSeduta
+                ? allineaProdottiPerSeduta(r.prodottiPerSeduta, nuoveSedute, r.prodotti)
+                : r.prodottiPerSeduta,
+              consensoOk: null,
+              consensoMotivi: [],
+            }
+          : r,
+      ),
+    );
     void valutaConsenso(rUid, trattamentoId);
   }
 
@@ -356,6 +368,84 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         if (r.zone.some((x) => x.toLowerCase() === z.toLowerCase()))
           return { ...r, zoneDraft: "" };
         return { ...r, zone: [...r.zone, z], zoneDraft: "" };
+      }),
+    );
+  }
+
+  // ---------- personalizzazione per seduta ----------
+  function togglePersonalizza(rUid: string, on: boolean) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        if (on) {
+          return {
+            ...r,
+            personalizzaPerSeduta: true,
+            prodottiPerSeduta: allineaProdottiPerSeduta(
+              r.prodottiPerSeduta,
+              r.numero_sedute,
+              r.prodotti,
+            ),
+          };
+        }
+        return { ...r, personalizzaPerSeduta: false };
+      }),
+    );
+  }
+
+  function setNumeroSedute(rUid: string, n: number) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const nuovo = Math.max(Math.max(1, r.numero_sedute_min), Math.floor(n || 1));
+        return {
+          ...r,
+          numero_sedute: nuovo,
+          prodottiPerSeduta: r.personalizzaPerSeduta
+            ? allineaProdottiPerSeduta(r.prodottiPerSeduta, nuovo, r.prodotti)
+            : r.prodottiPerSeduta,
+        };
+      }),
+    );
+  }
+
+  function aggiungiProdottoSeduta(rUid: string, idx: number) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? [...arr, { uid: uid(), prodotto_id: "", quantita: 1 }] : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
+      }),
+    );
+  }
+
+  function rimuoviProdottoSeduta(rUid: string, idx: number, pUid: string) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? arr.filter((p) => p.uid !== pUid) : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
+      }),
+    );
+  }
+
+  function patchProdottoSeduta(
+    rUid: string,
+    idx: number,
+    pUid: string,
+    patch: Partial<{ prodotto_id: string; quantita: number }>,
+  ) {
+    setRighe((cur) =>
+      cur.map((r) => {
+        if (r.uid !== rUid) return r;
+        const next = r.prodottiPerSeduta.map((arr, i) =>
+          i === idx ? arr.map((p) => (p.uid === pUid ? { ...p, ...patch } : p)) : arr,
+        );
+        return { ...r, prodottiPerSeduta: next };
       }),
     );
   }
@@ -483,8 +573,15 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       if (r.numero_sedute < 1) return "Il numero di sedute deve essere almeno 1";
       if (r.numero_sedute < r.numero_sedute_min)
         return `Non puoi scendere sotto ${r.numero_sedute_min} sedute (già completate) per un trattamento`;
-      if (r.prodotti.some((p) => !p.prodotto_id || p.quantita < 1))
-        return "Completa o rimuovi i prodotti con quantità < 1";
+      if (!r.personalizzaPerSeduta) {
+        if (r.prodotti.some((p) => !p.prodotto_id || p.quantita < 1))
+          return "Completa o rimuovi i prodotti con quantità < 1";
+      } else {
+        for (const arr of r.prodottiPerSeduta) {
+          if (arr.some((p) => !p.prodotto_id || p.quantita < 1))
+            return "Completa o rimuovi i prodotti per seduta con quantità < 1";
+        }
+      }
     }
     if (scontoTipo === "percento" && (scontoValore < 0 || scontoValore > 100))
       return "Lo sconto in percentuale deve essere tra 0 e 100";
@@ -500,16 +597,23 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     return `Piano ${formatDateIT(new Date())} — ${nomi.join(", ")}`;
   }
 
-  function buildVocePayload(r: RigaForm, ordine: number) {
-    const prodotti: ProdottoPrevisto[] = r.prodotti.map((p) => {
+  function mapProdottiForm(list: ProdottoForm[], trattamentoId: string): ProdottoPrevisto[] {
+    return list.map((p) => {
       const prod = PRODOTTI_DEMO.find((x) => x.id === p.prodotto_id);
       return {
         nome: prod?.nome ?? p.prodotto_id,
         quantita: Math.max(1, Math.floor(p.quantita)),
         prodotto_id: p.prodotto_id,
-        trattamento_id: r.trattamento_id,
+        trattamento_id: trattamentoId,
       };
     });
+  }
+
+  function buildVocePayload(r: RigaForm, ordine: number) {
+    const prodotti = mapProdottiForm(r.prodotti, r.trattamento_id);
+    const pps = r.personalizzaPerSeduta
+      ? r.prodottiPerSeduta.map((arr) => mapProdottiForm(arr, r.trattamento_id))
+      : null;
     return {
       trattamento_id: r.trattamento_id,
       numero_sedute: r.numero_sedute,
@@ -517,8 +621,18 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       prezzo_riga: 0,
       ordine,
       prodotti_previsti: prodotti as unknown as never,
+      prodotti_per_seduta: (pps as unknown) as never,
       zone: r.zone as unknown as never,
     };
+  }
+
+  /** Ritorna la lista prodotti da assegnare alla seduta numero `n` (1-based). */
+  function prodottiPerSedutaN(r: RigaForm, n: number): ProdottoPrevisto[] {
+    if (r.personalizzaPerSeduta) {
+      const arr = r.prodottiPerSeduta[n - 1];
+      if (arr) return mapProdottiForm(arr, r.trattamento_id);
+    }
+    return mapProdottiForm(r.prodotti, r.trattamento_id);
   }
 
   // ---------- creazione piano ----------
@@ -551,35 +665,27 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       if (pianoErr || !pianoData) throw pianoErr ?? new Error("Errore creazione piano");
       const pianoId = (pianoData as { id: string }).id;
 
-      const vociPayload = righe.map((r, i) => ({
-        piano_id: pianoId,
-        ...buildVocePayload(r, i),
-      }));
-      const { data: vociData, error: vociErr } = await supabase
-        .from("piano_trattamento_voce")
-        .insert(vociPayload as never)
-        .select("id, trattamento_id, numero_sedute, prodotti_previsti");
-      if (vociErr || !vociData) throw vociErr ?? new Error("Errore creazione voci");
-
       const sedutePayload: Array<Record<string, unknown>> = [];
-      for (const v of vociData as Array<{
-        id: string;
-        trattamento_id: string;
-        numero_sedute: number;
-        prodotti_previsti: unknown;
-      }>) {
-        const prodottiBase = parseProdotti(v.prodotti_previsti);
-        for (let n = 1; n <= v.numero_sedute; n++) {
+      for (let i = 0; i < righe.length; i++) {
+        const r = righe[i];
+        const { data: vNew, error: vErr } = await supabase
+          .from("piano_trattamento_voce")
+          .insert({ piano_id: pianoId, ...buildVocePayload(r, i) } as never)
+          .select("id")
+          .single();
+        if (vErr || !vNew) throw vErr ?? new Error("Errore creazione voce");
+        const voceId = (vNew as { id: string }).id;
+        for (let n = 1; n <= r.numero_sedute; n++) {
           sedutePayload.push({
             piano_id: pianoId,
             paziente_id: pazienteId,
-            trattamento_id: v.trattamento_id,
-            voce_id: v.id,
+            trattamento_id: r.trattamento_id,
+            voce_id: voceId,
             numero_seduta: n,
             data_seduta: null, // data da definire
             operatore_id: user?.id,
             completata: false,
-            prodotti_previsti: JSON.parse(JSON.stringify(prodottiBase)),
+            prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
           });
         }
       }
@@ -656,7 +762,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       let ordine = 0;
       for (const r of righe) {
         if (r.voceId) {
-          const vEsistente = vociEsistenti.find((v) => v.id === r.voceId);
+          // (vEsistente non più necessario: i prodotti sono già nel form)
           const { error } = await supabase
             .from("piano_trattamento_voce")
             .update({
@@ -665,18 +771,18 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
             .eq("id", r.voceId);
           if (error) throw error;
 
-          // aggiorna prodotti_previsti delle sedute non completate (ri-clona)
+          // aggiorna prodotti_previsti delle sedute non completate (per-seduta)
           const seduteVoce = sedute.filter((s) => s.voce_id === r.voceId);
           const completate = seduteVoce.filter((s) => s.completata);
           const programmate = seduteVoce.filter((s) => !s.completata);
-          const prodottiNuovi = (buildVocePayload(r, ordine).prodotti_previsti as unknown) as ProdottoPrevisto[];
 
-          // aggiorna prodotti su sedute future
+          // aggiorna prodotti su sedute future, in base al numero_seduta
           for (const s of programmate) {
+            const prodN = prodottiPerSedutaN(r, s.numero_seduta);
             await supabase
               .from("seduta")
               .update({
-                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+                prodotti_previsti: JSON.parse(JSON.stringify(prodN)),
                 trattamento_id: r.trattamento_id,
               } as never)
               .eq("id", s.id);
@@ -699,7 +805,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                 data_seduta: null,
                 operatore_id: user?.id,
                 completata: false,
-                prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
+                prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
               });
             }
             if (insertSed.length > 0) {
@@ -732,28 +838,22 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           const { data: vNew, error } = await supabase
             .from("piano_trattamento_voce")
             .insert({ piano_id: pianoId, ...buildVocePayload(r, ordine) } as never)
-            .select("id, trattamento_id, numero_sedute, prodotti_previsti")
+            .select("id")
             .single();
           if (error || !vNew) throw error ?? new Error("Errore creazione voce");
-          const v = vNew as {
-            id: string;
-            trattamento_id: string;
-            numero_sedute: number;
-            prodotti_previsti: unknown;
-          };
-          const prodotti = parseProdotti(v.prodotti_previsti);
+          const voceId = (vNew as { id: string }).id;
           const insertSed: Array<Record<string, unknown>> = [];
-          for (let n = 1; n <= v.numero_sedute; n++) {
+          for (let n = 1; n <= r.numero_sedute; n++) {
             insertSed.push({
               piano_id: pianoId,
               paziente_id: pazienteId,
-              trattamento_id: v.trattamento_id,
-              voce_id: v.id,
+              trattamento_id: r.trattamento_id,
+              voce_id: voceId,
               numero_seduta: n,
               data_seduta: null,
               operatore_id: user?.id,
               completata: false,
-              prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
+              prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
             });
           }
           if (insertSed.length > 0) {
@@ -935,12 +1035,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           step={1}
                           value={r.numero_sedute}
                           onChange={(e) =>
-                            patchRiga(r.uid, {
-                              numero_sedute: Math.max(
-                                Math.max(1, r.numero_sedute_min),
-                                Math.floor(Number(e.target.value) || 1),
-                              ),
-                            })
+                            setNumeroSedute(r.uid, Number(e.target.value))
                           }
                         />
                         {r.numero_sedute_min > 0 && (
@@ -975,76 +1070,177 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                       </div>
                     </div>
 
-                    {/* Prodotti previsti per singola seduta */}
+                    {/* Prodotti previsti */}
                     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
                           <Package className="h-3 w-3" />
-                          Prodotti per seduta (× {r.numero_sedute} sedute)
+                          {r.personalizzaPerSeduta
+                            ? `Prodotti per ciascuna seduta (${r.numero_sedute})`
+                            : `Prodotti per seduta (× ${r.numero_sedute} sedute)`}
                         </Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => aggiungiProdotto(r.uid)}
-                        >
-                          <Plus className="h-3 w-3" />
-                          Aggiungi
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Label
+                            htmlFor={`pers-${r.uid}`}
+                            className="text-[11px] text-muted-foreground"
+                          >
+                            Personalizza per seduta
+                          </Label>
+                          <Switch
+                            id={`pers-${r.uid}`}
+                            checked={r.personalizzaPerSeduta}
+                            onCheckedChange={(v) => togglePersonalizza(r.uid, v)}
+                            disabled={r.numero_sedute < 2}
+                          />
+                        </div>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Le quantità qui sotto si riferiscono a <strong>una singola seduta</strong>. Verranno
-                        replicate su ogni seduta del ciclo.
+                        {r.personalizzaPerSeduta
+                          ? "Definisci prodotti diversi per ciascuna seduta del ciclo (es. concentrazioni crescenti)."
+                          : "Le quantità qui sotto si riferiscono a una singola seduta e verranno replicate su ogni seduta del ciclo."}
                       </p>
 
-                      {r.prodotti.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          Nessun prodotto previsto.
-                        </p>
+                      {!r.personalizzaPerSeduta ? (
+                        <>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => aggiungiProdotto(r.uid)}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Aggiungi prodotto
+                            </Button>
+                          </div>
+                          {r.prodotti.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Nessun prodotto previsto.
+                            </p>
+                          ) : (
+                            <div className="space-y-1">
+                              {r.prodotti.map((p) => (
+                                <div key={p.uid} className="flex items-center gap-2">
+                                  <Select
+                                    value={p.prodotto_id || undefined}
+                                    onValueChange={(v) =>
+                                      patchProdotto(r.uid, p.uid, { prodotto_id: v })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 flex-1 text-xs">
+                                      <SelectValue placeholder="Seleziona prodotto…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {PRODOTTI_DEMO.map((prod) => (
+                                        <SelectItem key={prod.id} value={prod.id}>
+                                          {prod.nome}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    type="number"
+                                    step={1}
+                                    min={1}
+                                    className="h-8 w-20 text-xs"
+                                    value={p.quantita}
+                                    onChange={(e) =>
+                                      patchProdotto(r.uid, p.uid, {
+                                        quantita: Math.max(
+                                          1,
+                                          Math.floor(Number(e.target.value) || 1),
+                                        ),
+                                      })
+                                    }
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => rimuoviProdotto(r.uid, p.uid)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <div className="space-y-1">
-                          {r.prodotti.map((p) => (
-                            <div key={p.uid} className="flex items-center gap-2">
-                              <Select
-                                value={p.prodotto_id || undefined}
-                                onValueChange={(v) =>
-                                  patchProdotto(r.uid, p.uid, { prodotto_id: v })
-                                }
-                              >
-                                <SelectTrigger className="h-8 flex-1 text-xs">
-                                  <SelectValue placeholder="Seleziona prodotto…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {PRODOTTI_DEMO.map((prod) => (
-                                    <SelectItem key={prod.id} value={prod.id}>
-                                      {prod.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                type="number"
-                                step={1}
-                                min={1}
-                                className="h-8 w-20 text-xs"
-                                value={p.quantita}
-                                onChange={(e) =>
-                                  patchProdotto(r.uid, p.uid, {
-                                    quantita: Math.max(
-                                      1,
-                                      Math.floor(Number(e.target.value) || 1),
-                                    ),
-                                  })
-                                }
-                              />
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => rimuoviProdotto(r.uid, p.uid)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                        <div className="space-y-3">
+                          {r.prodottiPerSeduta.map((arr, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-1 rounded-md border border-border/60 bg-background p-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Seduta {idx + 1}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => aggiungiProdottoSeduta(r.uid, idx)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Aggiungi
+                                </Button>
+                              </div>
+                              {arr.length === 0 ? (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Nessun prodotto.
+                                </p>
+                              ) : (
+                                arr.map((p) => (
+                                  <div key={p.uid} className="flex items-center gap-2">
+                                    <Select
+                                      value={p.prodotto_id || undefined}
+                                      onValueChange={(v) =>
+                                        patchProdottoSeduta(r.uid, idx, p.uid, {
+                                          prodotto_id: v,
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 flex-1 text-xs">
+                                        <SelectValue placeholder="Seleziona prodotto…" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {PRODOTTI_DEMO.map((prod) => (
+                                          <SelectItem key={prod.id} value={prod.id}>
+                                            {prod.nome}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      step={1}
+                                      min={1}
+                                      className="h-8 w-20 text-xs"
+                                      value={p.quantita}
+                                      onChange={(e) =>
+                                        patchProdottoSeduta(r.uid, idx, p.uid, {
+                                          quantita: Math.max(
+                                            1,
+                                            Math.floor(Number(e.target.value) || 1),
+                                          ),
+                                        })
+                                      }
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        rimuoviProdottoSeduta(r.uid, idx, p.uid)
+                                      }
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           ))}
                         </div>
