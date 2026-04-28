@@ -117,6 +117,7 @@ export interface ConsensoFirmato {
   operatore_testimone: string | null;
   hash_integrita: string | null;
   note: string | null;
+  rifiutato: boolean;
   created_at: string;
 }
 

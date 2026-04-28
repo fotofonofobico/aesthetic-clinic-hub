@@ -109,6 +109,64 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
     void load();
   }
 
+  /**
+   * Rigenera il PDF di un consenso a partire dagli snapshot salvati.
+   * Utile per record vecchi senza pdf_url o con file mancante in storage.
+   * Richiede firma_immagine (firma su tablet).
+   */
+  async function rigeneraPdf(c: ConsensoFirmato): Promise<void> {
+    if (!c.firma_immagine) {
+      toast.error("Impossibile rigenerare: firma originale non disponibile (consenso cartaceo).");
+      return;
+    }
+    try {
+      const { data: paz, error: pazErr } = await supabase
+        .from("pazienti")
+        .select("nome, cognome, data_nascita, codice_fiscale")
+        .eq("id", c.paziente_id)
+        .single();
+      if (pazErr || !paz) throw new Error(pazErr?.message ?? "Paziente non trovato");
+
+      const { blob } = await generaPdfConsenso({
+        paziente: {
+          nome: paz.nome,
+          cognome: paz.cognome,
+          data_nascita: paz.data_nascita ?? null,
+          codice_fiscale: paz.codice_fiscale ?? null,
+        },
+        titolo: c.titolo_snapshot,
+        testo: c.testo_snapshot,
+        versione: c.versione_snapshot,
+        categoria: c.categoria_snapshot,
+        firmatoIl: new Date(c.firmato_il),
+        validoFinoA: c.valido_fino_a ? new Date(c.valido_fino_a) : null,
+        modalitaFirma: "tablet",
+        firmaPazienteDataUrl: c.firma_immagine,
+        firmaMedicoDataUrl: null,
+        operatoreNome: null,
+        rifiutato: c.rifiutato,
+        note: c.note ?? null,
+      });
+      const path = `${c.paziente_id}/rigenerato/${c.id}-${Date.now()}.pdf`;
+      const up = await supabase.storage
+        .from("consensi-pdf")
+        .upload(path, blob, { contentType: "application/pdf", upsert: true });
+      if (up.error || !up.data?.path) {
+        throw new Error(up.error?.message ?? "upload fallito");
+      }
+      const { error: updErr } = await supabase
+        .from("consenso_firmato")
+        .update({ pdf_url: path })
+        .eq("id", c.id);
+      if (updErr) throw updErr;
+      toast.success("PDF rigenerato e archiviato");
+      setViewing((v) => (v && v.id === c.id ? { ...v, pdf_url: path } : v));
+      void load();
+    } catch (e) {
+      toast.error(`Errore rigenerazione PDF: ${(e as Error).message}`);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -274,11 +332,28 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                       bucket="consensi-pdf"
                       path={viewing.pdf_url}
                       label="Apri PDF firmato"
+                      onMissing={() => {
+                        if (viewing.firma_immagine) void rigeneraPdf(viewing);
+                      }}
                     />
+                  ) : viewing.firma_immagine ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        PDF non disponibile (record antecedente alla generazione automatica).
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void rigeneraPdf(viewing)}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Rigenera PDF firmato
+                      </Button>
+                    </div>
                   ) : (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      PDF non disponibile per questo consenso (record antecedente alla
-                      generazione automatica)
+                      PDF non disponibile e firma originale assente: ricaricare manualmente il
+                      cartaceo.
                     </p>
                   )}
                 </div>
