@@ -1,8 +1,8 @@
 import * as React from "react";
 import { FileText, Loader2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { renderPdfInWindow } from "@/lib/pdf-viewer";
 
 interface Props {
   bucket: string;
@@ -20,6 +20,7 @@ interface Props {
  * non con HEAD sul signed URL (inaffidabile dietro Cloudflare).
  */
 export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMissing }: Props) {
+  const navigate = useNavigate();
   const [busy, setBusy] = React.useState(false);
   const busyRef = React.useRef(false);
 
@@ -27,17 +28,6 @@ export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMiss
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    const pdfWindow = window.open("", "_blank");
-    if (!pdfWindow) {
-      busyRef.current = false;
-      setBusy(false);
-      toast.error("Abilita i popup per aprire il PDF.");
-      return;
-    }
-    pdfWindow.opener = null;
-    pdfWindow.document.write(
-      '<!doctype html><html lang="it"><head><title>Caricamento PDF…</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">Caricamento PDF…</body></html>',
-    );
     try {
       // Verifica esistenza via list (autenticata, no CORS)
       const lastSlash = path.lastIndexOf("/");
@@ -53,17 +43,10 @@ export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMiss
       const exists = (listed ?? []).some((o) => o.name === filename);
       if (!exists) {
         toast.error("Il PDF non è più presente nello storage.");
-        pdfWindow.close();
         onMissing?.();
         return;
       }
-      const { data, error } = await supabase.storage.from(bucket).download(path);
-      if (error || !data) {
-        toast.error(`PDF presente ma non scaricabile: ${error?.message ?? "n/d"}`);
-        pdfWindow.close();
-        return;
-      }
-      await renderPdfInWindow(pdfWindow, data, label);
+      void navigate({ to: "/pdf-viewer", search: { bucket, path, title: label } });
     } finally {
       busyRef.current = false;
       setBusy(false);
