@@ -32,7 +32,6 @@ import {
   type TrattamentoCategoria,
   TRATTAMENTO_CATEGORIE,
   TRATTAMENTO_CATEGORIA_LABELS,
-  DURATA_UNITA_LABELS,
 } from "@/types/trattamenti";
 
 export const Route = createFileRoute("/_authenticated/trattamenti/")({
