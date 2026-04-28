@@ -538,6 +538,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 <Upload className="h-4 w-4" />
                 Carica PDF firmato
               </Button>
+              {lastSigned && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void annullaModifiche()}
+                  disabled={annullando || signing || forking}
+                  className="text-destructive"
+                >
+                  {annullando ? "Annullamento…" : `Annulla modifiche (torna a v${lastSigned.versione_numero})`}
+                </Button>
+              )}
               <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
