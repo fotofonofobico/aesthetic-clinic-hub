@@ -516,7 +516,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
         numero_sedute: number;
         prodotti_previsti: unknown;
       }>) {
-        const prodotti = parseProdotti(v.prodotti_previsti);
+        const prodottiBase = parseProdotti(v.prodotti_previsti);
         for (let n = 1; n <= v.numero_sedute; n++) {
           sedutePayload.push({
             piano_id: pianoId,
@@ -524,9 +524,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
             trattamento_id: v.trattamento_id,
             voce_id: v.id,
             numero_seduta: n,
+            data_seduta: null, // data da definire
             operatore_id: user?.id,
             completata: false,
-            prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
+            prodotti_previsti: JSON.parse(JSON.stringify(prodottiBase)),
           });
         }
       }
@@ -643,6 +644,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                 trattamento_id: r.trattamento_id,
                 voce_id: r.voceId,
                 numero_seduta: n,
+                data_seduta: null,
                 operatore_id: user?.id,
                 completata: false,
                 prodotti_previsti: JSON.parse(JSON.stringify(prodottiNuovi)),
@@ -696,6 +698,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
               trattamento_id: v.trattamento_id,
               voce_id: v.id,
               numero_seduta: n,
+              data_seduta: null,
               operatore_id: user?.id,
               completata: false,
               prodotti_previsti: JSON.parse(JSON.stringify(prodotti)),
@@ -920,12 +923,12 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                       </div>
                     </div>
 
-                    {/* Prodotti previsti */}
+                    {/* Prodotti previsti per singola seduta */}
                     <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
                       <div className="flex items-center justify-between">
                         <Label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
                           <Package className="h-3 w-3" />
-                          Prodotti previsti (conteggio)
+                          Prodotti per seduta (× {r.numero_sedute} sedute)
                         </Label>
                         <Button
                           type="button"
@@ -937,6 +940,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           Aggiungi
                         </Button>
                       </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Le quantità qui sotto si riferiscono a <strong>una singola seduta</strong>. Verranno
+                        replicate su ogni seduta del ciclo.
+                      </p>
 
                       {r.prodotti.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
@@ -1336,16 +1343,26 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                               )}
 
                               {v.prodotti_previsti.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {v.prodotti_previsti.map((prod, i) => (
-                                    <span
-                                      key={i}
-                                      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
-                                    >
-                                      <Package className="h-3 w-3" />
-                                      {prod.nome} × {prod.quantita}
-                                    </span>
-                                  ))}
+                                <div className="space-y-1">
+                                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                    Prodotti per seduta
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {v.prodotti_previsti.map((prod, i) => (
+                                      <span
+                                        key={i}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px]"
+                                      >
+                                        <Package className="h-3 w-3" />
+                                        {prod.nome} × {prod.quantita}
+                                        {v.numero_sedute > 1 && (
+                                          <span className="text-muted-foreground">
+                                            (tot ciclo: {prod.quantita * v.numero_sedute})
+                                          </span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>

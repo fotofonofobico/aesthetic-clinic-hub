@@ -228,16 +228,27 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
 
   const programmate = righe
     .filter((r) => !r.completata)
-    .sort((a, b) => new Date(a.data_seduta).getTime() - new Date(b.data_seduta).getTime());
+    .sort((a, b) => {
+      // "Da definire" in fondo
+      if (!a.data_seduta && !b.data_seduta) return 0;
+      if (!a.data_seduta) return 1;
+      if (!b.data_seduta) return -1;
+      return new Date(a.data_seduta).getTime() - new Date(b.data_seduta).getTime();
+    });
   const eseguite = righe
     .filter((r) => r.completata)
-    .sort(
-      (a, b) =>
-        new Date(dataClinica(b)).getTime() - new Date(dataClinica(a)).getTime(),
-    );
+    .sort((a, b) => {
+      const da = dataClinica(a);
+      const db = dataClinica(b);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return new Date(db).getTime() - new Date(da).getTime();
+    });
 
   const inRitardo = programmate.filter((r) => statoSeduta(r) === "in_ritardo").length;
   const oggi = programmate.filter((r) => statoSeduta(r) === "oggi").length;
+  const daDefinire = programmate.filter((r) => statoSeduta(r) === "da_definire").length;
 
   const visibili =
     filtro === "programmate"
@@ -293,6 +304,12 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
               <Badge variant="secondary" className="gap-1">
                 <Clock className="h-3 w-3" />
                 {oggi} oggi
+              </Badge>
+            )}
+            {daDefinire > 0 && (
+              <Badge variant="outline" className="gap-1">
+                <Calendar className="h-3 w-3" />
+                {daDefinire} da pianificare
               </Badge>
             )}
           </div>
@@ -528,9 +545,13 @@ function SedutaCard({
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {seduta.completata ? `Eseguita: ${fmtData(dataEff)}` : `Prevista: ${fmtData(seduta.data_seduta)}`}
+              {seduta.completata
+                ? `Eseguita: ${dataEff ? fmtData(dataEff) : "—"}`
+                : seduta.data_seduta
+                  ? `Prevista: ${fmtData(seduta.data_seduta)}`
+                  : "Data da definire"}
             </span>
-            {seduta.completata &&
+            {seduta.completata && dataEff &&
               new Date(seduta.data_registrazione).toDateString() !==
                 new Date(dataEff).toDateString() && (
                 <span className="italic">
@@ -652,6 +673,13 @@ function StatoBadge({ stato }: { stato: StatoSeduta }) {
         Oggi
       </Badge>
     );
+  if (stato === "da_definire")
+    return (
+      <Badge variant="outline" className="gap-1 text-[10px] border-muted-foreground/40 text-muted-foreground">
+        <Calendar className="h-3 w-3" />
+        Da pianificare
+      </Badge>
+    );
   return (
     <Badge variant="outline" className="gap-1 text-[10px]">
       <Calendar className="h-3 w-3" />
@@ -669,7 +697,9 @@ function RescheduleInline({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [val, setVal] = useState(toLocalInput(seduta.data_seduta));
+  const [val, setVal] = useState(
+    toLocalInput(seduta.data_seduta ?? new Date().toISOString()),
+  );
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -988,7 +1018,9 @@ function ModificaSedutaDialog({
   const permesso = valutaModificaSeduta(seduta, userId, isMedico);
 
   const [dataEsecuzione, setDataEsecuzione] = useState(
-    toLocalInput(seduta.data_esecuzione_effettiva ?? seduta.data_seduta),
+    toLocalInput(
+      seduta.data_esecuzione_effettiva ?? seduta.data_seduta ?? new Date().toISOString(),
+    ),
   );
   const [durata, setDurata] = useState<string>(seduta.durata_minuti?.toString() ?? "");
   const [prodotti, setProdotti] = useState<ProdottoPrevisto[]>(seduta.prodotti_previsti);

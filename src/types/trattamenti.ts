@@ -81,6 +81,8 @@ export interface Trattamento {
   consenso_template_id: string | null;
 }
 
+export type ConsensoDurataTipo = "mesi" | "sedute";
+
 export interface ConsensoTemplate {
   id: string;
   trattamento_id: string | null;
@@ -89,6 +91,8 @@ export interface ConsensoTemplate {
   versione: string;
   categoria: ConsensoCategoria;
   validita_mesi: number | null;
+  durata_tipo: ConsensoDurataTipo;
+  durata_sedute: number | null;
   descrizione: string | null;
   richiede_firma_medico: boolean;
   attivo: boolean;
@@ -105,6 +109,10 @@ export interface ConsensoFirmato {
   versione_snapshot: string;
   categoria_snapshot: ConsensoCategoria;
   validita_mesi_snapshot: number | null;
+  durata_tipo_snapshot: ConsensoDurataTipo;
+  durata_sedute_snapshot: number | null;
+  sedute_max_snapshot: number | null;
+  sedute_consumate: number;
   modalita_firma: ConsensoModalitaFirma;
   firma_immagine: string | null;
   pdf_url: string | null;
@@ -167,6 +175,9 @@ export interface PianoVoce {
   prezzo_riga: number;
   ordine: number;
   prodotti_previsti: ProdottoPrevisto[];
+  /** Quando valorizzato, contiene un array di array (uno per seduta) di prodotti.
+   *  Se NULL, viene replicata `prodotti_previsti` su ogni seduta. */
+  prodotti_per_seduta: ProdottoPrevisto[][] | null;
   zone: string[];
   created_at: string;
 }
@@ -176,8 +187,8 @@ export interface Seduta {
   piano_id: string | null;
   paziente_id: string;
   numero_seduta: number;
-  /** Data prevista / programmata della seduta */
-  data_seduta: string;
+  /** Data prevista / programmata della seduta. NULL = "data da definire". */
+  data_seduta: string | null;
   /** Data clinica reale (può essere retroattiva) */
   data_esecuzione_effettiva: string | null;
   /** Quando l'operatore l'ha registrata nel sistema */

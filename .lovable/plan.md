@@ -1,194 +1,115 @@
+## Obiettivo
 
-# Sezione "Sedute" - esecuzione clinica reale
+Tre cambi strutturali importanti + due rifiniture UX. Riguardano: prodotti per seduta vs per ciclo, durata consensi misurata in sedute, default "data da definire" per le sedute programmate, pulizia UI lista pazienti.
 
-## Decisioni recepite
+---
 
-- **Date**: opzionali in fase di piano, modificabili nella sezione Sedute
-- **Sedute spot**: ammesse, senza piano (richiede migrazione: `seduta.piano_id` nullable)
-- **Modifica post-firma**: libera entro 48h da chi l'ha eseguita; oltre 48h serve ruolo medico + motivo obbligatorio + audit completo
-- **Data retroattiva**: possibile inserire data di esecuzione passata, ma il sistema registra anche data di inserimento reale
-- **Diario**: ogni seduta completata genera automaticamente una voce nel diario (`paziente_nota` tipo `clinica`), aggiornata se la seduta viene modificata
+## 1. Prodotti per seduta (non più per ciclo intero)
 
-## 1. Modifiche database
+**Problema attuale**: nel piano si inseriscono i prodotti totali del trattamento (es. 3 fiale per la biostimolazione). Nella generazione delle sedute, lo stesso array `prodotti_previsti` viene clonato su OGNI seduta → 3 sedute × 3 fiale = 9 fiale "previste".
 
-### Migrazione schema (`seduta`)
+**Cambio di modello**: i prodotti diventano **per singola seduta** + opzionalmente differenziati seduta per seduta.
 
-```text
-ALTER TABLE seduta:
-  - piano_id DROP NOT NULL                       (sedute spot)
-  - data_esecuzione_effettiva timestamptz NULL   (quando il trattamento è stato fatto davvero)
-  - data_registrazione timestamptz DEFAULT now() (quando l'operatore l'ha inserita nel sistema)
-  - firmata_il timestamptz NULL                  (timestamp del "completata = true")
-  - firmata_da uuid NULL                         (operatore che ha firmato)
-  - bloccata boolean DEFAULT false               (true dopo 48h dalla firma)
-  - nota_diario_id uuid NULL                     (FK logica a paziente_nota auto-generata)
-  - trattamento_id valorizzato anche per spot
-```
+### Modifica al form Piano (componente `piani-panel.tsx`)
+- Per ogni voce di trattamento, l'utente vede una sezione "Prodotti per seduta" con due modalità:
+  - **Stessi prodotti su tutte le sedute** (default, semplice): un'unica lista applicata a ogni seduta del ciclo.
+  - **Prodotti diversi per seduta** (toggle "Personalizza per seduta"): mostra N tab/righe (1 per ogni seduta prevista), ognuna con la propria lista prodotti.
+- Etichetta chiara: "Prodotti per ciascuna seduta (×N sedute previste)".
+- Riepilogo a fine voce: "Totale fiale ciclo: 3 × 3 sedute = 9 fiale" così si capisce subito il consumo aggregato.
 
-`data_seduta` resta come "data programmata/prevista". `data_esecuzione_effettiva` è la data clinica reale (può essere nel passato).
+### Modifica DB
+- `piano_trattamento_voce.prodotti_previsti` resta com'è (è lo "schema base" della seduta tipo).
+- Aggiunta colonna nuova: `piano_trattamento_voce.prodotti_per_seduta jsonb` nullable. Quando valorizzato è `[ [prodotti_seduta1], [prodotti_seduta2], … ]`. Quando NULL si replica la lista base.
+- La generazione sedute prende, per la seduta n, l'array all'indice n-1 di `prodotti_per_seduta` se presente, altrimenti `prodotti_previsti`.
 
-### Nuova tabella audit `seduta_modifica`
+### Modifica visualizzazione
+- Nel pannello Piani (sia card collassata che riepilogo voce) si mostra: "1.8% × 1 fiala · 2.2% × 0 fiale" come prodotti **per seduta**, con sotto in muted "totale ciclo: 3 fiale".
+- Nel pannello Sedute, ogni card seduta mostra solo i propri prodotti (che già è così — il bug era nella generazione).
 
-```text
-seduta_modifica:
-  id uuid PK
-  seduta_id uuid NOT NULL
-  modificata_da uuid NOT NULL
-  modificata_il timestamptz DEFAULT now()
-  campo text NOT NULL              (es. "note_cliniche", "prodotti_previsti")
-  valore_precedente jsonb
-  valore_nuovo jsonb
-  motivo text NOT NULL             (obbligatorio per modifiche oltre 48h)
-  oltre_48h boolean DEFAULT false
-```
+---
 
-RLS: insert da operatori attivi, select da operatori attivi, no update/delete (immutabile).
+## 2. Durata consenso ciclo misurata in numero sedute
 
-### Trigger DB
+**Problema attuale**: i template consenso "ciclo" hanno `validita_mesi` (es. 12 mesi). Per cicli brevi è poco coerente: il consenso dovrebbe scadere quando finisce il ciclo, non per data.
 
-- **`seduta_blocca_dopo_48h`**: trigger BEFORE UPDATE che, se `firmata_il` è più vecchio di 48h e l'utente non è medico, blocca le modifiche se `motivo` non è fornito (passato via session var o gestito lato app).
-- **`seduta_sync_diario`**: AFTER INSERT/UPDATE quando `completata = true` → upsert in `paziente_nota` con riassunto strutturato; salva l'id in `seduta.nota_diario_id`. AFTER UPDATE quando `completata` torna false → marca la nota come "annullata" o la elimina.
-- Trigger `piano_auto_stato` esistente continua a funzionare.
+### Cambio modello
+- Aggiunta a `consenso_template`: colonna `durata_tipo text` con valori `mesi` | `sedute` (default `mesi` per retrocompatibilità). Aggiunta `durata_sedute integer` nullable.
+- Aggiunta a `consenso_firmato`: colonna `durata_tipo_snapshot`, `durata_sedute_snapshot`, `sedute_consumate integer default 0`, `sedute_max_snapshot integer` nullable.
+- La RPC `paziente_consensi_stato` viene aggiornata per gestire entrambi i casi:
+  - `mesi`: come oggi (confronta `valido_fino_a` con `now()`).
+  - `sedute`: il consenso è `expired` se `sedute_consumate >= sedute_max_snapshot`, `expiring` quando ne resta 1, altrimenti `valid`.
+- Trigger su `seduta` (after update completata=true): incrementa `sedute_consumate` sul consenso firmato collegato (lookup via paziente + template del trattamento + consenso valido più recente).
 
-## 2. UI - nuovo tab "Sedute"
+### Modifica UI
+- **Form template consenso (Consensi → nuovo/modifica)**: per categoria `trattamento_ciclo` mostra radio "Validità" → `Per N mesi` | `Per N sedute`. Selezionando "sedute", l'input chiede il numero (default = numero sedute previste dal trattamento collegato, se uno solo).
+- **Form trattamento ciclo**: il messaggio già presente ("✔ Consenso ciclo: valido per tutta la durata del trattamento") diventa accurato — mostra "valido per N sedute" o "per N mesi" letto dal template.
+- **Cronologia consensi paziente**: mostra "Validità: 3 sedute (1/3 usate)" oltre alla data.
 
-Aggiunto nella scheda paziente accanto a Diario / Piani / Anamnesi / Consensi.
+---
 
-### Layout principale (`src/components/paziente/sedute-panel.tsx`)
+## 3. Sedute programmate: data "da definire" di default
 
-```text
-[ Card riepilogo                                              ]
-[ Programmate: 5 · Eseguite: 12 · In ritardo: 1               ]
-[                                       [+ Nuova seduta spot] ]
+**Problema attuale**: alla creazione del piano, le sedute vengono inserite con `data_seduta = now()` (default DB), così risultano "in ritardo" subito dopo.
 
-[ Filtri: Tutte | Programmate | Eseguite | Per piano ▾        ]
+### Cambio
+- `seduta.data_seduta` diventa nullable.
+- Quando si genera una seduta dal piano (`piani-panel.tsx` → `creaPiano`/`modificaPiano` → `insertSed`), `data_seduta` viene esplicitamente passata come `null`.
+- `statoSeduta()` in `seduta-helpers.ts` aggiunge il caso `da_definire` (badge neutro grigio) e NON la conta più tra "in ritardo" finché la data è null.
+- Card seduta nel pannello Sedute mostra "Data da definire" con bottone inline "Pianifica" (apre il dialog reschedule esistente).
+- Filtri/contatori della card riepilogo: `programmate` resta uguale, `in ritardo` esclude le `da_definire`, aggiunto contatore `da pianificare` se > 0.
 
-╔══ PROGRAMMATE ═════════════════════════════════════════════╗
-║ ⚠ Botox glabella · Piano "Ringiovanimento viso"           ║
-║   Prevista: 15 mag 2026 · zone: glabella, fronte           ║
-║   Prodotti previsti: Botox 50U · Consenso ✓                ║
-║   [Sposta data] [Esegui ora] [Annulla]                    ║
-╠════════════════════════════════════════════════════════════╣
-║ ⚠ Biostimolazione viso (2/3) · Consenso MANCANTE          ║
-║   [Firma consenso] [Sposta data] [Esegui ora]             ║
-╚════════════════════════════════════════════════════════════╝
+---
 
-╔══ ESEGUITE ════════════════════════════════════════════════╗
-║ ✓ Filler labbra · 12 apr 2026 (registrata 13 apr)         ║
-║   Operatore: Dr. Rossi · zone: labbro sup/inf              ║
-║   Prodotti: Juvederm Volift 1ml                            ║
-║   [Vedi dettagli] [Modifica] (entro 48h)                   ║
-╚════════════════════════════════════════════════════════════╝
-```
+## 4. Lista pazienti: rimuovere icone severity a sinistra del nome
 
-### Dialog "Esegui seduta" (`src/components/paziente/sedute/esegui-seduta-dialog.tsx`)
+In `pazienti.index.tsx` (lista) il componente `SeverityBadge` viene renderizzato accanto al nome. Va rimosso:
+- Eliminare il rendering del badge severity nella riga lista.
+- Rimuovere import `AlertTriangle, ShieldAlert, Info` non più usati e funzione `SeverityBadge`.
+- Mantenuto invece il banner "stato" critico nella **scheda paziente** (`CriticalBanner` in `pazienti.$id.tsx`) — quello resta com'è.
 
-```text
-┌─ Esegui seduta · Botox glabella ──────────────────────┐
-│ ⚠ Consenso mancante  [Firma ora]  (blocca salvataggio)│
-│                                                        │
-│ Data esecuzione *  [15/05/2026 ▾] (default: oggi)     │
-│ ℹ Inserisci data passata se stai registrando a poste- │
-│   riori. Sistema registrerà anche data di inserimento.│
-│                                                        │
-│ Operatore *        [Dr. Rossi ▾]                       │
-│ Durata (min)       [30]                                │
-│                                                        │
-│ Zone trattate                                          │
-│ Previste: glabella, fronte                             │
-│ [chip: glabella ✓] [chip: fronte ✓] [+ aggiungi]      │
-│                                                        │
-│ Prodotti utilizzati                                    │
-│ ┌────────────────────────────────────────┐            │
-│ │ Botox     [- 1 +]   lotto: [____]      │            │
-│ │ [+ aggiungi prodotto]                   │            │
-│ └────────────────────────────────────────┘            │
-│                                                        │
-│ Parametri tecnici (opzionale)                          │
-│ [textarea libero]                                      │
-│                                                        │
-│ Note cliniche                                          │
-│ [textarea]                                             │
-│                                                        │
-│ ☑ Aggiungi voce automatica al diario                  │
-│                                                        │
-│        [Annulla]  [Salva bozza]  [Firma e completa]   │
-└────────────────────────────────────────────────────────┘
-```
+> Nota: se per "schermata pazienti" intendi invece la scheda del singolo paziente (icona allergie accanto al nome in alto), dimmelo e in fase di implementazione tolgo quella invece. Dalla descrizione "logo a sn del nome … mantenere solo banner stato" interpreto la lista, perché nella scheda non c'è un'icona accanto al nome ma solo il banner critico.
 
-### Dialog "Modifica seduta firmata"
+---
 
-Se `firmata_il < 48h` e utente è chi ha firmato → form normale, ogni campo cambiato salva entry in `seduta_modifica`.
+## 5. Pulizia UX trasversale
 
-Se `firmata_il > 48h` o utente diverso:
-- Solo medici possono procedere
-- Campo **"Motivo della modifica" obbligatorio**
-- Banner rosso: "Questa modifica verrà registrata permanentemente nell'audit"
-- Ogni delta salva entry in `seduta_modifica` con `oltre_48h = true`
+- Tooltip/help nel form piano: "I prodotti indicati sono PER SEDUTA. Verranno usati su tutte le sedute generate."
+- Riepilogo voce piano (sia card collassata che modifica) mostra tre dati in linea: `Prezzo riga · Sedute · Prodotti/seduta · Totale fiale ciclo`.
+- Pannello sedute: stesso tag stato seduta in card e in audit dialog.
+- Scheda paziente: il banner stato critico (consensi/anamnesi) resta in cima; aggiunto chip "Sedute da pianificare: N" quando > 0 (non blocca, solo informativo).
 
-### Dialog "Nuova seduta spot"
+---
 
-Form rapido: trattamento, data esecuzione, operatore, zone, prodotti, note, consenso. Crea seduta con `piano_id = NULL`.
+## Sezione tecnica
 
-### Card "Sposta data"
+**File da modificare**:
+- `supabase/migrations/<ts>_prodotti_per_seduta_e_consensi_per_sedute.sql`
+  - `ALTER TABLE piano_trattamento_voce ADD COLUMN prodotti_per_seduta jsonb`
+  - `ALTER TABLE consenso_template ADD COLUMN durata_tipo text DEFAULT 'mesi' CHECK (durata_tipo IN ('mesi','sedute')), ADD COLUMN durata_sedute int`
+  - `ALTER TABLE consenso_firmato ADD COLUMN durata_tipo_snapshot text DEFAULT 'mesi', ADD COLUMN durata_sedute_snapshot int, ADD COLUMN sedute_consumate int NOT NULL DEFAULT 0, ADD COLUMN sedute_max_snapshot int`
+  - `ALTER TABLE seduta ALTER COLUMN data_seduta DROP NOT NULL, ALTER COLUMN data_seduta DROP DEFAULT`
+  - Aggiornamento RPC `paziente_consensi_stato` per gestire `durata_tipo='sedute'`
+  - Trigger `trg_consenso_consuma_seduta` after update on seduta when (NEW.completata=true and OLD.completata=false): incrementa `sedute_consumate` sul consenso firmato attivo del paziente per quel trattamento
+- `src/types/trattamenti.ts`: aggiungere campi a `ConsensoTemplate`, `ConsensoFirmato`, `PianoVoce`; estendere `Seduta.data_seduta` a `string | null`
+- `src/lib/piano-prezzo.ts`: invariato (il prezzo per ciclo era già corretto, è solo il display dei prodotti che era confuso)
+- `src/lib/seduta-helpers.ts`: aggiungere stato `da_definire` in `StatoSeduta` e gestirlo in `statoSeduta()`
+- `src/lib/consensi-engine.ts`: aggiornare `STATO_BADGE` se serve nuovo wording, helper per "sedute residue"
+- `src/components/paziente/piani-panel.tsx`:
+  - UI prodotti con toggle "Personalizza per seduta"
+  - `buildVocePayload` produce `prodotti_per_seduta` quando in modalità custom
+  - `creaPiano`/`modificaPiano`: per ogni seduta n, scegli prodotti dall'array `prodotti_per_seduta[n-1]` se presente
+  - Inserisci sedute con `data_seduta: null`
+  - Riepilogo voce mostra "totale fiale ciclo"
+- `src/components/paziente/sedute-panel.tsx`:
+  - Card seduta gestisce `data_seduta === null` → "Data da definire" + bottone Pianifica
+  - Filtro/conteggio in_ritardo esclude da_definire
+- `src/routes/_authenticated/trattamenti.index.tsx`:
+  - In `TrattamentoDialog`, aggiornare il messaggio consenso ciclo per leggere `durata_tipo` del template
+- `src/components/paziente/consensi-panel.tsx`:
+  - Form template: radio mesi/sedute per categoria ciclo
+  - Cronologia: mostra "X/N sedute usate" per consensi a sedute
+  - Snapshot al momento della firma copia anche `durata_tipo`/`sedute`
+- `src/routes/_authenticated/pazienti.index.tsx`:
+  - Rimuovere `SeverityBadge` dalla riga lista e import non usati
 
-Mini-popover con date picker per modificare `data_seduta` (data prevista) di una seduta non ancora completata. Disabilitato per sedute già firmate.
-
-## 3. Diario automatico
-
-Ogni seduta completata genera/aggiorna una `paziente_nota` con questo formato:
-
-```text
-[Data esecuzione - Trattamento]
-Operatore: Dr. X
-Zone: glabella, fronte
-Prodotti: Botox 50U
-Durata: 30 min
-Note cliniche: <testo>
-
-(registrata il <data_registrazione> se diversa da data esecuzione)
-```
-
-Tipo nota = `clinica`. La nota porta un riferimento alla seduta (campo `seduta_id` da aggiungere a `paziente_nota` via migrazione, nullable).
-
-Nel diario panel, le note auto-generate hanno un badge "🩺 Seduta" e sono cliccabili per aprire il dettaglio della seduta. Non sono modificabili direttamente (si modifica la seduta).
-
-## 4. Banner globali (estensione esistente)
-
-In `src/routes/_authenticated/pazienti.$id.tsx` aggiungo al `CriticalBanner`:
-
-- **Sedute in ritardo**: rosso, se ci sono sedute programmate con `data_seduta < oggi - 7gg` e non completate
-- **Sedute oggi senza consenso**: rosso, se ci sono sedute previste oggi con consenso mancante
-
-Il banner consenso esistente resta come è.
-
-## 5. File da creare/modificare
-
-**Nuovi:**
-- `supabase/migrations/<ts>_sedute_esecuzione.sql` - schema seduta + tabella audit + trigger
-- `src/components/paziente/sedute-panel.tsx` - tab principale
-- `src/components/paziente/sedute/esegui-seduta-dialog.tsx` - dialog esecuzione
-- `src/components/paziente/sedute/modifica-seduta-dialog.tsx` - dialog modifica con audit
-- `src/components/paziente/sedute/nuova-seduta-spot-dialog.tsx` - seduta libera
-- `src/components/paziente/sedute/sposta-data-popover.tsx` - reschedule
-- `src/components/paziente/sedute/seduta-card.tsx` - card riusabile
-- `src/lib/seduta-helpers.ts` - util (puoModificare, formatRiassuntoDiario, etc.)
-- `src/types/seduta.ts` - tipi estesi
-
-**Modificati:**
-- `src/routes/_authenticated/pazienti.$id.tsx` - nuovo tab + banner sedute in ritardo
-- `src/components/paziente/diario-panel.tsx` - badge "Seduta" per note auto-generate
-- `src/integrations/supabase/types.ts` - rigenerato dalle migrazioni
-- `src/types/trattamenti.ts` - aggiornare interfaccia `Seduta`
-
-## 6. Cosa NON faccio in questo turno
-
-- Calendario visuale completo (vista mese/settimana) - per ora solo lista cronologica con date editabili
-- Promemoria via email/SMS - servirà cron job dopo
-- Magazzino prodotti (scarico automatico lotti) - quando faremo magazzino
-- Followup post-seduta strutturato - tabella `followup` esiste ma resta scollegata fino a un turno dedicato
-- Firma digitale del paziente sulla seduta - per ora "firma" = operatore conferma esecuzione
-
-## Punto da confermare
-
-Sul **diario automatico** non hai risposto direttamente, ma dal tuo commento finale assumo: **scrittura automatica sempre, con riga nel diario non modificabile direttamente** (si modifica la seduta, la nota si aggiorna). Se preferisci la versione con checkbox opzionale "Aggiungi voce diario" prima di salvare, dimmelo prima dell'approvazione.
+**Migrazioni dati legacy**: i piani esistenti restano con `prodotti_previsti` come prodotti-per-seduta (come fossero stati creati col modello nuovo). Le sedute già generate NON vengono toccate dalla migration — i prodotti già moltiplicati restano (è dato storico). Solo nuove generazioni useranno il nuovo modello. I template consenso esistenti restano `durata_tipo='mesi'`, nessun impatto.

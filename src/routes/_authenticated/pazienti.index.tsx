@@ -125,7 +125,6 @@ function PazientiListPage() {
                 <th className="px-4 py-3 font-medium">Paziente</th>
                 <th className="hidden px-4 py-3 font-medium md:table-cell">Contatti</th>
                 <th className="hidden px-4 py-3 font-medium lg:table-cell">CF</th>
-                <th className="px-4 py-3 font-medium">Stato</th>
               </tr>
             </thead>
             <tbody>
@@ -136,10 +135,7 @@ function PazientiListPage() {
                   onClick={() => navigate({ to: "/pazienti/$id", params: { id: p.id } })}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 font-medium">
-                      {p.max_severity === "critico" && (
-                        <ShieldAlert className="h-4 w-4 shrink-0 text-destructive" />
-                      )}
+                    <div className="font-medium">
                       {p.cognome} {p.nome}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -153,9 +149,6 @@ function PazientiListPage() {
                   </td>
                   <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground lg:table-cell">
                     {p.codice_fiscale ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <SeverityBadge severity={p.max_severity} />
                   </td>
                 </tr>
               ))}
