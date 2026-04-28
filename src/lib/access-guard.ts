@@ -25,7 +25,7 @@ export async function evaluateAccess(pazienteId: string): Promise<AccessEvaluati
       .order("updated_at", { ascending: false }),
   ]);
 
-  const rows = ((statoRes.data ?? []) as unknown as ConsensoStatoRow[]) ?? [];
+  const rows = (statoRes.data ?? []) as unknown as ConsensoStatoRow[];
   const motivi: string[] = [];
 
   // GDPR
