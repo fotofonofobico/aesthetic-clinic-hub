@@ -36,6 +36,8 @@ export interface SessionDoc {
   testo: string;
   versione: string;
   validitaMesi: number | null;
+  durataTipo: "mesi" | "sedute";
+  duratSedute: number | null;
   richiedeFirmaMedico: boolean;
   /** runtime — popolati durante il flusso */
   scelta?: "acconsento" | "non_acconsento";
@@ -64,6 +66,8 @@ function makeDoc(
     testo: string;
     versione: string;
     validitaMesi: number | null;
+    durataTipo?: "mesi" | "sedute";
+    duratSedute?: number | null;
     richiedeFirmaMedico: boolean;
   },
 ): SessionDoc {
