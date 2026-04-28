@@ -230,6 +230,10 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
 
   async function save() {
     if (!data) return;
+    if (data.stato === "signed") {
+      toast.error("Anamnesi firmata: crea una nuova versione per modificarla");
+      return;
+    }
     setSaving(true);
     const payload: AnamnesiPayload = {
       generale: data.generale ?? {},
