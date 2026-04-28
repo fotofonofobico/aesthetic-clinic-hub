@@ -22,6 +22,7 @@ import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
+import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
