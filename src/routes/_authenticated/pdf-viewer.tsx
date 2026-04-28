@@ -61,6 +61,17 @@ function PdfViewerPage() {
     };
   }, [bucket, path]);
 
+  function downloadPdf() {
+    if (!url) return;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = safeFilename(displayTitle);
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   function printPdf() {
     try {
       window.print();
@@ -84,19 +95,10 @@ function PdfViewerPage() {
           <Printer className="h-4 w-4" />
           Stampa
         </Button>
-        {url ? (
-          <Button asChild variant="outline" size="sm">
-            <a href={url} download={safeFilename(displayTitle)}>
-              <Download className="h-4 w-4" />
-              Scarica PDF
-            </a>
-          </Button>
-        ) : (
-          <Button type="button" variant="outline" size="sm" disabled>
-            <Download className="h-4 w-4" />
-            Scarica PDF
-          </Button>
-        )}
+        <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!url}>
+          <Download className="h-4 w-4" />
+          Scarica PDF
+        </Button>
       </header>
 
       <main className="min-h-0 flex-1 bg-muted">

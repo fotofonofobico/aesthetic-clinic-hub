@@ -35,6 +35,17 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
     return () => URL.revokeObjectURL(nextUrl);
   }, [blob, open]);
 
+  function downloadPdf() {
+    if (!url) return;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   function printPdf() {
     try {
       window.print();
@@ -56,11 +67,9 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
               <Printer className="h-4 w-4" />
               Stampa
             </Button>
-            <Button asChild type="button" variant="outline" size="sm" disabled={!url}>
-              <a href={url ?? "#"} download={filename}>
-                <Download className="h-4 w-4" />
-                Scarica PDF
-              </a>
+            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!url}>
+              <Download className="h-4 w-4" />
+              Scarica PDF
             </Button>
           </div>
         </DialogHeader>
