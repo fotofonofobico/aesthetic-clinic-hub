@@ -1,148 +1,75 @@
-## Refactor Piano: prezzo+sconto, zone, modifica, alert consenso, auto-stato
+## Fix Piani: prezzo per ciclo, riassunto voce, totale paziente, alert consenso globale
 
-Iterazione sul `PianiPanel` con migrazione DB minimale. La sezione "Sedute" come esecuzione reale è esplicitamente rimandata a un turno successivo.
+### 1. Bug calcolo prezzo (root cause)
 
-### 1. Migrazione DB
+`src/lib/piano-prezzo.ts → calcolaTotaleRighe` fa sempre `prezzo_indicativo * numero_sedute`. Per i trattamenti con `tipo = "ciclo"`, il `prezzo_indicativo` rappresenta già il prezzo dell'**intero ciclo** (es. Biostimolazione viso 3 sedute = 750 €), quindi va contato **una sola volta**, non moltiplicato per le sedute.
 
-Una sola migrazione SQL:
+Nuova regola di pricing:
+- `tipo === "ciclo"` → `prezzo_riga = prezzo_indicativo` (il numero di sedute è informativo, il prezzo del ciclo è fisso)
+- `tipo === "singolo"` (o null) → `prezzo_riga = prezzo_indicativo * numero_sedute` (comportamento attuale)
+- prezzo nullo → 0 + warning inline come oggi
 
-```sql
--- Sconto e prezzo finale piano
-ALTER TABLE public.piano_trattamento
-  ADD COLUMN IF NOT EXISTS sconto_tipo text NOT NULL DEFAULT 'nessuno'
-    CHECK (sconto_tipo IN ('nessuno','euro','percento')),
-  ADD COLUMN IF NOT EXISTS sconto_valore numeric NOT NULL DEFAULT 0;
--- prezzo_totale e prezzo_finale già esistenti vengono ricalcolati lato client
+Modifiche in `src/lib/piano-prezzo.ts`:
+- `calcolaTotaleRighe(righe, trattamenti)` → applica la regola sopra
+- nuova funzione esportata `prezzoRiga(trattamento, numeroSedute): number` riusabile in UI
 
--- Zone trattate sulla riga
-ALTER TABLE public.piano_trattamento_voce
-  ADD COLUMN IF NOT EXISTS zone jsonb NOT NULL DEFAULT '[]'::jsonb;
--- Forma: ["glabella","zampe gallina","zona custom"]
+### 2. Riassunto prezzo per voce (vista piano espansa)
 
--- Trigger: quando tutte le sedute di un piano sono completata=true,
--- imposta piano.stato='completato'. Se il piano è 'completato' e una
--- seduta torna a completata=false, riporta a 'attivo'.
-CREATE OR REPLACE FUNCTION public.piano_auto_stato()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE
-  pid uuid := COALESCE(NEW.piano_id, OLD.piano_id);
-  tot int;
-  done int;
-  cur_stato piano_stato;
-BEGIN
-  SELECT stato INTO cur_stato FROM piano_trattamento WHERE id = pid;
-  IF cur_stato IN ('sospeso','annullato') THEN RETURN NEW; END IF;
-  SELECT count(*), count(*) FILTER (WHERE completata) INTO tot, done
-    FROM seduta WHERE piano_id = pid;
-  IF tot > 0 AND done = tot THEN
-    UPDATE piano_trattamento SET stato='completato' WHERE id=pid AND stato<>'completato';
-  ELSIF cur_stato = 'completato' AND done < tot THEN
-    UPDATE piano_trattamento SET stato='attivo' WHERE id=pid;
-  END IF;
-  RETURN NEW;
-END $$;
+In `src/components/paziente/piani-panel.tsx`, dentro il render di ogni `voce` (sezione `{voci.map((v) => …)}`, ~riga 1232), aggiungere accanto al nome trattamento un piccolo blocco prezzo:
 
-DROP TRIGGER IF EXISTS trg_seduta_piano_auto_stato ON public.seduta;
-CREATE TRIGGER trg_seduta_piano_auto_stato
-AFTER INSERT OR UPDATE OF completata OR DELETE ON public.seduta
-FOR EACH ROW EXECUTE FUNCTION public.piano_auto_stato();
+```text
+[Trattamento]  [badge consenso]                    € 750,00 · 3 sedute
 ```
 
-### 2. Costanti zone (`src/lib/zone-trattamento.ts` — nuovo)
+Il prezzo mostrato per voce è `prezzoRiga(trattamento, v.numero_sedute)` calcolato lato client dal `prezzo_indicativo` corrente (i piani non hanno il prezzo per voce salvato in DB — `prezzo_unitario`/`prezzo_riga` esistono ma sono sempre 0). Mostriamo SEMPRE il prezzo derivato live dal trattamento.
 
-Array `ZONE_PREDEFINITE` con: glabella, fronte, zampe di gallina, sopracciglia, palpebre, naso, labbra, solco nasogenieno, marionette, zigomi, mento, ovale viso, collo, décolleté, mani, addome, fianchi, glutei, cosce, braccia.
+Sotto la lista voci, aggiungere un riepilogo del piano:
+- "Totale base: €X"
+- se `sconto_tipo !== 'nessuno' && sconto_valore > 0`: "Sconto: − €Y (10% / fisso)"
+- "Totale finale: €Z" (in evidenza)
 
-### 3. Tipi (`src/types/trattamenti.ts`)
+Lo sconto viene letto da `p.sconto_tipo` / `p.sconto_valore`; il finale viene ricalcolato live (più affidabile del `prezzo_finale` salvato, in caso il prezzo del trattamento cambi).
 
-- Aggiungere a `PianoTrattamento`: `sconto_tipo: "nessuno"|"euro"|"percento"`, `sconto_valore: number`, `prezzo_finale: number | null`.
-- Aggiungere a `PianoVoce`: `zone: string[]`.
+L'header del piano collassato continua a mostrare `prezzo_finale` salvato (sintesi rapida).
 
-### 4. Helper prezzo (`src/lib/piano-prezzo.ts` — nuovo)
+### 3. Totale generale speso dal paziente
 
-```ts
-export function calcolaTotaleRighe(righe: { trattamento_id: string; numero_sedute: number }[],
-                                   trattamenti: Trattamento[]): number
-export function applicaSconto(totale: number, tipo: "nessuno"|"euro"|"percento",
-                              valore: number): { sconto: number; finale: number }
+Sopra la lista piani in `PianiPanel`, aggiungere una piccola card riassuntiva:
+
+```text
+Totale piani paziente: € 2.450,00       Attivi: 2 · Completati: 1
 ```
 
-### 5. Refactor `src/components/paziente/piani-panel.tsx`
+Calcolo: somma `prezzo_finale` (fallback `prezzo_totale`) su tutti i piani con `stato !== 'annullato'`. Visualizzata solo se ci sono piani.
 
-#### Form `RigaForm`
+### 4. Alert consenso globale (in alto, accanto ad allergie)
 
-```ts
-type RigaForm = {
-  uid; trattamento_id; numero_sedute;
-  prodotti: { uid; prodotto_id; quantita: number /* SOLO INTERI step=1 */ }[];
-  zone: string[];                  // chip selezionati + custom
-  zoneCustomDraft: string;         // input testo per aggiungere chip custom
-  consensoOk; consensoLoading; consensoMotivi;
-};
+Estendere `CriticalBanner` in `src/routes/_authenticated/pazienti.$id.tsx`:
+- caricare in `load()` una nuova query: tutti i piani **non annullati** del paziente con relative voci, calcolando per ogni voce `puoEseguireTrattamento`. Per evitare un fan-out di chiamate, aggregare i `trattamento_id` distinti delle voci di piani attivi/sospesi e chiamare `puoEseguireTrattamento` una volta per ciascuno (cache locale). Risultato: lista di nomi trattamenti senza consenso valido.
+- se la lista non è vuota, aggiungere un nuovo banner DISTINTO da quello critico allergie/flag, con icona e colori diversi:
+
+```text
+[FileSignature icon] Consensi mancanti — banner ambra/warning
+"Il piano include 2 trattamenti senza consenso firmato:
+Botox glabella, Biostimolazione viso. Firma prima di iniziare."
 ```
 
-Default `quantita=1`, input number `step=1 min=1`, niente decimali.
+Stile: `border-warning/40 bg-warning/10` con icona `FileSignature` (lucide) per distinguerlo visivamente dal banner allergie (`ShieldAlert` rosso). Posizione: dopo il banner critici, prima del banner blocchi consensi access-guard (che è più generico).
 
-#### UI riga (Card)
-- Select trattamento + Input sedute (come oggi).
-- **Badge consenso** + tooltip motivi. **Rimosso bottone "Firma consenso"** dalla riga.
-- Sezione **"Prodotti previsti"**: per ogni prodotto `[Select prodotto] [Input qta intero] [trash]` + `+ Aggiungi prodotto`.
-- Sezione **"Zone previste"**: chip cliccabili da `ZONE_PREDEFINITE` (toggle), sotto un `Input + bottone "Aggiungi"` per zone custom; chip già selezionati mostrano una `x` per rimuovere.
+NB: il banner "Avvisi consensi" già esistente proviene da `access-guard` ed è basato sull'anamnesi/consensi generali; il nuovo è specificamente "questo paziente ha PIANI con voci senza consenso firmato". Sono complementari.
 
-#### Footer dialog Nuovo Piano
-Pannello riassuntivo prima dei bottoni:
-- Riga "Totale base: € X" (somma `prezzo_indicativo * numero_sedute` per ogni riga; se `prezzo_indicativo` null, riga vale 0 e mostra warning inline "Trattamento senza prezzo indicativo").
-- Selettore sconto: `[Nessuno] [€] [%]` + Input valore (disabilitato se "Nessuno").
-- Riga "Totale finale: € Y" in evidenza (font display, bold).
+### 5. File toccati
 
-#### Salvataggio
-- `piano_trattamento`: salva `prezzo_totale = totaleBase`, `sconto_tipo`, `sconto_valore`, `prezzo_finale = finale`. Niente `data` per riga seduta (resta `data_seduta = now()` di default DB, non lo mostriamo più in UI).
-- `piano_trattamento_voce`: aggiunge `zone: string[]`.
-- Generazione sedute identica a oggi.
+- `src/lib/piano-prezzo.ts` — fix `calcolaTotaleRighe`, export nuova `prezzoRiga`
+- `src/components/paziente/piani-panel.tsx` — riassunto prezzo per voce + riepilogo piano + card totale paziente
+- `src/routes/_authenticated/pazienti.$id.tsx` — caricamento voci piani + computazione consensi mancanti + nuovo banner in `CriticalBanner`
 
-#### Modifica piano esistente (NUOVO)
-Bottone "Modifica" su ogni `Card` piano. Apre lo stesso dialog precaricato:
-- Carica voci + sedute. Ogni riga form rappresenta una voce esistente con `voceId?: string`.
-- Per ogni voce: campi prodotti/zone editabili. `numero_sedute` editabile **ma con vincolo**: non scendere sotto il numero di sedute già `completata=true` di quella voce.
-- Sconto/tipo editabili.
-- Bottone `+ Aggiungi trattamento` permette di aggiungere nuove voci.
-- Bottone trash su una voce: consentito solo se nessuna seduta di quella voce è completata; toast d'errore altrimenti.
-- Salvataggio:
-  - `UPDATE piano_trattamento` (titolo ricomposto, totali, sconto, numero_sedute_previste).
-  - Per ogni voce esistente: `UPDATE` su prodotti/zone/numero_sedute.
-  - Per ogni voce nuova: `INSERT` voce + sedute.
-  - Per voce rimossa: `DELETE` voce + `DELETE` sedute non completate di quella voce.
-  - Aggiustamento sedute per voce esistente:
-    - Se `numero_sedute` aumenta: INSERT sedute mancanti `numero = max+1..nuovoTotale`.
-    - Se diminuisce: DELETE sedute con `numero_seduta > nuovoTotale AND completata=false`.
+### 6. Nessuna migrazione DB
 
-#### Render piano (Card collassabile)
-- **Rimossi i tick "completa seduta"** e l'azione `completaSeduta`.
-- **Rimossa visualizzazione data per singola seduta**; mostra solo numero seduta + (se completata) badge "fatta" derivato.
-- Header piano mostra: titolo, **data piano** (`created_at`), badge stato, **prezzo finale**.
-- **Alert consenso**: per ogni voce, calcolo `puoEseguireTrattamento` lazy on-expand; se mancante mostra `<Alert variant="destructive">` con CTA bottone "Firma consenso ora" che apre `SignatureSessionDialog` per quel trattamento. L'alert appare anche compatto in cima alla card del piano: "⚠ N trattamenti senza consenso firmato".
-- Bottone "Modifica" + Select stato (attivo/sospeso/annullato — `completato` è auto e disabilitato manualmente).
-- Bottone "Aggiungi seduta" rimosso (le sedute si pianificano dal piano; aggiunte spot saranno gestite dalla futura sezione Sedute).
+Non servono modifiche schema. I piani esistenti continuano a funzionare; il prezzo viene ricalcolato live dal `prezzo_indicativo` corrente del trattamento (piani vecchi salvati con il bug mostreranno comunque il valore corretto in vista perché ricalcolato).
 
-#### Backward compatibility
-Piani vecchi senza voci: render "fallback semplice" con titolo + numero sedute + stato; nessun crash; bottone "Modifica" disabilitato con tooltip "Piano legacy non modificabile".
+Eventuale ricalcolo retroattivo del campo `prezzo_finale` salvato nei piani esistenti: opzionale, da fare solo su esplicita richiesta (lasciamo i valori in DB invariati).
 
-### 6. Cosa NON tocchiamo in questo turno
+### 7. Domanda aperta
 
-- Nessuna nuova sezione "Sedute" (rimandata).
-- `signature-session-dialog`, `consensi-engine`, `access-guard`, `anamnesi-panel`, `consensi-panel`: invariati.
-- `firma-trattamento-launcher`: invariato (riusato dentro l'alert).
-- Nessuna scrittura su `diario` / `paziente_nota`.
-
-### 7. File toccati
-
-- `supabase/migrations/<ts>_piano_sconto_zone_autostato.sql` (nuovo)
-- `src/lib/zone-trattamento.ts` (nuovo)
-- `src/lib/piano-prezzo.ts` (nuovo)
-- `src/types/trattamenti.ts` (campi `sconto_*`, `prezzo_finale`, `zone`)
-- `src/components/paziente/piani-panel.tsx` (refactor: rimozione tick/data/firma riga, aggiunta zone/sconto/totale/modifica/alert)
-
-### 8. Rischi
-
-- **Modifica voci con sedute completate**: vincoli espliciti + toast. Test manuale richiesto su: riduzione sedute, eliminazione voce, cambio prodotti su voce con sedute future esistenti (i prodotti delle sedute future verranno **ri-clonati** dalla voce aggiornata).
-- **Trigger auto-stato**: scatta anche su INSERT/DELETE seduta — verificato che la modifica piano (insert/delete sedute) lascia il piano `attivo` finché esistono sedute non completate.
-- **Prezzo per trattamenti senza `prezzo_indicativo`**: warning inline, totale calcolato come 0 per quella riga, nessun blocco.
+Per i trattamenti `tipo = "ciclo"` con `numero_sedute` MODIFICATO rispetto a `durata_ciclo_valore` (es. ciclo standard 3 sedute, paziente vuole 5): manteniamo prezzo_indicativo fisso? Proposta: sì, fisso = prezzo del ciclo a prescindere da quante sedute si pianificano. Se in futuro serve "prezzo per seduta extra" lo aggiungeremo come campo separato sul trattamento. Procedo con questa assunzione salvo diversa indicazione.
