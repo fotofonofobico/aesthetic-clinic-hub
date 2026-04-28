@@ -257,7 +257,7 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
 
   async function handleFirmaConsenso(s: Seduta) {
     if (!s.trattamento_id) return;
-    const session = await buildTrattamentoSession(pazienteId, s.trattamento_id);
+    const session = await buildTrattamentoSession(pazienteId, [s.trattamento_id]);
     if (!session) {
       toast.success("Nessun consenso da firmare");
       return;
