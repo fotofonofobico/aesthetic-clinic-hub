@@ -787,16 +787,22 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
-              <SignaturePad ref={sigPazRef} />
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-medium">
-                Firma del medico <span className="text-muted-foreground">(opzionale)</span>
-              </p>
-              <SignaturePad ref={sigMedRef} />
-            </div>
+            <React.Suspense
+              fallback={
+                <p className="text-sm text-muted-foreground">Caricamento area firma…</p>
+              }
+            >
+              <div>
+                <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
+                <SignaturePad ref={sigPazRef} />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">
+                  Firma del medico <span className="text-muted-foreground">(opzionale)</span>
+                </p>
+                <SignaturePad ref={sigMedRef} />
+              </div>
+            </React.Suspense>
             <p className="text-xs text-muted-foreground">
               Firmando, il paziente conferma la veridicità delle informazioni. Il record diventerà
               immutabile; modifiche future creeranno una nuova versione.
