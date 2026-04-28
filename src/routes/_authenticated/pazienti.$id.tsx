@@ -177,7 +177,7 @@ function PazienteDetailPage() {
             <FileSignature className="h-4 w-4" />
             Firma visita
           </Button>
-          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load()} />
+          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load({ silent: true })} />
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
