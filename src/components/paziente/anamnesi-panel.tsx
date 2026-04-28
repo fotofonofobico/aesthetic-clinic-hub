@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
-import { useRef } from "react";
+
 
 interface AnamnesiRow {
   id: string;
