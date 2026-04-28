@@ -690,7 +690,9 @@ function RescheduleInline({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [val, setVal] = useState(toLocalInput(seduta.data_seduta));
+  const [val, setVal] = useState(
+    toLocalInput(seduta.data_seduta ?? new Date().toISOString()),
+  );
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -1009,7 +1011,9 @@ function ModificaSedutaDialog({
   const permesso = valutaModificaSeduta(seduta, userId, isMedico);
 
   const [dataEsecuzione, setDataEsecuzione] = useState(
-    toLocalInput(seduta.data_esecuzione_effettiva ?? seduta.data_seduta),
+    toLocalInput(
+      seduta.data_esecuzione_effettiva ?? seduta.data_seduta ?? new Date().toISOString(),
+    ),
   );
   const [durata, setDurata] = useState<string>(seduta.durata_minuti?.toString() ?? "");
   const [prodotti, setProdotti] = useState<ProdottoPrevisto[]>(seduta.prodotti_previsti);
