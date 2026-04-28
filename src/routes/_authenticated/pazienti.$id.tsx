@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate, useMatches } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useMatches, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -29,7 +29,32 @@ import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launche
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
+  errorComponent: PazienteErrorComponent,
 });
+
+function PazienteErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="mx-auto max-w-xl space-y-4 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-6">
+      <h2 className="font-display text-lg font-semibold text-destructive">
+        Si è verificato un errore caricando questa scheda
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {error?.message ?? "Errore sconosciuto"}
+      </p>
+      <div className="flex gap-2">
+        <Button
+          onClick={() => {
+            void router.invalidate();
+            reset();
+          }}
+        >
+          Riprova
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
