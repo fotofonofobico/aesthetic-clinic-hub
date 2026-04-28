@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { ArrowLeft, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
@@ -23,6 +23,8 @@ import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
+import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
