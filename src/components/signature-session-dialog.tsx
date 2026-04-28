@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -31,95 +31,230 @@ interface Props {
   onCompleted: () => void;
 }
 
-type Stato = "scelta_firma" | "salvataggio" | "fatto";
+type Stato = "compilazione" | "salvataggio" | "fatto";
+type Phase = "consensi" | "anamnesi" | "trattamento";
+
+type Scelta = "acconsento" | "non_acconsento";
 
 export function SignatureSessionDialog({ open, session, onClose, onCompleted }: Props) {
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
-  const [step, setStep] = useState(0);
-  const [stato, setStato] = useState<Stato>("scelta_firma");
-  const [scelta, setScelta] = useState<"acconsento" | "non_acconsento" | undefined>();
-  const [firmaReady, setFirmaReady] = useState(false);
-  const [firmaMedReady, setFirmaMedReady] = useState(false);
-  const sigPazRef = useRef<SignaturePadHandle>(null);
-  const sigMedRef = useRef<SignaturePadHandle>(null);
+  const [stato, setStato] = useState<Stato>("compilazione");
+
+  // Indici dei doc consensi (gdpr/uso_immagini), del doc anamnesi e dei doc trattamento
+  const consensoIdxs = docs
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.kind.kind === "gdpr" || d.kind.kind === "uso_immagini")
+    .map(({ i }) => i);
+  const anamnesiIdx = docs.findIndex((d) => d.kind.kind === "anamnesi");
+  const trattamentoIdxs = docs
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.kind.kind === "trattamento")
+    .map(({ i }) => i);
+
+  // Per la sessione "visita": phase iniziale = consensi se ne esistono, altrimenti anamnesi
+  // Per "trattamento": resta documento-per-documento
+  const isVisita = session?.tipo === "visita";
+
+  const [phase, setPhase] = useState<Phase>("consensi");
+  const [trattamentoStep, setTrattamentoStep] = useState(0);
+
+  // STATE FASE CONSENSI (combinata)
+  const [scelteConsensi, setScelteConsensi] = useState<Record<string, Scelta | undefined>>({});
+  const sigConsensiRef = useRef<SignaturePadHandle>(null);
+  const [firmaConsensiReady, setFirmaConsensiReady] = useState(false);
+
+  // STATE FASE ANAMNESI / TRATTAMENTO singolo
+  const [sceltaSingolo, setSceltaSingolo] = useState<Scelta | undefined>();
+  const sigSingoloRef = useRef<SignaturePadHandle>(null);
+  const sigSingoloMedRef = useRef<SignaturePadHandle>(null);
+  const [firmaSingoloReady, setFirmaSingoloReady] = useState(false);
+  const [firmaSingoloMedReady, setFirmaSingoloMedReady] = useState(false);
 
   // Reset al cambio sessione
-  useMemo(() => {
-    if (session) {
-      setDocs(session.documenti.map((d) => ({ ...d })));
-      setStep(0);
-      setStato("scelta_firma");
-      setScelta(undefined);
-      setFirmaReady(false);
-      setFirmaMedReady(false);
+  useEffect(() => {
+    if (!session) return;
+    setDocs(session.documenti.map((d) => ({ ...d })));
+    setStato("compilazione");
+    setScelteConsensi({});
+    setSceltaSingolo(undefined);
+    setFirmaConsensiReady(false);
+    setFirmaSingoloReady(false);
+    setFirmaSingoloMedReady(false);
+    setTrattamentoStep(0);
+    sigConsensiRef.current?.clear();
+    sigSingoloRef.current?.clear();
+    sigSingoloMedRef.current?.clear();
+
+    // Phase iniziale
+    if (session.tipo === "visita") {
+      const hasConsensi = session.documenti.some(
+        (d) => d.kind.kind === "gdpr" || d.kind.kind === "uso_immagini",
+      );
+      setPhase(hasConsensi ? "consensi" : "anamnesi");
+    } else {
+      setPhase("trattamento");
     }
   }, [session]);
-
-  const current = docs[step];
-  const total = docs.length;
-
-  function resetStep() {
-    setScelta(undefined);
-    setFirmaReady(false);
-    setFirmaMedReady(false);
-    sigPazRef.current?.clear();
-    sigMedRef.current?.clear();
-  }
 
   function chiudi() {
     if (stato === "salvataggio") return;
     onClose();
   }
 
-  function confermaDocumento() {
-    if (!current) return;
-    if (!scelta) {
-      toast.error("Seleziona Acconsento o Non acconsento");
+  // ===== FASE CONSENSI (combinata GDPR + uso immagini) =====
+  function confermaConsensi() {
+    if (consensoIdxs.length === 0) {
+      // niente da firmare in questa fase, salta direttamente
+      goToAfterConsensi();
       return;
     }
-    // Firma del paziente SEMPRE obbligatoria (sia per acconsento sia per non_acconsento)
-    let firmaPaz: string | null = null;
-    let firmaMed: string | null = null;
-    const padPaz = sigPazRef.current;
-    if (!padPaz || padPaz.isEmpty()) {
+    // Verifica scelte
+    for (const i of consensoIdxs) {
+      const d = docs[i];
+      if (!scelteConsensi[d.localId]) {
+        toast.error(`Seleziona "Acconsento" o "Non acconsento" per ${d.titolo}`);
+        return;
+      }
+    }
+    // Vincolo: GDPR rifiutato = blocca
+    const gdprIdx = consensoIdxs.find((i) => docs[i].kind.kind === "gdpr");
+    if (gdprIdx !== undefined && scelteConsensi[docs[gdprIdx].localId] === "non_acconsento") {
+      toast.error(
+        "Il consenso GDPR/Privacy è obbligatorio per proseguire la visita. Non è possibile rifiutarlo.",
+      );
+      return;
+    }
+    // Firma unica obbligatoria
+    const pad = sigConsensiRef.current;
+    if (!pad || pad.isEmpty()) {
       toast.error("La firma del paziente è obbligatoria");
       return;
     }
-    firmaPaz = padPaz.toDataURL();
-    // Firma medico richiesta solo se il template lo prevede
-    if (current.richiedeFirmaMedico) {
-      const padMed = sigMedRef.current;
+    const firma = pad.toDataURL();
+
+    // Applica la firma e la scelta a TUTTI i doc consensi
+    const next = [...docs];
+    for (const i of consensoIdxs) {
+      const d = next[i];
+      next[i] = {
+        ...d,
+        scelta: scelteConsensi[d.localId],
+        firmaPaziente: firma,
+        firmaMedico: null,
+        completato: true,
+      };
+    }
+    setDocs(next);
+    goToAfterConsensi(next);
+  }
+
+  function goToAfterConsensi(currentDocs?: SessionDoc[]) {
+    const hasAnamnesi = (currentDocs ?? docs).some((d) => d.kind.kind === "anamnesi");
+    if (hasAnamnesi) {
+      setPhase("anamnesi");
+      // reset firma anamnesi
+      setSceltaSingolo(undefined);
+      setFirmaSingoloReady(false);
+      setFirmaSingoloMedReady(false);
+      sigSingoloRef.current?.clear();
+      sigSingoloMedRef.current?.clear();
+    } else {
+      void salvaTutto(currentDocs ?? docs);
+    }
+  }
+
+  // ===== FASE ANAMNESI =====
+  function confermaAnamnesi() {
+    if (anamnesiIdx < 0) {
+      void salvaTutto(docs);
+      return;
+    }
+    if (!sceltaSingolo) {
+      toast.error("Seleziona Acconsento o Non acconsento");
+      return;
+    }
+    const pad = sigSingoloRef.current;
+    if (!pad || pad.isEmpty()) {
+      toast.error("La firma del paziente è obbligatoria");
+      return;
+    }
+    const firma = pad.toDataURL();
+    let firmaMed: string | null = null;
+    if (docs[anamnesiIdx].richiedeFirmaMedico) {
+      const padMed = sigSingoloMedRef.current;
       if (!padMed || padMed.isEmpty()) {
         toast.error("La firma del medico è obbligatoria per questo documento");
         return;
       }
       firmaMed = padMed.toDataURL();
     }
-
-    const nextDocs = [...docs];
-    nextDocs[step] = {
-      ...current,
-      scelta,
-      firmaPaziente: firmaPaz,
+    const next = [...docs];
+    next[anamnesiIdx] = {
+      ...next[anamnesiIdx],
+      scelta: sceltaSingolo,
+      firmaPaziente: firma,
       firmaMedico: firmaMed,
       completato: true,
     };
-    setDocs(nextDocs);
+    setDocs(next);
+    void salvaTutto(next);
+  }
 
-    if (step + 1 < total) {
-      setStep(step + 1);
-      resetStep();
+  function tornaAiConsensi() {
+    setPhase("consensi");
+  }
+
+  // ===== FASE TRATTAMENTO (documento-per-documento, retro-compatibile) =====
+  const currentTratt = trattamentoIdxs[trattamentoStep];
+  function confermaTrattamento() {
+    if (currentTratt === undefined) return;
+    const doc = docs[currentTratt];
+    if (!sceltaSingolo) {
+      toast.error("Seleziona Acconsento o Non acconsento");
+      return;
+    }
+    const pad = sigSingoloRef.current;
+    if (!pad || pad.isEmpty()) {
+      toast.error("La firma del paziente è obbligatoria");
+      return;
+    }
+    const firma = pad.toDataURL();
+    let firmaMed: string | null = null;
+    if (doc.richiedeFirmaMedico) {
+      const padMed = sigSingoloMedRef.current;
+      if (!padMed || padMed.isEmpty()) {
+        toast.error("La firma del medico è obbligatoria per questo documento");
+        return;
+      }
+      firmaMed = padMed.toDataURL();
+    }
+    const next = [...docs];
+    next[currentTratt] = {
+      ...doc,
+      scelta: sceltaSingolo,
+      firmaPaziente: firma,
+      firmaMedico: firmaMed,
+      completato: true,
+    };
+    setDocs(next);
+    if (trattamentoStep + 1 < trattamentoIdxs.length) {
+      setTrattamentoStep(trattamentoStep + 1);
+      setSceltaSingolo(undefined);
+      setFirmaSingoloReady(false);
+      setFirmaSingoloMedReady(false);
+      sigSingoloRef.current?.clear();
+      sigSingoloMedRef.current?.clear();
     } else {
-      void salvaTutto(nextDocs);
+      void salvaTutto(next);
     }
   }
 
+  // ===== SALVATAGGIO =====
   async function salvaTutto(finalDocs: SessionDoc[]) {
     if (!session) return;
     setStato("salvataggio");
 
-    // Carica dati paziente per i PDF
     const { data: paz, error: pazErr } = await supabase
       .from("pazienti")
       .select("nome, cognome, data_nascita, codice_fiscale")
@@ -127,7 +262,7 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       .single();
     if (pazErr || !paz) {
       toast.error("Errore caricamento paziente");
-      setStato("scelta_firma");
+      setStato("compilazione");
       return;
     }
 
@@ -143,7 +278,6 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       }
     }
 
-    // ID delle insert per rollback best-effort
     const insertedConsensi: string[] = [];
     const uploadedPaths: string[] = [];
 
@@ -151,12 +285,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       const firmatoIl = new Date();
 
       for (const doc of finalDocs) {
+        if (!doc.completato) continue; // safety
+
         if (doc.kind.kind === "anamnesi") {
-          // Solo se acconsento: firma + signed
-          if (doc.scelta === "non_acconsento") {
-            // Anamnesi non firmata: lascia draft, registra rifiuto come nota
-            continue;
-          }
+          if (doc.scelta === "non_acconsento") continue;
           if (!doc.firmaPaziente) continue;
 
           const { blob, hash } = await generaPdfAnamnesi({
@@ -174,7 +306,7 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
               farmacologica: null,
               estetica: null,
               note_libere: null,
-            }, // payload reale è già nel record DB; il PDF qui è leggero (i dati clinici restano nella tabella)
+            },
             firmaPazienteDataUrl: doc.firmaPaziente,
             firmaMedicoDataUrl: doc.firmaMedico ?? null,
             operatoreNome,
@@ -185,7 +317,6 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
             .from("anamnesi-pdf")
             .upload(path, blob, { contentType: "application/pdf", upsert: true });
           if (up.error || !up.data?.path) {
-            console.error("[anamnesi-pdf upload] errore", up.error, "path:", path);
             throw new Error(`Upload PDF anamnesi fallito: ${up.error?.message ?? "path vuoto"}`);
           }
           uploadedPaths.push(`anamnesi-pdf:${path}`);
@@ -204,12 +335,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
             .eq("id", doc.kind.anamnesiId);
           if (upd.error) throw upd.error;
         } else {
-          // Consenso firmato (gdpr / uso_immagini / trattamento)
           const categoria = doc.kind.kind === "trattamento" ? doc.kind.categoria : doc.kind.kind;
           const validoFinoA =
             doc.scelta === "acconsento" ? calcolaValidoFinoA(doc, firmatoIl) : null;
 
-          // PDF
           const { blob, hash } = await generaPdfConsenso({
             paziente: {
               nome: paz.nome,
@@ -235,13 +364,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
             .from("consensi-pdf")
             .upload(pdfPath, blob, { contentType: "application/pdf" });
           if (up.error || !up.data?.path) {
-            console.error("[consensi-pdf upload] errore", up.error, "path:", pdfPath);
             throw new Error(`Upload PDF consenso fallito: ${up.error?.message ?? "path vuoto"}`);
           }
-          if (!pdfPath) throw new Error("pdf_url vuoto, abort");
           uploadedPaths.push(`consensi-pdf:${pdfPath}`);
 
-          // Hash extra includendo firma + esito (compatibile con l'engine esistente)
           const integrita = await sha256Hex(
             `${doc.titolo}|${doc.testo}|${doc.versione}|${firmatoIl.toISOString()}|${
               doc.firmaPaziente?.length ?? 0
@@ -250,10 +376,7 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
 
           const insertPayload: Record<string, unknown> = {
             paziente_id: session.pazienteId,
-            template_id:
-              doc.kind.kind === "trattamento"
-                ? doc.kind.templateId
-                : doc.kind.templateId,
+            template_id: doc.kind.templateId,
             titolo_snapshot: doc.titolo,
             testo_snapshot: doc.testo,
             versione_snapshot: doc.versione,
@@ -287,7 +410,6 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       toast.success("Sessione firma completata");
       onCompleted();
     } catch (e) {
-      // Rollback best effort
       if (insertedConsensi.length > 0) {
         await supabase.from("consenso_firmato").delete().in("id", insertedConsensi);
       }
@@ -297,11 +419,22 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
         await supabase.storage.from(bucket).remove([path]);
       }
       toast.error(`Errore salvataggio: ${(e as Error).message}`);
-      setStato("scelta_firma");
+      setStato("compilazione");
     }
   }
 
   if (!session) return null;
+
+  // Progress
+  const totalPhases = isVisita
+    ? (consensoIdxs.length > 0 ? 1 : 0) + (anamnesiIdx >= 0 ? 1 : 0)
+    : trattamentoIdxs.length;
+  const currentPhaseNum = (() => {
+    if (!isVisita) return trattamentoStep + 1;
+    if (phase === "consensi") return 1;
+    return (consensoIdxs.length > 0 ? 1 : 0) + 1;
+  })();
+  const progressValue = totalPhases > 0 ? (currentPhaseNum / totalPhases) * 100 : 0;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && chiudi()}>
@@ -309,77 +442,228 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <FileSignature className="h-5 w-5" />
-            {session.tipo === "visita" ? "Sessione firma — Visita" : "Sessione firma — Trattamento"}
+            {isVisita ? "Sessione firma — Visita" : "Sessione firma — Trattamento"}
           </DialogTitle>
-          {total > 0 && (
+          {totalPhases > 0 && stato !== "fatto" && (
             <p className="text-xs text-muted-foreground">
-              Documento {Math.min(step + 1, total)} di {total}
+              {isVisita
+                ? phase === "consensi"
+                  ? "Step 1 — Consensi (GDPR + Uso immagini)"
+                  : "Step 2 — Anamnesi"
+                : `Documento ${trattamentoStep + 1} di ${trattamentoIdxs.length}`}
             </p>
           )}
         </DialogHeader>
 
-        {total === 0 && (
+        {docs.length === 0 && (
           <div className="py-10 text-center">
             <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
             <p className="mt-3 text-sm">Nessun documento da firmare. Tutto in regola.</p>
           </div>
         )}
 
-        {total > 0 && stato !== "fatto" && current && (
+        {docs.length > 0 && stato === "compilazione" && (
           <div className="space-y-4">
-            <Progress value={((step + (stato === "salvataggio" ? 1 : 0)) / total) * 100} />
+            <Progress value={progressValue} />
 
-            <div>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <h3 className="font-display text-lg font-semibold">{current.titolo}</h3>
-                <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  v{current.versione}
-                </span>
+            {/* === FASE CONSENSI COMBINATI === */}
+            {isVisita && phase === "consensi" && consensoIdxs.length > 0 && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Una sola firma vale per entrambi i consensi. Le scelte (Acconsento / Non
+                  acconsento) sono indipendenti.
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {consensoIdxs.map((i) => {
+                    const d = docs[i];
+                    return (
+                      <div
+                        key={d.localId}
+                        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3"
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <h3 className="font-display text-base font-semibold">{d.titolo}</h3>
+                            <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              v{d.versione}
+                            </span>
+                          </div>
+                          <div className="mt-2 max-h-40 overflow-auto rounded-md border border-border bg-muted/40 p-2 text-xs">
+                            <p className="whitespace-pre-wrap">{d.testo}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-semibold">Scelta paziente *</Label>
+                          <RadioGroup
+                            value={scelteConsensi[d.localId] ?? ""}
+                            onValueChange={(v) =>
+                              setScelteConsensi((prev) => ({
+                                ...prev,
+                                [d.localId]: v as Scelta,
+                              }))
+                            }
+                            className="grid gap-1.5"
+                          >
+                            <label
+                              htmlFor={`acc-${d.localId}`}
+                              className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 hover:bg-accent/30"
+                            >
+                              <RadioGroupItem value="acconsento" id={`acc-${d.localId}`} />
+                              <span className="text-sm leading-none">Acconsento</span>
+                            </label>
+                            <label
+                              htmlFor={`nacc-${d.localId}`}
+                              className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-1.5 hover:bg-accent/30"
+                            >
+                              <RadioGroupItem value="non_acconsento" id={`nacc-${d.localId}`} />
+                              <span className="text-sm leading-none">Non acconsento</span>
+                            </label>
+                          </RadioGroup>
+                          {d.kind.kind === "gdpr" &&
+                            scelteConsensi[d.localId] === "non_acconsento" && (
+                              <p className="text-[11px] text-destructive">
+                                Il GDPR è obbligatorio per proseguire la visita.
+                              </p>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <Label className="text-sm font-semibold">
+                    Firma del paziente * — vale per entrambi i consensi
+                  </Label>
+                  <SignaturePad
+                    ref={sigConsensiRef}
+                    onChange={(empty) => setFirmaConsensiReady(!empty)}
+                  />
+                </div>
               </div>
-              <div className="mt-2 max-h-56 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-sm">
-                <p className="whitespace-pre-wrap">{current.testo}</p>
+            )}
+
+            {/* === FASE ANAMNESI === */}
+            {isVisita && phase === "anamnesi" && anamnesiIdx >= 0 && (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <h3 className="font-display text-lg font-semibold">
+                      {docs[anamnesiIdx].titolo}
+                    </h3>
+                    <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      v{docs[anamnesiIdx].versione}
+                    </span>
+                  </div>
+                  <div className="mt-2 max-h-56 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-sm">
+                    <p className="whitespace-pre-wrap">{docs[anamnesiIdx].testo}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+                  <Label className="text-sm font-semibold">Scelta paziente *</Label>
+                  <RadioGroup
+                    value={sceltaSingolo ?? ""}
+                    onValueChange={(v) => setSceltaSingolo(v as Scelta)}
+                    className="grid gap-2"
+                  >
+                    <label
+                      htmlFor="anam-acc"
+                      className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                    >
+                      <RadioGroupItem value="acconsento" id="anam-acc" />
+                      <span className="text-sm leading-none">Acconsento e confermo</span>
+                    </label>
+                    <label
+                      htmlFor="anam-nacc"
+                      className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                    >
+                      <RadioGroupItem value="non_acconsento" id="anam-nacc" />
+                      <span className="text-sm leading-none">Non confermo</span>
+                    </label>
+                  </RadioGroup>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-semibold">Firma del paziente *</Label>
+                  <SignaturePad
+                    ref={sigSingoloRef}
+                    onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                </div>
+                {docs[anamnesiIdx].richiedeFirmaMedico && (
+                  <div>
+                    <Label className="text-sm font-semibold">Firma del medico *</Label>
+                    <SignaturePad
+                      ref={sigSingoloMedRef}
+                      onChange={(empty) => setFirmaSingoloMedReady(!empty)}
+                    />
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
-              <Label className="text-sm font-semibold">Scelta paziente *</Label>
-              <RadioGroup
-                value={scelta ?? ""}
-                onValueChange={(v) => setScelta(v as "acconsento" | "non_acconsento")}
-                className="grid gap-2"
-              >
-                <label
-                  htmlFor={`acc-${current.localId}`}
-                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
-                >
-                  <RadioGroupItem value="acconsento" id={`acc-${current.localId}`} />
-                  <span className="text-sm leading-none">Acconsento</span>
-                </label>
-                <label
-                  htmlFor={`nacc-${current.localId}`}
-                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
-                >
-                  <RadioGroupItem value="non_acconsento" id={`nacc-${current.localId}`} />
-                  <span className="text-sm leading-none">Non acconsento</span>
-                </label>
-              </RadioGroup>
-            </div>
-
-            {/* Firma sempre richiesta, indipendentemente dalla scelta */}
-            <div>
-              <Label className="text-sm font-semibold">Firma del paziente *</Label>
-              <SignaturePad
-                ref={sigPazRef}
-                onChange={(empty) => setFirmaReady(!empty)}
-              />
-            </div>
-            {current.richiedeFirmaMedico && (
-              <div>
-                <Label className="text-sm font-semibold">Firma del medico *</Label>
-                <SignaturePad
-                  ref={sigMedRef}
-                  onChange={(empty) => setFirmaMedReady(!empty)}
-                />
+            {/* === FASE TRATTAMENTO (legacy doc-per-doc) === */}
+            {!isVisita && currentTratt !== undefined && (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <h3 className="font-display text-lg font-semibold">
+                      {docs[currentTratt].titolo}
+                    </h3>
+                    <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      v{docs[currentTratt].versione}
+                    </span>
+                  </div>
+                  <div className="mt-2 max-h-56 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-sm">
+                    <p className="whitespace-pre-wrap">{docs[currentTratt].testo}</p>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+                  <Label className="text-sm font-semibold">Scelta paziente *</Label>
+                  <RadioGroup
+                    value={sceltaSingolo ?? ""}
+                    onValueChange={(v) => setSceltaSingolo(v as Scelta)}
+                    className="grid gap-2"
+                  >
+                    <label
+                      htmlFor={`tratt-acc-${docs[currentTratt].localId}`}
+                      className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                    >
+                      <RadioGroupItem
+                        value="acconsento"
+                        id={`tratt-acc-${docs[currentTratt].localId}`}
+                      />
+                      <span className="text-sm leading-none">Acconsento</span>
+                    </label>
+                    <label
+                      htmlFor={`tratt-nacc-${docs[currentTratt].localId}`}
+                      className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                    >
+                      <RadioGroupItem
+                        value="non_acconsento"
+                        id={`tratt-nacc-${docs[currentTratt].localId}`}
+                      />
+                      <span className="text-sm leading-none">Non acconsento</span>
+                    </label>
+                  </RadioGroup>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold">Firma del paziente *</Label>
+                  <SignaturePad
+                    ref={sigSingoloRef}
+                    onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                </div>
+                {docs[currentTratt].richiedeFirmaMedico && (
+                  <div>
+                    <Label className="text-sm font-semibold">Firma del medico *</Label>
+                    <SignaturePad
+                      ref={sigSingoloMedRef}
+                      onChange={(empty) => setFirmaSingoloMedReady(!empty)}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -393,22 +677,47 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
         )}
 
         <DialogFooter className="gap-2">
-          {stato === "scelta_firma" && step > 0 && (
-            <Button variant="ghost" onClick={() => { setStep(step - 1); resetStep(); }}>
+          {stato === "compilazione" && isVisita && phase === "anamnesi" && consensoIdxs.length > 0 && (
+            <Button variant="ghost" onClick={tornaAiConsensi}>
               <ChevronLeft className="h-4 w-4" />
               Indietro
             </Button>
           )}
-          {stato === "scelta_firma" && current && (
+          {stato === "compilazione" && isVisita && phase === "consensi" && (
             <Button
-              onClick={confermaDocumento}
+              onClick={confermaConsensi}
               disabled={
-                !scelta ||
-                !firmaReady ||
-                (current.richiedeFirmaMedico && !firmaMedReady)
+                !firmaConsensiReady ||
+                consensoIdxs.some((i) => !scelteConsensi[docs[i].localId])
               }
             >
-              {step + 1 < total ? "Conferma e prosegui" : "Completa e salva"}
+              {anamnesiIdx >= 0 ? "Conferma e prosegui" : "Completa e salva"}
+            </Button>
+          )}
+          {stato === "compilazione" && isVisita && phase === "anamnesi" && (
+            <Button
+              onClick={confermaAnamnesi}
+              disabled={
+                !sceltaSingolo ||
+                !firmaSingoloReady ||
+                (docs[anamnesiIdx]?.richiedeFirmaMedico && !firmaSingoloMedReady)
+              }
+            >
+              Completa e salva
+            </Button>
+          )}
+          {stato === "compilazione" && !isVisita && currentTratt !== undefined && (
+            <Button
+              onClick={confermaTrattamento}
+              disabled={
+                !sceltaSingolo ||
+                !firmaSingoloReady ||
+                (docs[currentTratt].richiedeFirmaMedico && !firmaSingoloMedReady)
+              }
+            >
+              {trattamentoStep + 1 < trattamentoIdxs.length
+                ? "Conferma e prosegui"
+                : "Completa e salva"}
             </Button>
           )}
           {stato === "salvataggio" && (

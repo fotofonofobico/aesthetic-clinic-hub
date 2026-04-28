@@ -100,6 +100,7 @@ interface Props {
 export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const { user } = useAuth();
   const [data, setData] = React.useState<AnamnesiRow | null>(null);
+  const [lastSigned, setLastSigned] = React.useState<AnamnesiRow | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [signing, setSigning] = React.useState(false);
@@ -108,6 +109,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [cartaceoDlgOpen, setCartaceoDlgOpen] = React.useState(false);
   const [draftPdfBlob, setDraftPdfBlob] = React.useState<Blob | null>(null);
   const [draftPdfOpen, setDraftPdfOpen] = React.useState(false);
+  const [annullando, setAnnullando] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
@@ -130,10 +132,32 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       return;
     }
     const list = (rows ?? []) as unknown as AnamnesiRow[];
-    // preferisci un draft attivo, altrimenti la più recente
     const draft = list.find((r) => r.stato === "draft");
-    setData(draft ?? list[0] ?? null);
+    const signed = list.find((r) => r.stato === "signed") ?? null;
+    setLastSigned(signed);
+    setData(draft ?? signed ?? list[0] ?? null);
     setLoading(false);
+  }
+
+  async function annullaModifiche() {
+    if (!data || data.stato !== "draft" || !lastSigned) return;
+    if (
+      !confirm(
+        `Eliminare le modifiche correnti e ripristinare l'ultima versione firmata (v${lastSigned.versione_numero})?`,
+      )
+    )
+      return;
+    setAnnullando(true);
+    const { error } = await supabase.from("anamnesi").delete().eq("id", data.id);
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      setAnnullando(false);
+      return;
+    }
+    toast.success(`Modifiche annullate, ripristinata v${lastSigned.versione_numero}`);
+    await load();
+    onSaved();
+    setAnnullando(false);
   }
 
   /**
@@ -514,6 +538,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 <Upload className="h-4 w-4" />
                 Carica PDF firmato
               </Button>
+              {lastSigned && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void annullaModifiche()}
+                  disabled={annullando || signing || forking}
+                  className="text-destructive"
+                >
+                  {annullando ? "Annullamento…" : `Annulla modifiche (torna a v${lastSigned.versione_numero})`}
+                </Button>
+              )}
               <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}

@@ -37,6 +37,7 @@ import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pa
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { sha256Hex } from "@/lib/hash";
 import { generaPdfConsenso } from "@/lib/pdf-consenso";
+import { generaPdfModuloVuoto } from "@/lib/pdf-consenso-vuoto";
 import {
   CATEGORIA_LABELS,
   type ConsensoFirmato,
@@ -47,6 +48,7 @@ import {
 import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
+import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
@@ -427,6 +429,11 @@ function NuovoConsensoDialog({
   );
   const sigRef = React.useRef<SignaturePadHandle>(null);
 
+  // Stato per dialog stampa modulo vuoto
+  const [stampaBlob, setStampaBlob] = useState<Blob | null>(null);
+  const [stampaOpen, setStampaOpen] = useState(false);
+  const [stampaTitle, setStampaTitle] = useState("Modulo vuoto");
+
   const tpl = templates.find((t) => t.id === tplId) ?? null;
 
   function reset() {
@@ -441,40 +448,54 @@ function NuovoConsensoDialog({
     sigRef.current?.clear();
   }
 
-  function stampaTemplate() {
-    if (!tpl) return;
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast.error("Abilita i popup per stampare");
+  /**
+   * Stampa un modulo vuoto (senza dati paziente o con essi a seconda del flag).
+   * Il PDF NON viene salvato in storage e NON crea record DB.
+   */
+  async function stampaModuloVuoto(precompilaPaziente: boolean) {
+    if (!tpl) {
+      toast.error("Seleziona prima un modello");
       return;
     }
-    const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${tpl.titolo}</title><style>
-      body{font-family:Georgia,serif;max-width:780px;margin:32px auto;padding:0 24px;color:#111}
-      h1{font-size:20px;margin:0 0 4px}
-      .meta{font-size:11px;color:#666;margin-bottom:18px}
-      pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.5}
-      .firme{margin-top:48px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
-      .firma{border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
-      .scelta{margin:24px 0;font-size:13px}
-      .scelta label{display:inline-flex;align-items:center;gap:6px;margin-right:18px}
-      @media print{body{margin:0}}
-      </style></head><body>
-      <h1>${tpl.titolo}</h1>
-      <div class="meta">Versione ${tpl.versione} · da firmare a mano</div>
-      <pre>${tpl.testo.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>
-      <div class="scelta">
-        Scelta del paziente:
-        <label>☐ Acconsento</label>
-        <label>☐ Non acconsento</label>
-      </div>
-      <div class="firme">
-        <div class="firma">Firma del paziente · data __________</div>
-        <div class="firma">Firma del medico · data __________</div>
-      </div>
-      <script>window.onload=()=>setTimeout(()=>window.print(),200)</script>
-      </body></html>`;
-    w.document.write(html);
-    w.document.close();
+    try {
+      let pazHeader: {
+        cognome: string;
+        nome: string;
+        codice_fiscale: string | null;
+        data_nascita: string | null;
+      } | null = null;
+      if (precompilaPaziente) {
+        const { data: paz, error } = await supabase
+          .from("pazienti")
+          .select("nome, cognome, codice_fiscale, data_nascita")
+          .eq("id", pazienteId)
+          .single();
+        if (error || !paz) {
+          throw new Error(error?.message ?? "Paziente non trovato");
+        }
+        pazHeader = {
+          cognome: paz.cognome,
+          nome: paz.nome,
+          codice_fiscale: paz.codice_fiscale ?? null,
+          data_nascita: paz.data_nascita ?? null,
+        };
+      }
+      const blob = generaPdfModuloVuoto({
+        paziente: pazHeader,
+        titolo: tpl.titolo,
+        testo: tpl.testo,
+        versione: tpl.versione,
+      });
+      setStampaTitle(
+        precompilaPaziente
+          ? `${tpl.titolo} — modulo per il paziente`
+          : `${tpl.titolo} — modulo generico`,
+      );
+      setStampaBlob(blob);
+      setStampaOpen(true);
+    } catch (e) {
+      toast.error(`Errore stampa: ${(e as Error).message}`);
+    }
   }
 
   function calcValidoFinoA(t: ConsensoTemplate, firmatoIl: Date): string | null {
@@ -648,6 +669,7 @@ function NuovoConsensoDialog({
   }
 
   return (
+    <>
     <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-display">Nuovo consenso informato</DialogTitle>
@@ -685,6 +707,29 @@ function NuovoConsensoDialog({
                 ? `Validità: ${tpl.validita_mesi} mesi dalla firma.`
                 : "Nessuna scadenza temporale (valido finché non cambia versione o non viene revocato)."}
             </p>
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 p-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Stampa cartacea (per firma a mano):
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void stampaModuloVuoto(true)}
+              >
+                <FileText className="h-4 w-4" />
+                Stampa per questo paziente
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void stampaModuloVuoto(false)}
+              >
+                <FileText className="h-4 w-4" />
+                Modulo generico vuoto
+              </Button>
+            </div>
           </>
         )}
 
@@ -750,19 +795,7 @@ function NuovoConsensoDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label>PDF firmato a mano *</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={stampaTemplate}
-                disabled={!tpl}
-              >
-                <FileText className="h-4 w-4" />
-                Stampa modulo vuoto
-              </Button>
-            </div>
+            <Label>PDF firmato a mano *</Label>
             <Input
               type="file"
               accept="application/pdf,image/*"
@@ -827,5 +860,16 @@ function NuovoConsensoDialog({
         </Button>
       </DialogFooter>
     </DialogContent>
+    <PdfBlobDialog
+      open={stampaOpen}
+      onOpenChange={(o) => {
+        setStampaOpen(o);
+        if (!o) setStampaBlob(null);
+      }}
+      blob={stampaBlob}
+      title={stampaTitle}
+      filename="modulo-consenso-vuoto.pdf"
+    />
+    </>
   );
 }

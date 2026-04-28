@@ -1,53 +1,121 @@
-Hai ragione a essere frustrato: il problema non è che non si possano creare PDF. I PDF vengono generati, ma il modo in cui li stiamo aprendo in Safari/nel preview Lovable è sbagliato: aprire una nuova scheda vuota e poi iniettarci dentro `blob:` / `data:application/pdf;base64` può far ricaricare la pagina principale o lasciare una scheda bianca/fittizia.
+# Piano — Firma visita unificata + annulla modifiche + stampa modulo vuoto
 
-Piano per correggerlo in modo stabile:
+## Obiettivi
+1. Sessione firma "Visita" come wizard a **2 step**: STEP 1 GDPR+Uso immagini con UNA firma sola; STEP 2 anamnesi con firma separata.
+2. Pulsante "Annulla modifiche" sull'anamnesi: cancella la draft e ripristina l'ultima signed senza richiedere firma.
+3. Nel dialog "Nuovo consenso" aggiungere due pulsanti di stampa: "Stampa per questo paziente" (precompilato con anagrafica) e "Stampa modulo generico vuoto".
 
-1. Rimuovere il flusso con scheda vuota
-   - Niente più `window.open("")` seguito da `document.write()` per i PDF.
-   - Niente più navigazione diretta a `blob:` o iframe con PDF base64 dentro una scheda creata al volo.
+Regole confermate dall'utente:
+- 1 immagine di firma → 2 record `consenso_firmato` (GDPR + uso_immagini), stesso timestamp e stessa firma.
+- GDPR rifiutato = blocca avanzamento; uso immagini rifiutato = OK, prosegue.
+- Stampa: due pulsanti distinti.
 
-2. Creare una pagina viewer PDF interna all’app
-   - Aggiungere una route dedicata tipo `/pdf-viewer`.
-   - La pagina resta dentro l’app normale, quindi non manda in crisi Safari/preview.
-   - Mostra stato di caricamento, errore chiaro, pulsanti “Stampa” e “Scarica PDF”.
+---
 
-3. Passare al viewer solo riferimenti sicuri, non il blob
-   - Per PDF firmati di anamnesi e consensi: aprire `/pdf-viewer?bucket=...&path=...&title=...`.
-   - Il viewer scarica il PDF dallo storage autenticato e lo mostra.
-   - Per la “Stampa bozza” dell’anamnesi, evitare nuova scheda: generare il PDF nella pagina e mostrarlo nello stesso viewer/modal oppure salvare temporaneamente la bozza e aprirla nel viewer.
+## STEP 1 — Wizard firma a 2 fasi
 
-4. Aggiungere fallback pratico se il browser non visualizza il PDF inline
-   - Se l’anteprima PDF non viene renderizzata, il viewer mostra comunque “Scarica PDF”.
-   - Il pulsante “Stampa” userà l’iframe solo quando disponibile; altrimenti invita ad aprire/scaricare il PDF.
+### Modifiche a `src/components/signature-session-dialog.tsx`
+Sostituire il loop documento-per-documento con due "fasi" ben definite quando `session.tipo === "visita"`:
 
-5. Pulire il codice precedente
-   - Sostituire l’utility `renderPdfInWindow` o limitarla solo a HTML stampabile non-PDF.
-   - Aggiornare `PdfSignedLink`, anamnesi e consensi per usare il nuovo viewer.
-   - Mantenere il blocco anti doppio-click per evitare doppie aperture.
+**Fase A — Consensi combinati** (visibile solo se nella sessione esistono doc `gdpr` e/o `uso_immagini`):
+- Una sola schermata che mostra in due card affiancate (verticali su mobile) il testo di GDPR e Uso immagini, ciascuno con il proprio RadioGroup Acconsento/Non acconsento (scelte indipendenti).
+- UN SOLO `SignaturePad` in fondo, etichettato "Firma del paziente — vale per entrambi i consensi sopra".
+- Al click "Conferma e prosegui":
+  - validazioni: entrambe le scelte selezionate, firma non vuota.
+  - **se GDPR = `non_acconsento` → toast di errore bloccante** ("Il consenso GDPR è obbligatorio per proseguire la visita") e si rimane sulla schermata.
+  - altrimenti la stessa `firmaPaziente` (dataURL) viene applicata ai SessionDoc dei due consensi e si passa alla fase B.
 
-Dettagli tecnici:
+**Fase B — Anamnesi** (solo se presente nella sessione):
+- Identica schermata attuale (testo + scelta + signature pad). Firma indipendente.
 
-- File coinvolti previsti:
-  - `src/routes/pdf-viewer.tsx` nuova pagina dedicata.
-  - `src/components/pdf-signed-link.tsx` aggiornato per navigare al viewer invece di aprire schede vuote.
-  - `src/components/paziente/anamnesi-panel.tsx` aggiornato per “Stampa bozza”.
-  - Eventualmente `src/lib/pdf-viewer.ts` da rimuovere o ridurre.
+**Salvataggio (`salvaTutto`)**: già scrive un record `consenso_firmato` per documento. Niente da cambiare lato DB: i due record GDPR/Uso immagini condivideranno semplicemente `firma_immagine`, `firmato_il` e (best-effort) lo stesso `hash_integrita` finale. Aggiungere un secondo flag interno `firmaCondivisa: true` solo per UX (es. log), non necessario in DB.
 
-- Per i PDF firmati si userà `supabase.storage.from(bucket).download(path)` dentro il viewer, poi si creerà un object URL solo dentro la stessa pagina viewer.
-- Per la bozza anamnesi la soluzione più stabile è mostrarla in un dialog/viewer interno, senza pop-up. Se serve una vera nuova pagina per stampare, la apro tramite route app, non tramite pagina `about:blank` manipolata via script.
+**Stato componente**: introdurre `phase: "consensi" | "anamnesi" | "salvataggio" | "fatto"` invece di `step` numerico. Mantenere `Progress` calcolato come `phase === "consensi" ? 50 : 100`.
 
-Risultato atteso:
+**Rimanere retrocompatibile**: se `session.tipo === "trattamento"` (firma trattamenti) il flusso resta documento-per-documento come ora — non viene toccato.
 
-```text
-Click su “Apri PDF” o “Stampa bozza”
-→ nessuna scheda fittizia about:blank
-→ nessun blob nella barra indirizzi
-→ la pagina principale non si riavvia
-→ PDF visibile in viewer interno
-→ pulsanti Stampa / Scarica disponibili
+### Eventuale ritocco a `src/lib/signature-session.ts`
+- `buildVisitaSession` resta com'è (produce SessionDoc separati GDPR / uso_immagini / anamnesi).
+- Garantire l'ordine: GDPR prima, poi uso_immagini, poi anamnesi (già rispettato).
+
+---
+
+## STEP 2 — "Annulla modifiche" sull'anamnesi
+
+### Modifiche a `src/components/paziente/anamnesi-panel.tsx`
+
+Aggiungere bottone in fondo al pannello, visibile **solo** quando esiste una `draft` E una `signed` precedente per lo stesso paziente.
+
+Logica:
+1. Caricare in `load()` non solo il record corrente ma anche l'ultima `signed` (memorizzare `lastSigned: AnamnesiRow | null`).
+2. Mostrare bottone "Annulla modifiche" rosso outline accanto a "Salva bozza" se `data.stato === "draft" && lastSigned`.
+3. Handler `annullaModifiche()`:
+   - `confirm("Eliminare le modifiche e tornare all'ultima versione firmata v{n}?")`.
+   - `DELETE` della draft corrente: `supabase.from("anamnesi").delete().eq("id", data.id)`.
+   - Ricaricare → `setData(lastSigned)`.
+   - Toast "Modifiche annullate, ripristinata v{n}".
+   - Chiamare `onSaved()` per refresh badge esterni.
+
+**Verifica RLS**: la tabella `anamnesi` non ha policy DELETE → operatori non possono cancellare. Va aggiunta una policy DELETE limitata alle draft.
+
+### Migration richiesta
+```sql
+CREATE POLICY "Draft anamnesi eliminabili da operatori attivi"
+ON public.anamnesi
+FOR DELETE
+TO authenticated
+USING (is_active_operator(auth.uid()) AND stato = 'draft');
 ```
 
-<lov-actions>
-<lov-open-history>View History</lov-open-history>
-<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-</lov-actions>
+---
+
+## STEP 3 — Stampa modulo vuoto nel "Nuovo consenso"
+
+### Modifiche a `src/components/paziente/consensi-panel.tsx` (`NuovoConsensoDialog`)
+
+Stato attuale: c'è già una funzione `stampaTemplate()` che apre `window.open("")` con HTML inline → stesso pattern problematico già abbandonato per i PDF firmati.
+
+Riscriverla generando un PDF con `jsPDF` (riusando i renderer di `src/lib/pdf-template.ts`) e mostrarlo nel `PdfBlobDialog` esistente — coerente con la nuova architettura PDF interna.
+
+Due pulsanti nel dialog (visibili solo quando un template è selezionato):
+
+1. **"Stampa per questo paziente"** — carica anagrafica del paziente corrente (`pazienti.nome/cognome/codice_fiscale/data_nascita`) e genera PDF con header precompilato.
+2. **"Stampa modulo generico vuoto"** — passa anagrafica vuota (`{ nome: "_______", cognome: "_______", codice_fiscale: "_______", data_nascita: null }`) — sempre disponibile.
+
+### Nuova helper `src/lib/pdf-consenso-vuoto.ts`
+Funzione `generaPdfModuloVuoto({ paziente, titolo, testo, versione })` che produce un PDF con:
+- intestazione paziente (riusa `renderHeaderPaziente`)
+- titolo + versione
+- testo del consenso
+- riga "Data: ____________________"
+- due checkbox: ☐ Acconsento  ☐ Non acconsento (disegnati come quadrati vuoti)
+- due blocchi firma vuoti: "Firma paziente ____________________" / "Firma medico ____________________"
+
+Il PDF viene mostrato nel `PdfBlobDialog` (preview canvas + bottoni Stampa / Scarica). **Non viene salvato in storage e non crea record DB**.
+
+---
+
+## File toccati
+
+```text
+NUOVI
+- src/lib/pdf-consenso-vuoto.ts             (helper generazione PDF vuoto)
+- supabase migration                         (policy DELETE su anamnesi draft)
+
+MODIFICATI
+- src/components/signature-session-dialog.tsx  (wizard 2-fasi per visita)
+- src/components/paziente/anamnesi-panel.tsx   (bottone "Annulla modifiche" + load lastSigned)
+- src/components/paziente/consensi-panel.tsx   (NuovoConsensoDialog: 2 pulsanti stampa via PdfBlobDialog)
+```
+
+Nessuna modifica a `signature-session.ts`, `pdf-consenso.ts`, schema DB (eccetto policy), routing.
+
+---
+
+## Note tecniche
+
+- **Stessa firma su 2 record consenso**: l'hash di integrità rimane individuale per record (include titolo/testo/versione del singolo consenso) — corretto per la storicizzazione separata. La condivisione è solo a livello di `firma_immagine` + `firmato_il`.
+- **GDPR obbligatorio**: il blocco è solo client-side nel wizard. Lato dato resta possibile salvare un GDPR rifiutato da altri flussi (è già così oggi).
+- **Annulla modifiche**: limitato alle draft per design — la policy USING `stato = 'draft'` impedisce a chiunque di cancellare versioni firmate, in linea con il trigger `anamnesi_signed_protect`.
+- **Stampa vuoto**: PDF generato client-side, mai uploadato. Il `PdfBlobDialog` già gestisce print + download.
+- **Mobile (viewport 867×762)**: nella Fase A le 2 card consensi vanno in `grid md:grid-cols-2 gap-3` — su mobile stacked, su desktop affiancate. Il signature pad in fondo full-width.
