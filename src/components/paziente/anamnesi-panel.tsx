@@ -27,7 +27,7 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature, History } from "lucide-react";
+import { Lock, FileSignature, History, Printer, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { SignaturePadHandle } from "@/components/signature-pad";
+import { PdfSignedLink } from "@/components/pdf-signed-link";
 
 type ReactNode = React.ReactNode;
 
@@ -104,8 +105,11 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [signing, setSigning] = React.useState(false);
   const [forking, setForking] = React.useState(false);
   const [signDlgOpen, setSignDlgOpen] = React.useState(false);
+  const [cartaceoDlgOpen, setCartaceoDlgOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
+  // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
+  const forkPromiseRef = React.useRef<Promise<AnamnesiRow | null> | null>(null);
 
   React.useEffect(() => {
     void load();
@@ -170,9 +174,18 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   async function ensureEditable(): Promise<AnamnesiRow | null> {
     if (!data) return null;
     if (data.stato !== "signed") return data;
-    const draft = await forkFromSigned(data);
-    if (draft) setData(draft);
-    return draft;
+    // Fork lock: se è già in corso un fork, riusa la stessa promise.
+    // Evita corse e violazioni dell'unique index `anamnesi_one_draft_per_paziente`.
+    if (forkPromiseRef.current) {
+      return forkPromiseRef.current;
+    }
+    const p = forkFromSigned(data).then((draft) => {
+      if (draft) setData(draft);
+      forkPromiseRef.current = null;
+      return draft;
+    });
+    forkPromiseRef.current = p;
+    return p;
   }
 
   async function patch<S extends keyof AnamnesiPayload>(
@@ -182,8 +195,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     const editable = await ensureEditable();
     if (!editable) return;
     setData((d: AnamnesiRow | null) => {
-      const target = d?.id === editable.id ? d : editable;
-      if (!target) return d;
+      // Usa SEMPRE editable come base (può essere il nuovo draft appena forkato)
+      // per evitare di applicare patch sul vecchio record signed.
+      const target = d && d.id === editable.id ? d : editable;
       const current = (target[sez] ?? {}) as Record<string, unknown>;
       return { ...target, [sez]: { ...current, ...patchObj } };
     });
@@ -193,8 +207,8 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     const editable = await ensureEditable();
     if (!editable) return;
     setData((d: AnamnesiRow | null) => {
-      const target = d?.id === editable.id ? d : editable;
-      return target ? { ...target, note_libere: v } : d;
+      const target = d && d.id === editable.id ? d : editable;
+      return { ...target, note_libere: v };
     });
   }
 
@@ -248,10 +262,13 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       });
 
       const path = `${pazienteId}/${data.id}-v${data.versione_numero}.pdf`;
-      const { error: upErr } = await supabase.storage
+      const up = await supabase.storage
         .from("anamnesi-pdf")
         .upload(path, blob, { contentType: "application/pdf", upsert: true });
-      if (upErr) throw upErr;
+      if (up.error || !up.data?.path) {
+        console.error("[anamnesi-pdf upload] errore", up.error, "path:", path);
+        throw new Error(`Upload PDF anamnesi fallito: ${up.error?.message ?? "path vuoto"}`);
+      }
 
       const { error: updErr } = await supabase
         .from("anamnesi")
@@ -354,6 +371,103 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     void firmaAnamnesi(firmaPaz, firmaMed);
   }
 
+  /** Stampa anamnesi senza firme per workflow cartaceo. */
+  async function stampaAnamnesi() {
+    if (!data) return;
+    try {
+      const { data: paz, error: pazErr } = await supabase
+        .from("pazienti")
+        .select("nome, cognome, codice_fiscale, data_nascita")
+        .eq("id", pazienteId)
+        .single();
+      if (pazErr || !paz) throw new Error(pazErr?.message ?? "Paziente non trovato");
+      const { blob } = await generaPdfAnamnesi({
+        paziente: {
+          nome: paz.nome,
+          cognome: paz.cognome,
+          codice_fiscale: paz.codice_fiscale ?? null,
+          data_nascita: paz.data_nascita ?? null,
+        },
+        versioneNumero: data.versione_numero ?? 1,
+        firmataIl: new Date(),
+        payload: {
+          generale: (data.generale ?? {}) as Record<string, unknown>,
+          patologica: (data.patologica ?? {}) as Record<string, unknown>,
+          farmacologica: (data.farmacologica ?? {}) as Record<string, unknown>,
+          estetica: (data.estetica ?? {}) as Record<string, unknown>,
+          note_libere: data.note_libere,
+        },
+        firmaPazienteDataUrl: null,
+        firmaMedicoDataUrl: null,
+        operatoreNome: null,
+        modalita: "cartaceo",
+      });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      toast.error(`Errore stampa: ${(e as Error).message}`);
+    }
+  }
+
+  /** Carica PDF cartaceo già firmato. */
+  async function caricaCartaceo(file: File, dataFirma: string): Promise<boolean> {
+    if (!data) return false;
+    if (data.stato === "signed") {
+      toast.error("Già firmata. Modifica un campo per creare una nuova versione.");
+      return false;
+    }
+    setSigning(true);
+    try {
+      const firmataIl = new Date(`${dataFirma}T12:00:00`);
+      if (isNaN(firmataIl.getTime()) || firmataIl > new Date()) {
+        throw new Error("Data firma non valida");
+      }
+      const path = `${pazienteId}/${data.id}-v${data.versione_numero}-cartaceo.pdf`;
+      const up = await supabase.storage
+        .from("anamnesi-pdf")
+        .upload(path, file, { contentType: file.type || "application/pdf", upsert: true });
+      if (up.error || !up.data?.path) {
+        console.error("[anamnesi-pdf cartaceo] upload errore", up.error);
+        throw new Error(`Upload PDF fallito: ${up.error?.message ?? "path vuoto"}`);
+      }
+      const enc = new TextEncoder().encode(
+        `cartaceo|${file.name}|${file.size}|${firmataIl.toISOString()}`,
+      );
+      const buf = await crypto.subtle.digest("SHA-256", enc);
+      const hash = Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const { error: updErr } = await supabase
+        .from("anamnesi")
+        .update({
+          stato: "signed",
+          firmata_il: firmataIl.toISOString(),
+          firmata_da_medico: user?.id ?? null,
+          firma_paziente: null,
+          firma_medico: null,
+          hash_integrita: hash,
+          pdf_url: path,
+        })
+        .eq("id", data.id);
+      if (updErr) throw updErr;
+      toast.success("Anamnesi cartacea archiviata");
+      setCartaceoDlgOpen(false);
+      await load();
+      onSaved();
+      return true;
+    } catch (e) {
+      toast.error(`Errore: ${(e as Error).message}`);
+      return false;
+    } finally {
+      setSigning(false);
+    }
+  }
+
+  function isCartaceo(row: AnamnesiRow): boolean {
+    return row.stato === "signed" && !row.firma_paziente && !!row.pdf_url;
+  }
+
   if (loading || !data) {
     return <p className="text-sm text-muted-foreground">Caricamento…</p>;
   }
@@ -383,24 +497,46 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           )}
           <span>
             {isSigned
-              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""} — modifica un campo per creare una nuova versione`
+              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""}${isCartaceo(data) ? " · cartacea" : ""} — modifica un campo per creare una nuova versione`
               : `Bozza v${data.versione_numero ?? 1} — richiede firma del paziente`}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void stampaAnamnesi()}>
+            <Printer className="h-4 w-4" />
+            Stampa anamnesi
+          </Button>
           {!isSigned && (
-            <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
-              <FileSignature className="h-4 w-4" />
-              {signing ? "Firma in corso…" : "Firma e blocca"}
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={() => setCartaceoDlgOpen(true)} disabled={signing || forking}>
+                <Upload className="h-4 w-4" />
+                Carica PDF firmato
+              </Button>
+              <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
+                <FileSignature className="h-4 w-4" />
+                {signing ? "Firma in corso…" : "Firma e blocca"}
+              </Button>
+            </>
           )}
         </div>
       </div>
+      {isSigned && isCartaceo(data) && data.pdf_url && (
+        <PdfSignedLink bucket="anamnesi-pdf" path={data.pdf_url} label="Apri PDF cartaceo firmato" />
+      )}
       {forking && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <History className="h-3 w-3" /> Creazione nuova versione in corso…
         </p>
       )}
+
+      {/* Dialog upload cartaceo */}
+      <CartaceoUploadDialog
+        open={cartaceoDlgOpen}
+        onClose={() => setCartaceoDlgOpen(false)}
+        onConfirm={(file, dataFirma) => caricaCartaceo(file, dataFirma)}
+        saving={signing}
+      />
+
 
       {/* === 1. GENERALE === */}
       <Card>
@@ -1000,5 +1136,74 @@ function FieldNote({
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
+  );
+}
+
+function CartaceoUploadDialog({
+  open,
+  onClose,
+  onConfirm,
+  saving,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (file: File, dataFirma: string) => Promise<boolean>;
+  saving: boolean;
+}) {
+  const [file, setFile] = React.useState<File | null>(null);
+  const [dataFirma, setDataFirma] = React.useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+  React.useEffect(() => {
+    if (!open) {
+      setFile(null);
+      setDataFirma(new Date().toISOString().slice(0, 10));
+    }
+  }, [open]);
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display">Carica anamnesi cartacea firmata</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-sm font-medium">PDF firmato *</p>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm"
+            />
+            {file && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-medium">Data firma *</p>
+            <input
+              type="date"
+              value={dataFirma}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDataFirma(e.target.value)}
+              className="block w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Annulla
+          </Button>
+          <Button
+            onClick={() => file && void onConfirm(file, dataFirma)}
+            disabled={!file || !dataFirma || saving}
+          >
+            {saving ? "Caricamento…" : "Conferma"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

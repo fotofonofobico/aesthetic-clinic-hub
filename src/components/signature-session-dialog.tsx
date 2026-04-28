@@ -78,23 +78,23 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
       toast.error("Seleziona Acconsento o Non acconsento");
       return;
     }
+    // Firma del paziente SEMPRE obbligatoria (sia per acconsento sia per non_acconsento)
     let firmaPaz: string | null = null;
     let firmaMed: string | null = null;
-    if (scelta === "acconsento") {
-      const padPaz = sigPazRef.current;
-      if (!padPaz || padPaz.isEmpty()) {
-        toast.error("La firma del paziente è obbligatoria");
+    const padPaz = sigPazRef.current;
+    if (!padPaz || padPaz.isEmpty()) {
+      toast.error("La firma del paziente è obbligatoria");
+      return;
+    }
+    firmaPaz = padPaz.toDataURL();
+    // Firma medico richiesta solo se il template lo prevede
+    if (current.richiedeFirmaMedico) {
+      const padMed = sigMedRef.current;
+      if (!padMed || padMed.isEmpty()) {
+        toast.error("La firma del medico è obbligatoria per questo documento");
         return;
       }
-      firmaPaz = padPaz.toDataURL();
-      if (current.richiedeFirmaMedico) {
-        const padMed = sigMedRef.current;
-        if (!padMed || padMed.isEmpty()) {
-          toast.error("La firma del medico è obbligatoria per questo documento");
-          return;
-        }
-        firmaMed = padMed.toDataURL();
-      }
+      firmaMed = padMed.toDataURL();
     }
 
     const nextDocs = [...docs];
@@ -184,7 +184,10 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
           const up = await supabase.storage
             .from("anamnesi-pdf")
             .upload(path, blob, { contentType: "application/pdf", upsert: true });
-          if (up.error) throw up.error;
+          if (up.error || !up.data?.path) {
+            console.error("[anamnesi-pdf upload] errore", up.error, "path:", path);
+            throw new Error(`Upload PDF anamnesi fallito: ${up.error?.message ?? "path vuoto"}`);
+          }
           uploadedPaths.push(`anamnesi-pdf:${path}`);
 
           const upd = await supabase
@@ -231,7 +234,11 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
           const up = await supabase.storage
             .from("consensi-pdf")
             .upload(pdfPath, blob, { contentType: "application/pdf" });
-          if (up.error) throw up.error;
+          if (up.error || !up.data?.path) {
+            console.error("[consensi-pdf upload] errore", up.error, "path:", pdfPath);
+            throw new Error(`Upload PDF consenso fallito: ${up.error?.message ?? "path vuoto"}`);
+          }
+          if (!pdfPath) throw new Error("pdf_url vuoto, abort");
           uploadedPaths.push(`consensi-pdf:${pdfPath}`);
 
           // Hash extra includendo firma + esito (compatibile con l'engine esistente)
@@ -341,36 +348,39 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
                 onValueChange={(v) => setScelta(v as "acconsento" | "non_acconsento")}
                 className="grid gap-2"
               >
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2 hover:bg-accent/30">
+                <label
+                  htmlFor={`acc-${current.localId}`}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
                   <RadioGroupItem value="acconsento" id={`acc-${current.localId}`} />
-                  <span>Acconsento</span>
+                  <span className="text-sm leading-none">Acconsento</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2 hover:bg-accent/30">
+                <label
+                  htmlFor={`nacc-${current.localId}`}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
                   <RadioGroupItem value="non_acconsento" id={`nacc-${current.localId}`} />
-                  <span>Non acconsento</span>
+                  <span className="text-sm leading-none">Non acconsento</span>
                 </label>
               </RadioGroup>
             </div>
 
-            {scelta === "acconsento" && (
-              <>
-                <div>
-                  <Label className="text-sm font-semibold">Firma del paziente *</Label>
-                  <SignaturePad
-                    ref={sigPazRef}
-                    onChange={(empty) => setFirmaReady(!empty)}
-                  />
-                </div>
-                {current.richiedeFirmaMedico && (
-                  <div>
-                    <Label className="text-sm font-semibold">Firma del medico *</Label>
-                    <SignaturePad
-                      ref={sigMedRef}
-                      onChange={(empty) => setFirmaMedReady(!empty)}
-                    />
-                  </div>
-                )}
-              </>
+            {/* Firma sempre richiesta, indipendentemente dalla scelta */}
+            <div>
+              <Label className="text-sm font-semibold">Firma del paziente *</Label>
+              <SignaturePad
+                ref={sigPazRef}
+                onChange={(empty) => setFirmaReady(!empty)}
+              />
+            </div>
+            {current.richiedeFirmaMedico && (
+              <div>
+                <Label className="text-sm font-semibold">Firma del medico *</Label>
+                <SignaturePad
+                  ref={sigMedRef}
+                  onChange={(empty) => setFirmaMedReady(!empty)}
+                />
+              </div>
             )}
           </div>
         )}
@@ -394,8 +404,8 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
               onClick={confermaDocumento}
               disabled={
                 !scelta ||
-                (scelta === "acconsento" && !firmaReady) ||
-                (scelta === "acconsento" && current.richiedeFirmaMedico && !firmaMedReady)
+                !firmaReady ||
+                (current.richiedeFirmaMedico && !firmaMedReady)
               }
             >
               {step + 1 < total ? "Conferma e prosegui" : "Completa e salva"}
