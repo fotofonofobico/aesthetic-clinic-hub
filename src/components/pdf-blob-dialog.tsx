@@ -2,6 +2,7 @@ import * as React from "react";
 import { Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,6 @@ interface PdfBlobDialogProps {
 }
 
 export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: PdfBlobDialogProps) {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const [url, setUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -37,10 +37,7 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
 
   function printPdf() {
     try {
-      const frameWindow = iframeRef.current?.contentWindow;
-      if (!frameWindow) throw new Error("Anteprima non pronta");
-      frameWindow.focus();
-      frameWindow.print();
+      window.print();
     } catch {
       toast.error("Se la stampa non parte, usa Scarica PDF e stampa dal visualizzatore del dispositivo.");
     }
@@ -69,7 +66,7 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
         </DialogHeader>
         <div className="min-h-0 flex-1 bg-muted">
           {url ? (
-            <iframe ref={iframeRef} title={title} src={url} className="h-full w-full border-0 bg-background" />
+            <PdfCanvasViewer blob={blob} />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Generazione anteprima…
