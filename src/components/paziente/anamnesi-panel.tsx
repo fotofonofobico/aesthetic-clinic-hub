@@ -374,15 +374,6 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   /** Stampa anamnesi senza firme per workflow cartaceo. */
   async function stampaAnamnesi() {
     if (!data) return;
-    const pdfWindow = window.open("", "_blank");
-    if (!pdfWindow) {
-      toast.error("Abilita i popup per aprire la stampa bozza.");
-      return;
-    }
-    pdfWindow.opener = null;
-    pdfWindow.document.write(
-      '<!doctype html><html lang="it"><head><title>Generazione PDF…</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">Generazione PDF…</body></html>',
-    );
     try {
       const { data: paz, error: pazErr } = await supabase
         .from("pazienti")
@@ -411,9 +402,9 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         operatoreNome: null,
         modalita: "cartaceo",
       });
-      await renderPdfInWindow(pdfWindow, blob, "Bozza anamnesi");
+      setDraftPdfBlob(blob);
+      setDraftPdfOpen(true);
     } catch (e) {
-      pdfWindow.close();
       toast.error(`Errore stampa: ${(e as Error).message}`);
     }
   }
