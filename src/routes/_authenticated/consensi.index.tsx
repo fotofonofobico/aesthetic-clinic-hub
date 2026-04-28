@@ -152,11 +152,15 @@ function ConsensiPage() {
                           {trat.nome}
                         </span>
                       )}
-                      {t.validita_mesi != null && (
+                      {t.durata_tipo === "sedute" && t.durata_sedute != null ? (
+                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] tracking-wide text-muted-foreground">
+                          Validità {t.durata_sedute} sedute
+                        </span>
+                      ) : t.validita_mesi != null ? (
                         <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] tracking-wide text-muted-foreground">
                           Validità {t.validita_mesi} mesi
                         </span>
-                      )}
+                      ) : null}
                       {!t.attivo && (
                         <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
                           Disattivato
