@@ -267,7 +267,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                   <p className="whitespace-pre-wrap">{viewing.testo_snapshot}</p>
                 </div>
 
-                {viewing.modalita_firma === "tablet" && viewing.firma_immagine ? (
+                {viewing.modalita_firma === "tablet" && viewing.firma_immagine && (
                   <div>
                     <Label>Firma</Label>
                     <img
@@ -276,15 +276,22 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                       className="mt-1 h-32 w-full rounded border border-border bg-card object-contain"
                     />
                   </div>
-                ) : viewing.pdf_url ? (
-                  <div>
-                    <Label>PDF firmato</Label>
-                    <PdfLink
+                )}
+                <div>
+                  <Label>PDF firmato</Label>
+                  {viewing.pdf_url ? (
+                    <PdfSignedLink
+                      bucket="consensi-pdf"
                       path={viewing.pdf_url}
-                      getUrl={() => getSignedUrl(viewing.pdf_url!)}
+                      label="Apri PDF firmato"
                     />
-                  </div>
-                ) : null}
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      PDF non disponibile per questo consenso (record antecedente alla
+                      generazione automatica)
+                    </p>
+                  )}
+                </div>
 
                 {viewing.note && (
                   <div>
