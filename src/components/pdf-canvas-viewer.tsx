@@ -32,15 +32,17 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
   React.useEffect(() => {
     const host = hostRef.current;
     if (!host || !blob || width <= 0) return;
+    const currentHost = host;
+    const pdfBlob = blob;
 
     let cancelled = false;
-    host.innerHTML = "";
+    currentHost.innerHTML = "";
     setLoading(true);
     setError(null);
 
     async function render() {
       try {
-        const data = await blob.arrayBuffer();
+        const data = await pdfBlob.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data }).promise;
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         const cssWidth = Math.max(280, width - 32);
@@ -62,8 +64,8 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
           canvas.className = "mx-auto my-4 block rounded-md bg-background shadow-sm";
           context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          await page.render({ canvasContext: context, viewport }).promise;
-          if (!cancelled) host.appendChild(canvas);
+          await page.render({ canvas, canvasContext: context, viewport }).promise;
+          if (!cancelled) currentHost.appendChild(canvas);
         }
         await pdf.destroy();
       } catch (e) {
@@ -80,7 +82,7 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
 
     return () => {
       cancelled = true;
-      host.innerHTML = "";
+      currentHost.innerHTML = "";
     };
   }, [blob, onError, width]);
 
