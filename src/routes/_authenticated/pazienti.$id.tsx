@@ -223,7 +223,7 @@ function PazienteDetailPage() {
           <AnamnesiPanel
             pazienteId={id}
             sesso={paziente.sesso}
-            onSaved={() => void load()}
+            onSaved={() => void load({ silent: true })}
           />
         </TabsContent>
 
