@@ -38,7 +38,7 @@ export const CATEGORIA_VALIDITA_DEFAULT: Record<ConsensoCategoria, number | null
 };
 
 export type TrattamentoTipo = "singolo" | "ciclo";
-export type DurataUnita = "giorni" | "settimane" | "mesi";
+export type DurataUnita = "giorni" | "settimane" | "mesi" | "sedute";
 
 export const TRATTAMENTO_CATEGORIE = [
   "tossina_botulinica",
@@ -63,6 +63,7 @@ export const DURATA_UNITA_LABELS: Record<DurataUnita, string> = {
   giorni: "Giorni",
   settimane: "Settimane",
   mesi: "Mesi",
+  sedute: "Sedute",
 };
 
 export interface Trattamento {
