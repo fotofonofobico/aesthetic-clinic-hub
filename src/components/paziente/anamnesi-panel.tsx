@@ -27,7 +27,7 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature, History } from "lucide-react";
+import { Lock, FileSignature, History, Printer, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { SignaturePadHandle } from "@/components/signature-pad";
+import { PdfSignedLink } from "@/components/pdf-signed-link";
 
 type ReactNode = React.ReactNode;
 
