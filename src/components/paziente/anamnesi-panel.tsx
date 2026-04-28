@@ -94,6 +94,10 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [forking, setForking] = useState(false);
+  const [signDlgOpen, setSignDlgOpen] = useState(false);
+  const sigPazRef = useRef<SignaturePadHandle>(null);
+  const sigMedRef = useRef<SignaturePadHandle>(null);
 
   useEffect(() => {
     void load();
@@ -101,7 +105,6 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
 
   async function load() {
     setLoading(true);
-    // Carica l'ultima anamnesi (preferendo draft, poi più recente)
     const { data: rows, error } = await supabase
       .from("anamnesi")
       .select("*")
@@ -113,46 +116,85 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       return;
     }
     const list = (rows ?? []) as unknown as AnamnesiRow[];
-    // preferisci un draft attivo
+    // preferisci un draft attivo, altrimenti la più recente
     const draft = list.find((r) => r.stato === "draft");
     setData(draft ?? list[0] ?? null);
     setLoading(false);
   }
 
   /**
-   * Crea una nuova versione draft a partire dall'ultima firmata, mantenendo i dati.
-   * Usata quando l'utente vuole modificare un'anamnesi già firmata.
+   * Crea (e ritorna) una nuova versione draft a partire dall'attuale firmata.
+   * Chiamata automaticamente al primo edit su un'anamnesi firmata.
    */
-  async function nuovaVersioneDraft() {
-    if (!data) return;
-    const { data: created, error } = await supabase
-      .from("anamnesi")
-      .insert({
-        paziente_id: pazienteId,
-        generale: (data.generale ?? {}) as never,
-        patologica: (data.patologica ?? {}) as never,
-        farmacologica: (data.farmacologica ?? {}) as never,
-        estetica: (data.estetica ?? {}) as never,
-        note_libere: data.note_libere,
-        compilata_da: user?.id ?? null,
-        versione_numero: (data.versione_numero ?? 1) + 1,
-      })
-      .select("*")
-      .single();
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
-      return;
+  async function forkFromSigned(base: AnamnesiRow): Promise<AnamnesiRow | null> {
+    if (forking) return null;
+    setForking(true);
+    try {
+      const { data: created, error } = await supabase
+        .from("anamnesi")
+        .insert({
+          paziente_id: pazienteId,
+          generale: (base.generale ?? {}) as never,
+          patologica: (base.patologica ?? {}) as never,
+          farmacologica: (base.farmacologica ?? {}) as never,
+          estetica: (base.estetica ?? {}) as never,
+          note_libere: base.note_libere,
+          compilata_da: user?.id ?? null,
+          versione_numero: (base.versione_numero ?? 1) + 1,
+        })
+        .select("*")
+        .single();
+      if (error || !created) {
+        toast.error(`Errore creazione versione: ${error?.message ?? "n/d"}`);
+        return null;
+      }
+      toast.success(`Creata bozza v${(base.versione_numero ?? 1) + 1} da v${base.versione_numero}`);
+      return created as unknown as AnamnesiRow;
+    } finally {
+      setForking(false);
     }
-    setData(created as unknown as AnamnesiRow);
-    toast.success("Nuova versione creata. Modifica e firma di nuovo.");
   }
 
-  async function firmaAnamnesi() {
+  /**
+   * Wrapper per modifiche: se l'attuale è firmata, crea prima un draft, poi applica la patch.
+   * Restituisce l'eventuale draft appena creato (così altri update possono usarlo subito).
+   */
+  async function ensureEditable(): Promise<AnamnesiRow | null> {
+    if (!data) return null;
+    if (data.stato !== "signed") return data;
+    const draft = await forkFromSigned(data);
+    if (draft) setData(draft);
+    return draft;
+  }
+
+  async function patch<S extends keyof AnamnesiPayload>(
+    sez: S,
+    patchObj: Partial<NonNullable<AnamnesiPayload[S]>>,
+  ) {
+    const editable = await ensureEditable();
+    if (!editable) return;
+    setData((d) => {
+      const target = d?.id === editable.id ? d : editable;
+      if (!target) return d;
+      const current = (target[sez] ?? {}) as Record<string, unknown>;
+      return { ...target, [sez]: { ...current, ...patchObj } };
+    });
+  }
+
+  async function setNoteLibere(v: string) {
+    const editable = await ensureEditable();
+    if (!editable) return;
+    setData((d) => {
+      const target = d?.id === editable.id ? d : editable;
+      return target ? { ...target, note_libere: v } : d;
+    });
+  }
+
+  async function firmaAnamnesi(firmaPazienteDataUrl: string, firmaMedicoDataUrl: string | null) {
     if (!data) return;
     if (data.stato === "signed") return;
     setSigning(true);
     try {
-      // 1. Recupera dati paziente + operatore
       const [pazRes, profRes] = await Promise.all([
         supabase
           .from("pazienti")
@@ -176,7 +218,6 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
 
       const firmataIl = new Date();
 
-      // 2. Genera PDF + hash
       const { blob, hash } = await generaPdfAnamnesi({
         paziente: {
           nome: pazRes.data.nome,
@@ -193,25 +234,25 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           estetica: (data.estetica ?? {}) as Record<string, unknown>,
           note_libere: data.note_libere,
         },
-        firmaPazienteDataUrl: null,
-        firmaMedicoDataUrl: null,
+        firmaPazienteDataUrl,
+        firmaMedicoDataUrl,
         operatoreNome,
       });
 
-      // 3. Upload PDF su Storage
       const path = `${pazienteId}/${data.id}-v${data.versione_numero}.pdf`;
       const { error: upErr } = await supabase.storage
         .from("anamnesi-pdf")
         .upload(path, blob, { contentType: "application/pdf", upsert: true });
       if (upErr) throw upErr;
 
-      // 4. Update record → signed
       const { error: updErr } = await supabase
         .from("anamnesi")
         .update({
           stato: "signed",
           firmata_il: firmataIl.toISOString(),
           firmata_da_medico: user?.id ?? null,
+          firma_paziente: firmaPazienteDataUrl,
+          firma_medico: firmaMedicoDataUrl,
           hash_integrita: hash,
           pdf_url: path,
         })
@@ -219,6 +260,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       if (updErr) throw updErr;
 
       toast.success("Anamnesi firmata e bloccata");
+      setSignDlgOpen(false);
       await load();
       onSaved();
     } catch (e) {
@@ -228,21 +270,10 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     }
   }
 
-  function patch<S extends keyof AnamnesiPayload>(
-    sez: S,
-    patchObj: Partial<NonNullable<AnamnesiPayload[S]>>,
-  ) {
-    setData((d) => {
-      if (!d) return d;
-      const current = (d[sez] ?? {}) as Record<string, unknown>;
-      return { ...d, [sez]: { ...current, ...patchObj } };
-    });
-  }
-
   async function save() {
     if (!data) return;
     if (data.stato === "signed") {
-      toast.error("Anamnesi firmata: crea una nuova versione per modificarla");
+      toast.error("Anamnesi firmata: modifica un campo per creare automaticamente una nuova versione");
       return;
     }
     setSaving(true);
@@ -289,9 +320,30 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
       );
     }
 
-    toast.success("Anamnesi salvata");
+    toast.success("Bozza salvata");
     setSaving(false);
     onSaved();
+  }
+
+  function openSignDialog() {
+    if (!data) return;
+    if (data.stato === "signed") {
+      toast.info("Già firmata. Modifica un campo per creare una nuova versione.");
+      return;
+    }
+    setSignDlgOpen(true);
+  }
+
+  function confermaFirma() {
+    const padPaz = sigPazRef.current;
+    if (!padPaz || padPaz.isEmpty()) {
+      toast.error("La firma del paziente è obbligatoria");
+      return;
+    }
+    const firmaPaz = padPaz.toDataURL();
+    const padMed = sigMedRef.current;
+    const firmaMed = padMed && !padMed.isEmpty() ? padMed.toDataURL() : null;
+    void firmaAnamnesi(firmaPaz, firmaMed);
   }
 
   if (loading || !data) {
