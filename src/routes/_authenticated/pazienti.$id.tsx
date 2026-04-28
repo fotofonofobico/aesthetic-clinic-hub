@@ -74,6 +74,7 @@ function PazienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [sessione, setSessione] = useState<SignatureSession | null>(null);
   const [sessioneOpen, setSessioneOpen] = useState(false);
+  const [tab, setTab] = useState<string>("diario");
 
   async function avviaFirmaVisita() {
     if (!paziente) return;
@@ -99,8 +100,8 @@ function PazienteDetailPage() {
     void load();
   }, [id, isChildRoute]);
 
-  async function load() {
-    setLoading(true);
+  async function load(opts: { silent?: boolean } = {}) {
+    if (!opts.silent) setLoading(true);
     const [pRes, aRes, fRes] = await Promise.all([
       supabase.from("pazienti").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -176,7 +177,7 @@ function PazienteDetailPage() {
             <FileSignature className="h-4 w-4" />
             Firma visita
           </Button>
-          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load()} />
+          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load({ silent: true })} />
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
@@ -196,11 +197,11 @@ function PazienteDetailPage() {
         onClose={() => setSessioneOpen(false)}
         onCompleted={() => {
           setSessioneOpen(false);
-          void load();
+          void load({ silent: true });
         }}
       />
 
-      <Tabs defaultValue="diario" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="diario">Diario</TabsTrigger>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
@@ -222,7 +223,7 @@ function PazienteDetailPage() {
           <AnamnesiPanel
             pazienteId={id}
             sesso={paziente.sesso}
-            onSaved={() => void load()}
+            onSaved={() => void load({ silent: true })}
           />
         </TabsContent>
 
@@ -239,7 +240,7 @@ function PazienteDetailPage() {
             pazienteId={id}
             alerts={alerts}
             flags={flags}
-            onChanged={() => void load()}
+            onChanged={() => void load({ silent: true })}
           />
         </TabsContent>
       </Tabs>
