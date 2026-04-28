@@ -192,23 +192,53 @@ function PazienteDetailPage() {
 function CriticalBanner({
   flags,
   alerts,
+  access,
 }: {
   flags: FlagRischio[];
   alerts: PazienteAlert[];
+  access: AccessEvaluation | null;
 }) {
   const critici = [
     ...flags.filter((f) => f.severity === "critico").map((f) => f.etichetta),
     ...alerts.filter((a) => a.severity === "critico").map((a) => a.testo),
   ];
-  if (critici.length === 0) return null;
+  const blocchi = access ? access.motivi : [];
+  const haBlocco = !!access && (access.bloccoTotale || access.bloccoTrattamenti);
+
+  if (critici.length === 0 && blocchi.length === 0) return null;
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-4 text-sm shadow-sm">
-      <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-      <div>
-        <div className="font-semibold text-destructive">Attenzione clinica</div>
-        <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
-      </div>
+    <div className="space-y-2">
+      {critici.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-4 text-sm shadow-sm">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-semibold text-destructive">Attenzione clinica</div>
+            <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
+          </div>
+        </div>
+      )}
+      {blocchi.length > 0 && (
+        <div
+          className={`flex items-start gap-3 rounded-lg border-2 p-4 text-sm shadow-sm ${
+            haBlocco
+              ? "border-destructive/40 bg-destructive/10"
+              : "border-warning/40 bg-warning/10"
+          }`}
+        >
+          <ShieldAlert
+            className={`mt-0.5 h-5 w-5 shrink-0 ${
+              haBlocco ? "text-destructive" : "text-warning"
+            }`}
+          />
+          <div>
+            <div className={`font-semibold ${haBlocco ? "text-destructive" : ""}`}>
+              {haBlocco ? "Trattamenti bloccati" : "Avvisi consensi"}
+            </div>
+            <div className="mt-0.5 text-foreground">{blocchi.join(" · ")}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
