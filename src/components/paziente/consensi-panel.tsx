@@ -772,7 +772,7 @@ function NuovoConsensoDialog({
           disabled={
             saving ||
             !tpl ||
-            (modalita === "tablet" && !signed) ||
+            (modalita === "tablet" && (!signed || !esitoTablet)) ||
             (modalita === "pdf_caricato" && !pdfFile)
           }
         >
