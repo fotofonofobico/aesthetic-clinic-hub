@@ -29,6 +29,7 @@ import type {
   Trattamento,
   PianoStato,
 } from "@/types/trattamenti";
+import { puoEseguireTrattamento, evaluateAccess } from "@/lib/access-guard";
 
 const STATO_LABELS: Record<PianoStato, string> = {
   attivo: "Attivo",
