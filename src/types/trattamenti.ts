@@ -109,6 +109,10 @@ export interface ConsensoFirmato {
   versione_snapshot: string;
   categoria_snapshot: ConsensoCategoria;
   validita_mesi_snapshot: number | null;
+  durata_tipo_snapshot: ConsensoDurataTipo;
+  durata_sedute_snapshot: number | null;
+  sedute_max_snapshot: number | null;
+  sedute_consumate: number;
   modalita_firma: ConsensoModalitaFirma;
   firma_immagine: string | null;
   pdf_url: string | null;
