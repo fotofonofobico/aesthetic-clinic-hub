@@ -240,7 +240,7 @@ function PazienteDetailPage() {
             pazienteId={id}
             alerts={alerts}
             flags={flags}
-            onChanged={() => void load()}
+            onChanged={() => void load({ silent: true })}
           />
         </TabsContent>
       </Tabs>
