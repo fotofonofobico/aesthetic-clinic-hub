@@ -5,6 +5,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
 
 const pdfSearchSchema = z.object({
   bucket: z.enum(["anamnesi-pdf", "consensi-pdf"]),
@@ -23,7 +24,7 @@ function safeFilename(value: string): string {
 
 function PdfViewerPage() {
   const { bucket, path, title } = Route.useSearch();
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [blob, setBlob] = React.useState<Blob | null>(null);
   const [url, setUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -37,6 +38,7 @@ function PdfViewerPage() {
       setLoading(true);
       setError(null);
       setUrl(null);
+      setBlob(null);
       const { data, error: downloadError } = await supabase.storage.from(bucket).download(path);
       if (cancelled) return;
       if (downloadError || !data) {
@@ -46,6 +48,7 @@ function PdfViewerPage() {
       }
       const pdfBlob = data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
       objectUrl = URL.createObjectURL(pdfBlob);
+      setBlob(pdfBlob);
       setUrl(objectUrl);
       setLoading(false);
     }
@@ -60,10 +63,7 @@ function PdfViewerPage() {
 
   function printPdf() {
     try {
-      const frameWindow = iframeRef.current?.contentWindow;
-      if (!frameWindow) throw new Error("Anteprima non pronta");
-      frameWindow.focus();
-      frameWindow.print();
+      window.print();
     } catch {
       toast.error("Se la stampa non parte, scarica il PDF e stampalo dal dispositivo.");
     }
@@ -116,9 +116,7 @@ function PdfViewerPage() {
             </div>
           </div>
         )}
-        {!loading && !error && url && (
-          <iframe ref={iframeRef} title={displayTitle} src={url} className="h-full w-full border-0 bg-background" />
-        )}
+        {!loading && !error && blob && <PdfCanvasViewer blob={blob} onError={setError} />}
       </main>
     </div>
   );
