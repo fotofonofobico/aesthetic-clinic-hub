@@ -374,6 +374,15 @@ function NuovoConsensoDialog({
   }
 
   function calcValidoFinoA(t: ConsensoTemplate, firmatoIl: Date): string | null {
+    // Trattamento singolo: validità legata alla seduta, nessuna scadenza temporale
+    if (t.categoria === "trattamento_singolo") return null;
+    // Cicli: forza default 12 mesi se non valorizzato
+    if (t.categoria === "trattamento_ciclo") {
+      const mesi = t.validita_mesi && t.validita_mesi > 0 ? t.validita_mesi : 12;
+      const d = new Date(firmatoIl);
+      d.setMonth(d.getMonth() + mesi);
+      return d.toISOString();
+    }
     if (t.validita_mesi == null || t.validita_mesi <= 0) return null;
     const d = new Date(firmatoIl);
     d.setMonth(d.getMonth() + t.validita_mesi);
