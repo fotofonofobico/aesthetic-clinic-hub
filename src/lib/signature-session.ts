@@ -75,6 +75,8 @@ function makeDoc(
     localId: uid(),
     kind,
     completato: false,
+    durataTipo: "mesi",
+    duratSedute: null,
     ...partial,
   };
 }
