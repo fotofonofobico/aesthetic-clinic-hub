@@ -323,6 +323,8 @@ function TemplateDialog({
 
     let categoriaSalvata: ConsensoCategoria;
     let validitaMesiSalvata: number | null;
+    let duratSeduteSalvata: number | null = null;
+    let duratTipoSalvato: "mesi" | "sedute" = "mesi";
     let trattamentoIdSalvato: string | null = null;
 
     if (tipoUI === "trattamento") {
@@ -341,8 +343,14 @@ function TemplateDialog({
           return;
         }
         categoriaSalvata = "trattamento_ciclo";
-        validitaMesiSalvata =
-          cicloUnita === "mesi" ? Math.round(n) : Math.max(1, Math.ceil(n / 30));
+        if (cicloDurataTipo === "sedute") {
+          duratTipoSalvato = "sedute";
+          duratSeduteSalvata = Math.max(1, Math.round(n));
+          validitaMesiSalvata = null;
+        } else {
+          duratTipoSalvato = "mesi";
+          validitaMesiSalvata = Math.max(1, Math.round(n));
+        }
       }
     } else if (tipoUI === "gdpr") {
       categoriaSalvata = "gdpr";
@@ -362,6 +370,8 @@ function TemplateDialog({
       versione: versione.trim() || "1.0",
       categoria: categoriaSalvata,
       validita_mesi: validitaMesiSalvata,
+      durata_tipo: duratTipoSalvato,
+      durata_sedute: duratSeduteSalvata,
       descrizione: descrizione.trim() || null,
       trattamento_id: trattamentoIdSalvato,
     };
