@@ -794,19 +794,7 @@ function NuovoConsensoDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label>PDF firmato a mano *</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={stampaTemplate}
-                disabled={!tpl}
-              >
-                <FileText className="h-4 w-4" />
-                Stampa modulo vuoto
-              </Button>
-            </div>
+            <Label>PDF firmato a mano *</Label>
             <Input
               type="file"
               accept="application/pdf,image/*"
