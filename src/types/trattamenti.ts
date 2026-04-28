@@ -37,6 +37,34 @@ export const CATEGORIA_VALIDITA_DEFAULT: Record<ConsensoCategoria, number | null
   altro: null,
 };
 
+export type TrattamentoTipo = "singolo" | "ciclo";
+export type DurataUnita = "giorni" | "settimane" | "mesi";
+
+export const TRATTAMENTO_CATEGORIE = [
+  "tossina_botulinica",
+  "filler",
+  "biostimolazione",
+  "peeling",
+  "device",
+  "altro",
+] as const;
+export type TrattamentoCategoria = (typeof TRATTAMENTO_CATEGORIE)[number];
+
+export const TRATTAMENTO_CATEGORIA_LABELS: Record<TrattamentoCategoria, string> = {
+  tossina_botulinica: "Tossina botulinica",
+  filler: "Filler",
+  biostimolazione: "Biostimolazione",
+  peeling: "Peeling",
+  device: "Device",
+  altro: "Altro",
+};
+
+export const DURATA_UNITA_LABELS: Record<DurataUnita, string> = {
+  giorni: "Giorni",
+  settimane: "Settimane",
+  mesi: "Mesi",
+};
+
 export interface Trattamento {
   id: string;
   nome: string;
@@ -47,6 +75,10 @@ export interface Trattamento {
   attivo: boolean;
   created_at: string;
   updated_at: string;
+  tipo: TrattamentoTipo | null;
+  durata_ciclo_valore: number | null;
+  durata_ciclo_unita: DurataUnita | null;
+  consenso_template_id: string | null;
 }
 
 export interface ConsensoTemplate {

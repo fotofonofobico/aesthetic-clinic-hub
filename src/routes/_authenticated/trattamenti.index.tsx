@@ -6,8 +6,15 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -18,16 +25,31 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Syringe, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
-import type { Trattamento } from "@/types/trattamenti";
+import {
+  type Trattamento,
+  type TrattamentoTipo,
+  type DurataUnita,
+  type TrattamentoCategoria,
+  TRATTAMENTO_CATEGORIE,
+  TRATTAMENTO_CATEGORIA_LABELS,
+  DURATA_UNITA_LABELS,
+} from "@/types/trattamenti";
 
 export const Route = createFileRoute("/_authenticated/trattamenti/")({
   component: TrattamentiPage,
 });
 
+interface TemplateOption {
+  id: string;
+  titolo: string;
+  versione: string;
+}
+
 function TrattamentiPage() {
   const { hasRole } = useAuth();
   const isMedico = hasRole("medico");
   const [items, setItems] = useState<Trattamento[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Trattamento | null>(null);
   const [open, setOpen] = useState(false);
@@ -38,12 +60,18 @@ function TrattamentiPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("trattamenti")
-      .select("*")
-      .order("nome");
-    if (error) toast.error(error.message);
-    setItems((data ?? []) as Trattamento[]);
+    const [tratt, tpl] = await Promise.all([
+      supabase.from("trattamenti").select("*").order("nome"),
+      supabase
+        .from("consenso_template")
+        .select("id, titolo, versione")
+        .eq("attivo", true)
+        .order("titolo"),
+    ]);
+    if (tratt.error) toast.error(tratt.error.message);
+    if (tpl.error) toast.error(tpl.error.message);
+    setItems((tratt.data ?? []) as Trattamento[]);
+    setTemplates((tpl.data ?? []) as TemplateOption[]);
     setLoading(false);
   }
 
@@ -58,6 +86,11 @@ function TrattamentiPage() {
     }
     void load();
   }
+
+  const templateById = React.useMemo(
+    () => new Map(templates.map((t) => [t.id, t])),
+    [templates],
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -86,6 +119,7 @@ function TrattamentiPage() {
             </DialogTrigger>
             <TrattamentoDialog
               editing={editing}
+              templates={templates}
               onSaved={() => {
                 setOpen(false);
                 setEditing(null);
@@ -115,64 +149,83 @@ function TrattamentiPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {items.map((t) => (
-            <Card key={t.id} className={t.attivo ? "" : "opacity-60"}>
-              <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-lg font-semibold">
-                      {t.nome}
-                    </h3>
-                    {t.categoria && (
-                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                        {t.categoria}
-                      </span>
-                    )}
-                    {!t.attivo && (
-                      <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
-                        Disattivato
-                      </span>
-                    )}
+          {items.map((t) => {
+            const consenso = t.consenso_template_id
+              ? templateById.get(t.consenso_template_id)
+              : null;
+            const categoriaLabel =
+              t.categoria && (TRATTAMENTO_CATEGORIE as readonly string[]).includes(t.categoria)
+                ? TRATTAMENTO_CATEGORIA_LABELS[t.categoria as TrattamentoCategoria]
+                : t.categoria;
+            return (
+              <Card key={t.id} className={t.attivo ? "" : "opacity-60"}>
+                <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-display text-lg font-semibold">{t.nome}</h3>
+                      {categoriaLabel && (
+                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {categoriaLabel}
+                        </span>
+                      )}
+                      {t.tipo === "singolo" && (
+                        <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] uppercase tracking-wide">
+                          Singolo
+                        </span>
+                      )}
+                      {t.tipo === "ciclo" && (
+                        <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] uppercase tracking-wide">
+                          Ciclo {t.durata_ciclo_valore}
+                          {t.durata_ciclo_unita ? ` ${t.durata_ciclo_unita}` : ""}
+                        </span>
+                      )}
+                      {!t.attivo && (
+                        <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
+                          Disattivato
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                      {t.durata_minuti != null && <span>Durata: {t.durata_minuti} min</span>}
+                      {t.prezzo_indicativo != null && (
+                        <span>Prezzo: € {Number(t.prezzo_indicativo).toFixed(2)}</span>
+                      )}
+                      {consenso && (
+                        <span>
+                          Consenso: {consenso.titolo} (v{consenso.versione})
+                        </span>
+                      )}
+                      {!consenso && t.consenso_template_id == null && (
+                        <span className="text-warning">Consenso non collegato</span>
+                      )}
+                    </div>
                   </div>
-                  {t.descrizione && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t.descrizione}
-                    </p>
+                  {isMedico && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditing(t);
+                          setOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void toggleAttivo(t)}
+                        title={t.attivo ? "Disattiva" : "Attiva"}
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                    {t.durata_minuti != null && (
-                      <span>Durata: {t.durata_minuti} min</span>
-                    )}
-                    {t.prezzo_indicativo != null && (
-                      <span>Prezzo: € {Number(t.prezzo_indicativo).toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
-                {isMedico && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditing(t);
-                        setOpen(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void toggleAttivo(t)}
-                      title={t.attivo ? "Disattiva" : "Attiva"}
-                    >
-                      <Power className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -181,27 +234,39 @@ function TrattamentiPage() {
 
 function TrattamentoDialog({
   editing,
+  templates,
   onSaved,
 }: {
   editing: Trattamento | null;
+  templates: TemplateOption[];
   onSaved: () => void;
 }) {
   const { user } = useAuth();
   const [nome, setNome] = useState(editing?.nome ?? "");
-  const [categoria, setCategoria] = useState(editing?.categoria ?? "");
-  const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
-  const [durata, setDurata] = useState<string>(
-    editing?.durata_minuti?.toString() ?? "",
+  const [tipo, setTipo] = useState<TrattamentoTipo | "">(
+    (editing?.tipo as TrattamentoTipo | null) ?? "",
   );
-  const [prezzo, setPrezzo] = useState<string>(
-    editing?.prezzo_indicativo?.toString() ?? "",
+  const [duratValore, setDuratValore] = useState<string>(
+    editing?.durata_ciclo_valore?.toString() ?? "",
   );
+  const [duratUnita, setDuratUnita] = useState<DurataUnita | "">(
+    (editing?.durata_ciclo_unita as DurataUnita | null) ?? "",
+  );
+  const [categoria, setCategoria] = useState<TrattamentoCategoria | "">(
+    (editing?.categoria as TrattamentoCategoria | null) ?? "",
+  );
+  const [consensoId, setConsensoId] = useState<string>(editing?.consenso_template_id ?? "");
+  const [durata, setDurata] = useState<string>(editing?.durata_minuti?.toString() ?? "");
+  const [prezzo, setPrezzo] = useState<string>(editing?.prezzo_indicativo?.toString() ?? "");
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     setNome(editing?.nome ?? "");
-    setCategoria(editing?.categoria ?? "");
-    setDescrizione(editing?.descrizione ?? "");
+    setTipo((editing?.tipo as TrattamentoTipo | null) ?? "");
+    setDuratValore(editing?.durata_ciclo_valore?.toString() ?? "");
+    setDuratUnita((editing?.durata_ciclo_unita as DurataUnita | null) ?? "");
+    setCategoria((editing?.categoria as TrattamentoCategoria | null) ?? "");
+    setConsensoId(editing?.consenso_template_id ?? "");
     setDurata(editing?.durata_minuti?.toString() ?? "");
     setPrezzo(editing?.prezzo_indicativo?.toString() ?? "");
   }, [editing]);
@@ -211,19 +276,49 @@ function TrattamentoDialog({
       toast.error("Il nome è obbligatorio");
       return;
     }
+    if (tipo !== "singolo" && tipo !== "ciclo") {
+      toast.error("Seleziona il tipo di trattamento");
+      return;
+    }
+    let durValN: number | null = null;
+    let durUnitN: DurataUnita | null = null;
+    if (tipo === "ciclo") {
+      const n = Number(duratValore);
+      if (!duratValore || !Number.isFinite(n) || n <= 0) {
+        toast.error("Inserisci la durata del ciclo");
+        return;
+      }
+      if (duratUnita !== "giorni" && duratUnita !== "settimane" && duratUnita !== "mesi") {
+        toast.error("Seleziona l'unità di durata");
+        return;
+      }
+      durValN = Math.floor(n);
+      durUnitN = duratUnita;
+    }
+    if (!categoria) {
+      toast.error("Seleziona la categoria");
+      return;
+    }
+    if (!consensoId) {
+      toast.error("Collega un consenso al trattamento");
+      return;
+    }
+
     setSaving(true);
     const payload = {
       nome: nome.trim(),
-      categoria: categoria.trim() || null,
-      descrizione: descrizione.trim() || null,
+      tipo,
+      durata_ciclo_valore: durValN,
+      durata_ciclo_unita: durUnitN,
+      categoria,
+      consenso_template_id: consensoId,
       durata_minuti: durata ? Number(durata) : null,
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
+      descrizione: null,
     };
     const { error } = editing
       ? await supabase.from("trattamenti").update(payload).eq("id", editing.id)
-      : await supabase
-          .from("trattamenti")
-          .insert({ ...payload, created_by: user?.id });
+      : await supabase.from("trattamenti").insert({ ...payload, created_by: user?.id });
     setSaving(false);
     if (error) {
       toast.error(error.message);
@@ -240,27 +335,108 @@ function TrattamentoDialog({
           {editing ? "Modifica trattamento" : "Nuovo trattamento"}
         </DialogTitle>
       </DialogHeader>
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
-          <Label>Nome *</Label>
+          <Label>Nome trattamento *</Label>
           <Input value={nome} onChange={(e) => setNome(e.target.value)} />
         </div>
+
         <div>
-          <Label>Categoria</Label>
-          <Input
+          <Label>Tipo trattamento *</Label>
+          <RadioGroup
+            value={tipo}
+            onValueChange={(v) => setTipo(v as TrattamentoTipo)}
+            className="mt-2 grid grid-cols-2 gap-2"
+          >
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2">
+              <RadioGroupItem value="singolo" id="tipo-singolo" />
+              <span className="text-sm">Singolo</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2">
+              <RadioGroupItem value="ciclo" id="tipo-ciclo" />
+              <span className="text-sm">Ciclo</span>
+            </label>
+          </RadioGroup>
+        </div>
+
+        {tipo === "ciclo" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Durata ciclo *</Label>
+              <Input
+                type="number"
+                min="1"
+                value={duratValore}
+                onChange={(e) => setDuratValore(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Unità *</Label>
+              <Select
+                value={duratUnita}
+                onValueChange={(v) => setDuratUnita(v as DurataUnita)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleziona…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(DURATA_UNITA_LABELS) as DurataUnita[]).map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {DURATA_UNITA_LABELS[u]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <Label>Categoria *</Label>
+          <Select
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            placeholder="Es. Filler, Botulino, Laser…"
-          />
+            onValueChange={(v) => setCategoria(v as TrattamentoCategoria)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleziona…" />
+            </SelectTrigger>
+            <SelectContent>
+              {TRATTAMENTO_CATEGORIE.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {TRATTAMENTO_CATEGORIA_LABELS[c]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
         <div>
-          <Label>Descrizione</Label>
-          <Textarea
-            rows={3}
-            value={descrizione}
-            onChange={(e) => setDescrizione(e.target.value)}
-          />
+          <Label>Consenso associato *</Label>
+          <Select value={consensoId} onValueChange={setConsensoId}>
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  templates.length === 0
+                    ? "Nessun template attivo disponibile"
+                    : "Seleziona un consenso…"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.titolo} (v{t.versione})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {templates.length === 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Crea prima un template consenso nella sezione Consensi.
+            </p>
+          )}
         </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Durata (min)</Label>
@@ -282,6 +458,17 @@ function TrattamentoDialog({
             />
           </div>
         </div>
+
+        {tipo === "singolo" && (
+          <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            Il consenso sarà richiesto a ogni seduta.
+          </p>
+        )}
+        {tipo === "ciclo" && duratValore && duratUnita && (
+          <p className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            Il consenso sarà valido per {duratValore} {DURATA_UNITA_LABELS[duratUnita].toLowerCase()}.
+          </p>
+        )}
       </div>
       <DialogFooter>
         <Button onClick={save} disabled={saving}>
