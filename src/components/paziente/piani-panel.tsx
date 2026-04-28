@@ -1363,6 +1363,50 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           </p>
                         </>
                       )}
+
+                      {!isLegacy && voci.length > 0 && (() => {
+                        const base = voci.reduce(
+                          (acc, v) =>
+                            acc +
+                            prezzoRiga(
+                              trattamenti.find((t) => t.id === v.trattamento_id),
+                              v.numero_sedute,
+                            ),
+                          0,
+                        );
+                        const { sconto: sc, finale: fin } = applicaSconto(
+                          base,
+                          (p.sconto_tipo ?? "nessuno") as ScontoTipo,
+                          Number(p.sconto_valore ?? 0),
+                        );
+                        return (
+                          <div className="space-y-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Totale base</span>
+                              <span>{formatEuro(base)}</span>
+                            </div>
+                            {sc > 0 && (
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>
+                                  Sconto
+                                  {p.sconto_tipo === "percento"
+                                    ? ` (${Number(p.sconto_valore)}%)`
+                                    : ""}
+                                </span>
+                                <span>− {formatEuro(sc)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between border-t border-border pt-1">
+                              <span className="font-display uppercase tracking-wide">
+                                Totale finale
+                              </span>
+                              <span className="font-display text-base font-bold">
+                                {formatEuro(fin)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </CardContent>
