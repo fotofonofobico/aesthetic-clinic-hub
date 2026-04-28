@@ -1,190 +1,62 @@
-
-# Refactor core: Consensi, Anamnesi firmata, Piani con tariffario, Audit
-
 ## Obiettivo
 
-Trasformare consensi/anamnesi/piani in un sistema medico-legale coerente, con blocchi automatici non bypassabili, PDF immutabili, versioning e audit. UI esistente viene riusata; la logica viene centralizzata.
+Rendere modificabile un'anamnesi firmata creando automaticamente una nuova versione draft, mantenendo le precedenti immutabili in cronologia, e richiedendo firma del paziente (con SignaturePad) per convalidare. Allineare regole consensi trattamento/ciclo.
 
-## Architettura — moduli centrali (nuovi)
+## Problemi attuali
 
-```text
-src/lib/
-├── consensi-engine.ts      # stati consenso, calcolo scadenze, valutazione blocchi
-├── access-guard.ts         # gate centrale: può accedere/trattare il paziente?
-├── pdf-consenso.ts         # genera PDF firmato (jsPDF) -> Storage
-├── pdf-anamnesi.ts         # genera PDF anamnesi firmata
-├── audit.ts                # writeAudit(entity, before, after, user)
-└── tariffario.ts           # calcolo prezzo da trattamenti + pacchetti + sconto
-```
+1. UI dell'anamnesi blocca completamente i campi quando `stato='signed'`: l'utente deve cliccare "Nuova versione" prima di poter modificare. Va invece consentita la modifica diretta che crea automaticamente un nuovo draft al primo cambio.
+2. La firma anamnesi attualmente passa `firmaPazienteDataUrl: null` — manca la cattura della firma del paziente.
+3. La cronologia versioni esiste (`AnamnesiCronologia` + tabella `anamnesi`) ma le versioni precedenti non vengono marcate `superseded` quando una nuova viene firmata.
+4. Consensi trattamento singolo/ciclo: la logica RPC `paziente_consensi_stato` già gestisce `expired` per seduta completata e per `valido_fino_a`, ma manca la **garanzia** che a creazione consenso `trattamento_ciclo` venga impostato `valido_fino_a = now() + validita_mesi` (default 12) se non valorizzato, e va eliminato il fallback "vuoto = nessuna scadenza" per le categorie ciclo.
 
-`access-guard.evaluate(pazienteId)` ritorna:
-```ts
-{
-  bloccoTotale: boolean,        // GDPR mancante/revocato
-  bloccoTrattamenti: boolean,   // anamnesi non firmata o non aggiornata
-  immaginiConsentite: boolean,  // consenso uso immagini
-  trattamentiBloccati: string[],// trattamenti senza consenso valido
-  motivi: string[]
-}
-```
-È l'unico punto che decide se un'azione clinica è permessa: chiamato da `PianiPanel`, `aggiungiSeduta`, upload foto, ecc.
+## Modifiche
 
-## Modello dati — modifiche schema
+### 1. UI Anamnesi (`src/components/paziente/anamnesi-panel.tsx`)
 
-### `consenso_template`
-- `categoria` esteso: `gdpr` | `uso_immagini` | `anamnesi` | `trattamento_singolo` | `trattamento_ciclo` | `altro`
-- `richiede_firma_medico boolean default false`
-- `validita_mesi` resta nullable ma con semantica nuova (vedi engine)
-- aggiungere check: se `categoria='trattamento_singolo'` allora `validita_mesi` deve essere null (validità = singola seduta)
+- **Auto-fork on edit**: quando `data.stato === 'signed'` e l'utente modifica un campo, intercettare il primo cambio (`patch()` e setter di `note_libere`) e creare in automatico un nuovo draft (clone della versione firmata, `versione_numero + 1`). Lo stato locale viene sostituito con il nuovo draft prima di applicare la patch. Nessun blocco UI sui campi.
+- **Banner stato**: mostrare 3 stati: `signed` (verde, "Firmata vN — modifica per creare nuova versione"), `draft` da firmata precedente (warning, "Bozza vN+1 in revisione di vN — richiede nuova firma paziente"), `draft` iniziale.
+- **Pulsante "Firma e blocca"**: aprire un dialog con `SignaturePad` (componente già esistente in `src/components/signature-pad.tsx`) per cattura firma paziente; opzionalmente firma medico. Validare presenza firma paziente prima di procedere.
+- **Marca superseded**: in `firmaAnamnesi()`, dopo aver portato il nuovo record a `signed`, eseguire `UPDATE anamnesi SET stato='superseded' WHERE paziente_id=? AND id<>? AND stato='signed'`.
+- Rimuovere il pulsante separato "Nuova versione" (diventa automatico). Mantenere però la cronologia visibile.
 
-### `consenso_firmato`
-- `firma_medico_immagine text null`
-- `firmato_da_medico uuid null`
-- `seduta_id uuid null` — se categoria `trattamento_singolo`, lega il consenso alla seduta specifica
-- `pdf_generato_url text null` — PDF auto-generato (separato da `pdf_url` che è upload manuale)
-- vincolo: record è di fatto immutabile salvo `revocato_il/revocato_da` (policy UPDATE già limita ai medici; aggiungere trigger che impedisce modifiche di campi non-revoca)
+### 2. Trigger DB (nuova migration)
 
-### `anamnesi` — versioning con firma
-Schema attuale ha già `anamnesi_versione` (snapshot ad ogni update). Aggiungiamo:
-- `anamnesi.stato` enum `draft | signed | superseded` default `draft`
-- `anamnesi.firmata_il timestamptz null`
-- `anamnesi.firma_paziente text null` (data URL)
-- `anamnesi.firma_medico text null`
-- `anamnesi.pdf_url text null`
-- `anamnesi.hash_integrita text null`
-- Trigger: ogni UPDATE su anamnesi `signed` → archivia in `anamnesi_versione` con stato `superseded`, resetta nuova riga a `draft` (no overwrite del firmato)
+- **Aggiornare `anamnesi_signed_protect`**: oggi blocca solo il cambio dei campi clinici quando `OLD.stato='signed' AND NEW.stato='signed'`. Aggiungere blocco anche per la transizione `signed → draft/superseded` da parte di chiunque non sia il sistema (consentire solo `signed → superseded`). Vietare modifiche ai campi `firma_paziente`, `firma_medico`, `firmata_il`, `hash_integrita`, `pdf_url` di un record `signed`.
+- **Auto-supersede trigger**: trigger `AFTER UPDATE ON anamnesi` che, quando un record passa a `signed`, marca automaticamente le altre versioni `signed` dello stesso paziente come `superseded` (così l'app non deve farlo manualmente e la regola è centralizzata).
 
-### `trattamenti` — tariffario
-- `prezzo_indicativo` resta come prezzo singola seduta
-- nuova tabella `trattamento_pacchetto`:
-  ```
-  id, trattamento_id, nome, numero_sedute, prezzo_pacchetto, attivo
-  ```
+### 3. PDF anamnesi (`src/lib/pdf-anamnesi.ts`)
 
-### `piano_trattamento` — multi-trattamento
-- nuova tabella `piano_trattamento_voce`:
-  ```
-  id, piano_id, trattamento_id, pacchetto_id null, numero_sedute,
-  prezzo_unitario, prezzo_riga, ordine
-  ```
-- aggiungere a `piano_trattamento`: `sconto numeric default 0`, `prezzo_finale numeric`, `stato` esteso con `bozza | confermato | attivo | completato | sospeso | annullato`
-- `seduta.voce_id uuid null` — collega seduta alla voce di piano (per sapere quale trattamento)
+- Nessun cambio strutturale: già accetta `firmaPazienteDataUrl` e `firmaMedicoDataUrl`. Verifico solo che venga renderizzato il riquadro firma paziente quando presente.
 
-### `audit_log` — già esiste, lo usiamo
-Wrapper `audit.ts` scrive: `entity_type='paziente'|'consenso'|...`, `metadata={campo, prima, dopo}`.
-Per anagrafica: trigger Postgres su `pazienti` che intercetta UPDATE su telefono/email/codice_fiscale/indirizzo/... e inserisce in `audit_log`.
+### 4. Salvataggio firma paziente
 
-## Engine consensi (`consensi-engine.ts`)
+- Aggiornare `firmaAnamnesi()` per:
+  - Salvare `firma_paziente` (data URL) e `firma_medico` (se catturata) nei campi già esistenti della tabella `anamnesi`.
+  - Passare entrambe a `generaPdfAnamnesi`.
+  - Includere il data URL nella stringa hashata SHA-256 per integrità.
 
-Funzioni pure, una sola fonte di verità:
+### 5. Consensi trattamento — regole rafforzate
 
-```ts
-type Stato = 'valid' | 'missing' | 'expiring' | 'expired' | 'obsolete' | 'revoked';
+- **Frontend (`src/components/paziente/consensi-panel.tsx`)**: alla firma di un consenso categoria `trattamento_ciclo`, se `validita_mesi` del template è null forzare default 12; calcolare e impostare `valido_fino_a = firmato_il + validita_mesi`. Per `trattamento_singolo` lasciare `valido_fino_a = NULL` ma legare `seduta_id` (la RPC gestisce già `expired` su seduta completata).
+- **Trigger DB di validazione**: nuovo trigger `BEFORE INSERT ON consenso_firmato` che:
+  - se `categoria_snapshot = 'trattamento_ciclo'` e `valido_fino_a IS NULL`, calcola `valido_fino_a = firmato_il + COALESCE(validita_mesi_snapshot,12) months`.
+  - se `categoria_snapshot = 'trattamento_singolo'` e `seduta_id IS NULL`, RAISE: un consenso di seduta deve essere associato.
 
-calcolaStatoConsenso(firmato, templateCorrente, ora) -> Stato
-// regole:
-// - revocato_il != null              -> 'revoked'
-// - templateCorrente.versione != snapshot -> 'obsoleto'
-// - categoria='trattamento_singolo' && seduta.completata -> 'expired'
-// - valido_fino_a < ora              -> 'expired'
-// - valido_fino_a < ora+30gg         -> 'expiring'
-// - else                             -> 'valid'
+### 6. Access guard / pre-trattamento
 
-statoConsensiPaziente(pazienteId) -> Map<categoria|template, Stato>
-puoEseguireTrattamento(pazienteId, trattamentoId) -> { ok, motivi[] }
-```
+- Nessuna modifica logica: `puoEseguireTrattamento` già blocca se manca consenso valido per ogni template attivo. Verifico solo che `piani-panel.tsx` chiami `puoEseguireTrattamento` prima di creare la seduta (già fatto nel turno precedente).
 
-L'RPC `paziente_consensi_stato` viene aggiornata di conseguenza (server-side per sicurezza), ma esiste anche la versione client per UX immediata.
+## File modificati
 
-## Flusso firma — niente preselezione
+- `src/components/paziente/anamnesi-panel.tsx` — auto-fork + dialog firma paziente
+- `src/lib/pdf-anamnesi.ts` — verifica rendering firma (eventuale fix)
+- `src/components/paziente/consensi-panel.tsx` — calcolo `valido_fino_a` per cicli
+- `supabase/migrations/<new>.sql` — trigger auto-supersede + validazione consensi + protezioni firma
 
-Dialog firma consenso/anamnesi:
-1. Mostra testo completo (scrollabile)
-2. Due bottoni espliciti: `[ Acconsento ] [ Non acconsento ]` — nessun default
-3. Se "non acconsento":
-   - GDPR → blocco totale paziente, salvato come `consenso_firmato` con flag rifiuto
-   - Uso immagini → salvato, `access-guard` setta `immaginiConsentite=false`
-   - Trattamento → blocca quel trattamento
-4. Se "acconsento" → SignaturePad (paziente) + opzionale firma medico → genera PDF → upload Storage → insert `consenso_firmato`
+## Flusso utente finale
 
-PDF generato lato client con `jsPDF`:
-- intestazione clinica + dati paziente
-- testo integrale del template
-- versione, data/ora, hash
-- immagini firme
-
-## Anamnesi — firma + versioning
-
-UI esistente resta. Si aggiunge:
-- bottone **"Riepiloga e firma"** → mostra riepilogo read-only di tutte le sezioni
-- SignaturePad obbligatorio
-- al salvataggio: `stato='signed'`, snapshot in `anamnesi_versione`, PDF generato, `pdf_url` salvato
-- ogni successiva modifica forza creazione di una nuova riga `draft` (la firmata diventa `superseded` e resta consultabile in cronologia)
-- `access-guard` blocca trattamenti se `stato != 'signed'` o se esiste draft più recente del signed
-
-## Piani — tariffario e multi-trattamento
-
-Dialog "Nuovo piano":
-1. Titolo (prefill automatico = elenco trattamenti)
-2. Aggiungi più voci: per ogni trattamento → scegli "singola seduta" o pacchetto disponibile → quantità
-3. `tariffario.calcola(voci, sconto)` → mostra subtotale, sconto, totale (modificabile)
-4. Stato iniziale `bozza`, bottone "Conferma" → `confermato`
-
-Quando si aggiunge una seduta:
-- `access-guard.puoEseguireTrattamento(paziente, voce.trattamento_id)`
-- se non ok → dialog "Firma consensi mancanti" che apre direttamente i template necessari
-- se trattamento singolo → consenso firmato lega `seduta_id` e diventa `expired` a fine seduta
-
-## Sezione "Alert" paziente
-
-Mostra in modo unificato:
-- flag automatici da anamnesi (esiste)
-- alert manuali (esiste)
-- **stato consensi** (nuovo): elenco categorie/template con badge `valid/expiring/expired/obsoleto/missing/revoked`
-- **stato anamnesi**: `signed | draft pendente | superseded`
-- riassunto blocchi attivi (cosa il paziente NON può fare e perché)
-
-Banner critico in alto (`CriticalBanner`) include i blocchi.
-
-## Audit anagrafica
-
-- Trigger `audit_anagrafica_changes` su `pazienti` (UPDATE) → per ogni campo sensibile cambiato inserisce riga in `audit_log` con `metadata={campo, prima, dopo}`
-- UI: tab "Cronologia modifiche" sotto Anagrafica che legge `audit_log` (solo medici, RLS già ok)
-
-## Migrazione dati esistenti
-
-- `consenso_template.categoria` 'trattamento_continuativo' → 'trattamento_ciclo' (rinomina enum value)
-- `consenso_firmato` esistenti: ricalcolo `valido_fino_a` lasciato com'è (compatibile)
-- `piano_trattamento` esistenti: creo automaticamente una `piano_trattamento_voce` con `trattamento_id` corrente
-- nessuna perdita dati
-
-## Ordine di implementazione
-
-1. **Migrazioni DB** (enum, colonne, tabelle nuove, trigger audit, trigger anamnesi)
-2. **Tipi TS** aggiornati (`trattamenti.ts`, `clinico.ts`)
-3. **Engine** `consensi-engine.ts` + `access-guard.ts` + `tariffario.ts` + `audit.ts`
-4. **PDF generators** (`pdf-consenso.ts`, `pdf-anamnesi.ts`)
-5. **Refactor `consensi-panel.tsx`**: dialog firma con Acconsento/Non acconsento, generazione PDF, gestione GDPR/immagini
-6. **Refactor `consensi.index.tsx`**: nuove categorie + flag `richiede_firma_medico`
-7. **Refactor `anamnesi-panel.tsx`**: bottone firma, riepilogo, blocco modifica del firmato
-8. **Refactor `piani-panel.tsx`**: voci multiple, tariffario, sconto, stato bozza/confermato, hook `access-guard` su ogni azione
-9. **Refactor `pazienti.$id.tsx`**: tab Alert unificata, banner blocchi
-10. **Tab "Cronologia modifiche"** anagrafica
-11. **Tariffario UI** in `trattamenti.index.tsx` per gestire pacchetti
-
-## Cosa NON tocco
-
-- `signature-pad.tsx`, `flag-rischio.ts` (logica flag automatici), `auth-context`, routing, anagrafica form (solo aggiunta tab cronologia)
-- componenti `Diario`, follow-up
-- RLS già conformi, aggiungo solo policy per nuove tabelle
-
-## Note tecniche
-
-- PDF: `jsPDF` + `jspdf-autotable` (da installare). Generazione client-side per semplicità; hash SHA-256 calcolato sul contenuto serializzato prima dell'upload.
-- Trigger Postgres per audit anagrafica usa `OLD`/`NEW` e scrive in `audit_log` con `user_id = auth.uid()`.
-- Trigger su anamnesi: BEFORE UPDATE — se OLD.stato='signed' e cambia qualsiasi campo dati, blocca con RAISE EXCEPTION e lascia che il client crei nuova riga draft.
-- `access-guard` viene sempre chiamato lato client per UX, ma le insert critiche (seduta) hanno anche un check RPC server-side `puo_eseguire_trattamento(paziente, trattamento)` per sicurezza.
-
-## Domanda aperta
-
-Vuoi che il **PDF generato** includa anche il logo/intestazione della clinica? Se sì, mi serve sapere dove caricarlo (lo aggiungo come asset statico o lo metto su Storage e lo carico runtime?). In assenza di risposta, genero PDF con solo testo + dati operatore.
+1. Apre anamnesi firmata v3 → vede banner verde "Firmata v3".
+2. Modifica un campo qualsiasi → toast "Creata bozza v4 da v3" → continua a editare liberamente.
+3. Clicca "Firma e blocca" → dialog con SignaturePad paziente (obbligatorio) + medico (opz.) → conferma.
+4. v4 diventa `signed`, v3 diventa `superseded` automaticamente, PDF generato con firme, hash registrato.
+5. Cronologia mostra v1 superseded, v2 superseded, v3 superseded, v4 signed.
