@@ -22,7 +22,7 @@ import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
-import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
+import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launcher";
@@ -71,6 +71,7 @@ function PazienteDetailPage() {
   const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
   const [flags, setFlags] = useState<FlagRischio[]>([]);
   const [access, setAccess] = useState<AccessEvaluation | null>(null);
+  const [consensiPianoMancanti, setConsensiPianoMancanti] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessione, setSessione] = useState<SignatureSession | null>(null);
   const [sessioneOpen, setSessioneOpen] = useState(false);
@@ -128,6 +129,57 @@ function PazienteDetailPage() {
 
     // Valuta stato consensi/anamnesi (non bloccante per il rendering)
     void evaluateAccess(id).then(setAccess).catch(() => setAccess(null));
+
+    // Consensi mancanti per voci di piani non annullati
+    void (async () => {
+      try {
+        const { data: piani } = await supabase
+          .from("piano_trattamento")
+          .select("id, stato")
+          .eq("paziente_id", id)
+          .neq("stato", "annullato");
+        const ids = (piani ?? []).map((p) => (p as { id: string }).id);
+        if (ids.length === 0) {
+          setConsensiPianoMancanti([]);
+          return;
+        }
+        const { data: voci } = await supabase
+          .from("piano_trattamento_voce")
+          .select("trattamento_id")
+          .in("piano_id", ids);
+        const trattIds = Array.from(
+          new Set(
+            (voci ?? [])
+              .map((v) => (v as { trattamento_id: string | null }).trattamento_id)
+              .filter((x): x is string => !!x),
+          ),
+        );
+        if (trattIds.length === 0) {
+          setConsensiPianoMancanti([]);
+          return;
+        }
+        const { data: trattRows } = await supabase
+          .from("trattamenti")
+          .select("id, nome")
+          .in("id", trattIds);
+        const nameMap = new Map<string, string>(
+          (trattRows ?? []).map((t) => [
+            (t as { id: string }).id,
+            (t as { nome: string }).nome,
+          ]),
+        );
+        const mancanti: string[] = [];
+        await Promise.all(
+          trattIds.map(async (tid) => {
+            const res = await puoEseguireTrattamento(id, tid);
+            if (!res.ok) mancanti.push(nameMap.get(tid) ?? "Trattamento");
+          }),
+        );
+        setConsensiPianoMancanti(mancanti.sort());
+      } catch {
+        setConsensiPianoMancanti([]);
+      }
+    })();
 
     if (user?.id) {
       void supabase
@@ -189,7 +241,12 @@ function PazienteDetailPage() {
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
-      <CriticalBanner flags={flags} alerts={alerts} access={access} />
+      <CriticalBanner
+        flags={flags}
+        alerts={alerts}
+        access={access}
+        consensiPianoMancanti={consensiPianoMancanti}
+      />
 
       <SignatureSessionDialog
         open={sessioneOpen}
@@ -252,10 +309,12 @@ function CriticalBanner({
   flags,
   alerts,
   access,
+  consensiPianoMancanti,
 }: {
   flags: FlagRischio[];
   alerts: PazienteAlert[];
   access: AccessEvaluation | null;
+  consensiPianoMancanti: string[];
 }) {
   const critici = [
     ...flags.filter((f) => f.severity === "critico").map((f) => f.etichetta),
@@ -270,7 +329,13 @@ function CriticalBanner({
     !access.bloccoTotale &&
     !access.bloccoTrattamenti;
 
-  if (critici.length === 0 && blocchi.length === 0 && !showObsoletaWarning) return null;
+  if (
+    critici.length === 0 &&
+    blocchi.length === 0 &&
+    !showObsoletaWarning &&
+    consensiPianoMancanti.length === 0
+  )
+    return null;
 
   return (
     <div className="space-y-2">
@@ -280,6 +345,19 @@ function CriticalBanner({
           <div>
             <div className="font-semibold text-destructive">Attenzione clinica</div>
             <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
+          </div>
+        </div>
+      )}
+      {consensiPianoMancanti.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
+          <FileSignature className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div>
+            <div className="font-semibold">
+              Consenso mancante per {consensiPianoMancanti.length} trattamento/i nei piani
+            </div>
+            <div className="mt-0.5 text-foreground">
+              {consensiPianoMancanti.join(" · ")}. Firma prima di iniziare le sedute.
+            </div>
           </div>
         </div>
       )}

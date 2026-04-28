@@ -52,6 +52,7 @@ import {
   applicaSconto,
   calcolaTotaleRighe,
   formatEuro,
+  prezzoRiga,
 } from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
@@ -749,6 +750,21 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
     });
   }
 
+  // ---------- riepilogo paziente ----------
+  const totalePaziente = useMemo(() => {
+    let tot = 0;
+    let attivi = 0;
+    let completati = 0;
+    for (const p of piani) {
+      if (p.stato === "annullato") continue;
+      const v = typeof p.prezzo_finale === "number" ? p.prezzo_finale : (p.prezzo_totale ?? 0);
+      tot += Number(v) || 0;
+      if (p.stato === "attivo") attivi += 1;
+      else if (p.stato === "completato") completati += 1;
+    }
+    return { tot: Math.round(tot * 100) / 100, attivi, completati };
+  }, [piani]);
+
   // ---------- render ----------
   return (
     <div className="space-y-4">
@@ -764,6 +780,24 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           Nuovo piano
         </Button>
       </div>
+
+      {piani.length > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Totale piani paziente
+              </p>
+              <p className="font-display text-xl font-bold">
+                {formatEuro(totalePaziente.tot)}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Attivi: {totalePaziente.attivi} · Completati: {totalePaziente.completati}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog
         open={open}
@@ -1273,6 +1307,14 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                                       Firma consenso
                                     </Button>
                                   )}
+                                  <span className="text-xs font-medium">
+                                    {formatEuro(
+                                      prezzoRiga(
+                                        trattamenti.find((t) => t.id === v.trattamento_id),
+                                        v.numero_sedute,
+                                      ),
+                                    )}
+                                  </span>
                                   <span className="text-xs text-muted-foreground">
                                     {completateVoce} / {v.numero_sedute} sedute
                                   </span>
@@ -1321,6 +1363,50 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           </p>
                         </>
                       )}
+
+                      {!isLegacy && voci.length > 0 && (() => {
+                        const base = voci.reduce(
+                          (acc, v) =>
+                            acc +
+                            prezzoRiga(
+                              trattamenti.find((t) => t.id === v.trattamento_id),
+                              v.numero_sedute,
+                            ),
+                          0,
+                        );
+                        const { sconto: sc, finale: fin } = applicaSconto(
+                          base,
+                          (p.sconto_tipo ?? "nessuno") as ScontoTipo,
+                          Number(p.sconto_valore ?? 0),
+                        );
+                        return (
+                          <div className="space-y-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Totale base</span>
+                              <span>{formatEuro(base)}</span>
+                            </div>
+                            {sc > 0 && (
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>
+                                  Sconto
+                                  {p.sconto_tipo === "percento"
+                                    ? ` (${Number(p.sconto_valore)}%)`
+                                    : ""}
+                                </span>
+                                <span>− {formatEuro(sc)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between border-t border-border pt-1">
+                              <span className="font-display uppercase tracking-wide">
+                                Totale finale
+                              </span>
+                              <span className="font-display text-base font-bold">
+                                {formatEuro(fin)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </CardContent>
