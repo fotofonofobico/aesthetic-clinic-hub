@@ -26,6 +26,8 @@ import {
 } from "@/lib/flag-rischio";
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
+import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
+import { Lock, FileSignature } from "lucide-react";
 
 interface AnamnesiRow {
   id: string;
