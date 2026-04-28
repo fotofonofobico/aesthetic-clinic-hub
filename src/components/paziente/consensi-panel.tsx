@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { sha256Hex } from "@/lib/hash";
 import { generaPdfConsenso } from "@/lib/pdf-consenso";
 import {
@@ -45,6 +46,7 @@ import {
 } from "@/types/trattamenti";
 import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
+import { PdfSignedLink } from "@/components/pdf-signed-link";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
@@ -57,7 +59,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
-  const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
+  
 
   useEffect(() => {
     void load();
@@ -90,16 +92,6 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
     }
     setStati(map);
     setLoading(false);
-  }
-
-  async function getSignedUrl(path: string): Promise<string | null> {
-    if (pdfUrls[path]) return pdfUrls[path];
-    const { data, error } = await supabase.storage
-      .from("consensi-pdf")
-      .createSignedUrl(path, 60 * 10);
-    if (error || !data) return null;
-    setPdfUrls((p) => ({ ...p, [path]: data.signedUrl }));
-    return data.signedUrl;
   }
 
   async function revoca(c: ConsensoFirmato) {
@@ -265,7 +257,7 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                   <p className="whitespace-pre-wrap">{viewing.testo_snapshot}</p>
                 </div>
 
-                {viewing.modalita_firma === "tablet" && viewing.firma_immagine ? (
+                {viewing.modalita_firma === "tablet" && viewing.firma_immagine && (
                   <div>
                     <Label>Firma</Label>
                     <img
@@ -274,15 +266,22 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                       className="mt-1 h-32 w-full rounded border border-border bg-card object-contain"
                     />
                   </div>
-                ) : viewing.pdf_url ? (
-                  <div>
-                    <Label>PDF firmato</Label>
-                    <PdfLink
+                )}
+                <div>
+                  <Label>PDF firmato</Label>
+                  {viewing.pdf_url ? (
+                    <PdfSignedLink
+                      bucket="consensi-pdf"
                       path={viewing.pdf_url}
-                      getUrl={() => getSignedUrl(viewing.pdf_url!)}
+                      label="Apri PDF firmato"
                     />
-                  </div>
-                ) : null}
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      PDF non disponibile per questo consenso (record antecedente alla
+                      generazione automatica)
+                    </p>
+                  )}
+                </div>
 
                 {viewing.note && (
                   <div>
@@ -321,31 +320,6 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   );
 }
 
-function PdfLink({
-  path,
-  getUrl,
-}: {
-  path: string;
-  getUrl: () => Promise<string | null>;
-}) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    void getUrl().then(setUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
-  if (!url) return <p className="text-xs text-muted-foreground">Caricamento PDF…</p>;
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="mt-1 inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent"
-    >
-      <FileText className="h-4 w-4" />
-      Apri PDF firmato
-    </a>
-  );
-}
 
 function NuovoConsensoDialog({
   pazienteId,
@@ -372,6 +346,10 @@ function NuovoConsensoDialog({
   const [esitoCartaceo, setEsitoCartaceo] = useState<"acconsento" | "non_acconsento">(
     "acconsento",
   );
+  // Esito tablet: nessuna preselezione, scelta esplicita richiesta
+  const [esitoTablet, setEsitoTablet] = useState<"acconsento" | "non_acconsento" | undefined>(
+    undefined,
+  );
   const sigRef = React.useRef<SignaturePadHandle>(null);
 
   const tpl = templates.find((t) => t.id === tplId) ?? null;
@@ -384,6 +362,7 @@ function NuovoConsensoDialog({
     setPdfFile(null);
     setDataFirmaCartaceo(new Date().toISOString().slice(0, 10));
     setEsitoCartaceo("acconsento");
+    setEsitoTablet(undefined);
     sigRef.current?.clear();
   }
 
@@ -444,6 +423,10 @@ function NuovoConsensoDialog({
       toast.error("Seleziona un modello");
       return;
     }
+    if (modalita === "tablet" && !esitoTablet) {
+      toast.error("Seleziona Acconsento o Non acconsento");
+      return;
+    }
     if (modalita === "tablet" && (!sigRef.current || sigRef.current.isEmpty())) {
       toast.error("La firma è obbligatoria");
       return;
@@ -459,7 +442,9 @@ function NuovoConsensoDialog({
         ? new Date(`${dataFirmaCartaceo}T12:00:00`)
         : new Date();
     const validoFinoA = calcValidoFinoA(tpl, firmatoIl);
-    const isRifiutato = modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento";
+    const isRifiutato =
+      (modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento") ||
+      (modalita === "tablet" && esitoTablet === "non_acconsento");
 
     let firmaImmagine: string | null = null;
     let pdfPath: string | null = null;
@@ -504,7 +489,7 @@ function NuovoConsensoDialog({
           firmaPazienteDataUrl: firmaImmagine,
           firmaMedicoDataUrl: null,
           operatoreNome,
-          rifiutato: false,
+          rifiutato: isRifiutato,
           note: note.trim() || null,
         });
         const path = `${pazienteId}/manuale/${Date.now()}-${crypto.randomUUID()}.pdf`;
@@ -651,12 +636,42 @@ function NuovoConsensoDialog({
         </div>
 
         {modalita === "tablet" ? (
-          <div>
-            <Label>Firma del paziente *</Label>
-            <SignaturePad
-              ref={sigRef}
-              onChange={(empty) => setSigned(!empty)}
-            />
+          <div className="space-y-3">
+            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <Label className="text-sm font-semibold">Scelta del paziente *</Label>
+              <RadioGroup
+                value={esitoTablet ?? ""}
+                onValueChange={(v) =>
+                  setEsitoTablet(v as "acconsento" | "non_acconsento")
+                }
+                className="grid gap-2"
+              >
+                <label
+                  htmlFor="esito-tablet-acc"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
+                  <RadioGroupItem value="acconsento" id="esito-tablet-acc" />
+                  <span className="text-sm leading-none">Acconsento</span>
+                </label>
+                <label
+                  htmlFor="esito-tablet-nacc"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30"
+                >
+                  <RadioGroupItem value="non_acconsento" id="esito-tablet-nacc" />
+                  <span className="text-sm leading-none">Non acconsento</span>
+                </label>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label>Firma del paziente *</Label>
+              <p className="mb-1 text-xs text-muted-foreground">
+                La firma è sempre obbligatoria, anche in caso di "Non acconsento".
+              </p>
+              <SignaturePad
+                ref={sigRef}
+                onChange={(empty) => setSigned(!empty)}
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -729,7 +744,7 @@ function NuovoConsensoDialog({
           disabled={
             saving ||
             !tpl ||
-            (modalita === "tablet" && !signed) ||
+            (modalita === "tablet" && (!signed || !esitoTablet)) ||
             (modalita === "pdf_caricato" && !pdfFile)
           }
         >

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
@@ -264,7 +264,13 @@ function CriticalBanner({
   const blocchi = access ? access.motivi : [];
   const haBlocco = !!access && (access.bloccoTotale || access.bloccoTrattamenti);
 
-  if (critici.length === 0 && blocchi.length === 0) return null;
+  const showObsoletaWarning =
+    !!access &&
+    access.anamnesiObsoleta &&
+    !access.bloccoTotale &&
+    !access.bloccoTrattamenti;
+
+  if (critici.length === 0 && blocchi.length === 0 && !showObsoletaWarning) return null;
 
   return (
     <div className="space-y-2">
@@ -295,6 +301,17 @@ function CriticalBanner({
               {haBlocco ? "Trattamenti bloccati" : "Avvisi consensi"}
             </div>
             <div className="mt-0.5 text-foreground">{blocchi.join(" · ")}</div>
+          </div>
+        </div>
+      )}
+      {showObsoletaWarning && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div>
+            <div className="font-semibold">Anamnesi: nuova versione in lavorazione</div>
+            <div className="mt-0.5 text-foreground">
+              È presente una nuova anamnesi non firmata. Stai operando su una versione precedente.
+            </div>
           </div>
         </div>
       )}

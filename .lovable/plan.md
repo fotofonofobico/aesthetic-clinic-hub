@@ -1,93 +1,244 @@
-## Problema
+## 🔧 PROMPT COMPLETO CORRETTO
 
-Quando firmi la **bozza v2** dell'anamnesi:
-1. Compare l'alert "Trattamenti bloccati — Anamnesi non firmata" anche se la firma è andata a buon fine.
-2. La pagina sembra "tornare alla home del paziente" (in realtà la tab attiva si resetta su "Diario").
+## Sintesi dei bug
 
-## Causa (due bug indipendenti)
+1. **Radio decentrato** sui pulsanti "Acconsento / Non acconsento".
+2. **GDPR – firma non sempre visibile**: nel dialog "Nuovo consenso" della tab Consensi, in modalità tablet manca proprio la scelta acconsento/non_acconsento; la firma compare ma l'esito è forzato ad "acconsento".
+3. **Non tutti i consensi sono scaricabili in PDF dalla tab Consensi**: il link PDF appare solo se `modalita_firma === "pdf_caricato"`. Per tablet (es. GDPR firmato sul tablet) il PDF c'è (`pdf_url`) ma non viene mostrato nessun pulsante per scaricarlo.
+4. **Link PDF "vuoto"** per uso immagini / anamnesi: la signed URL viene generata ma a volte il `pdf_url` salvato punta a un path che non esiste (upload fallito silenziosamente in vecchi record) oppure il link non viene mai mostrato. Va reso visibile + gestito il caso "PDF non disponibile" senza link morto.
+5. **Anamnesi – warning "versione successiva non firmata"** non viene mostrato a UI, anche se il guard ora produce `anamnesiObsoleta = true`.
 
-**Bug 1 — `src/lib/access-guard.ts` (logica errata di valutazione anamnesi)**
-
-`evaluateAccess` ordina le righe `anamnesi` per `updated_at DESC` e considera solo `anamRows[0]`. Quando firmo v2:
-- Il trigger `anamnesi_auto_supersede` aggiorna v1 a `superseded` **dopo** l'update di v2.
-- Il trigger `trg_anamnesi_updated_at` rimette `updated_at = now()` su v1.
-- Risultato: v1 (`superseded`) ha `updated_at` più recente di v2 (`signed`) → `ultima.stato !== 'signed'` → viene aggiunto erroneamente "Anamnesi non firmata" e `bloccoTrattamenti = true`.
-
-La logica corretta è: **se esiste una riga `signed`, l'anamnesi è firmata**, indipendentemente da quante draft/superseded esistono. Una "draft posteriore" indica solo che il medico sta preparando una nuova versione (warning, non blocco).
-
-**Bug 2 — `src/routes/_authenticated/pazienti.$id.tsx` (perdita stato tab)**
-
-Dopo `firmaAnamnesi`, viene invocato `onSaved → load()`. `load()` esegue `setLoading(true)` che smonta tutto il blocco `<Tabs>`. Al rimontaggio, `<Tabs defaultValue="diario">` torna sulla tab "Diario", quindi l'utente perde il contesto e pensa di essere stato "rimandato alla homepage del paziente".
+---
 
 ## Modifiche
 
-### 1. `src/lib/access-guard.ts` — fix logica anamnesi
+### 1. `src/components/ui/radio-group.tsx` — centrare il pallino
 
-Sostituire il blocco "Anamnesi (firma)" con una logica basata sulla presenza di una riga `signed`:
-
-```ts
-const anamRows = (anamRes.data ?? []) as Array<{
-  stato: "draft" | "signed" | "superseded";
-  firmata_il: string | null;
-  updated_at: string;
-}>;
-
-const signed = anamRows.find((a) => a.stato === "signed");
-const draft = anamRows.find((a) => a.stato === "draft");
-
-let anamnesiStato: AccessEvaluation["anamnesiStato"] = "missing";
-let anamnesiObsoleta = false;
-
-if (anamRows.length === 0) {
-  bloccoTrattamenti = true;
-  motivi.push("Anamnesi non compilata");
-} else if (signed) {
-  anamnesiStato = "signed";
-  // draft posteriore = nuova versione in lavorazione (non blocca)
-  if (draft) anamnesiObsoleta = true;
-} else {
-  // solo draft/superseded, nessuna signed
-  anamnesiStato = draft ? "draft" : "superseded";
-  bloccoTrattamenti = true;
-  motivi.push("Anamnesi non firmata");
-}
-```
-
-### 2. `src/routes/_authenticated/pazienti.$id.tsx` — preservare la tab attiva
-
-Due modifiche minimali:
-
-a) Trasformare `<Tabs>` in **controlled component** con stato locale, così il valore corrente sopravvive a un re-render anche se l'albero viene smontato:
+Sostituire l'indicatore:
 
 ```tsx
-const [tab, setTab] = useState<string>("diario");
-// ...
-<Tabs value={tab} onValueChange={setTab} className="space-y-4">
+<Circle className="h-3.5 w-3.5 fill-primary" />
+
 ```
 
-b) In `load()`, evitare di forzare `setLoading(true)` sui refresh successivi al primo (così non smontiamo l'intera UI per un semplice refresh post-firma):
+con:
+
+```tsx
+<RadioGroupPrimitive.Indicator className="flex h-full w-full items-center justify-center">
+  <span className="h-2 w-2 rounded-full bg-primary" />
+</RadioGroupPrimitive.Indicator>
+
+```
+
+---
+
+### 2. `src/components/paziente/consensi-panel.tsx` — `NuovoConsensoDialog`
+
+#### UI + logica tablet
+
+- Aggiungere stato:
 
 ```ts
-async function load(opts: { silent?: boolean } = {}) {
-  if (!opts.silent) setLoading(true);
-  // ...
-}
+esitoTablet: "acconsento" | "non_acconsento" | undefined
+
 ```
 
-E passare `load({ silent: true })` da tutti i callback di refresh (`onSaved`, `onChanged`, `onCompleted` di `SignatureSessionDialog`, `FirmaTrattamentoLauncher`).
+- In modalità tablet:
+  - mostrare **RadioGroup Acconsento / Non acconsento PRIMA della firma**
+  - **nessuna preselezione**
+  - firma sempre visibile sotto
+  - firma sempre obbligatoria
+
+---
+
+#### Validazioni
+
+- bloccare submit se:
+
+```ts
+modalita === "tablet" && !esitoTablet
+
+```
+
+---
+
+#### Logica salvataggio
+
+```ts
+isRifiutato =
+  (modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento") ||
+  (modalita === "tablet" && esitoTablet === "non_acconsento")
+
+valido_fino_a = isRifiutato ? null : validoFinoA
+
+```
+
+---
+
+#### 🔴 PDF — REGOLA FONDAMENTALE (NUOVA)
+
+```txt
+ALL new consents MUST always generate a PDF.
+
+- gdpr
+- uso immagini
+- trattamento
+
+If PDF generation or upload fails:
+→ block save completely
+
+Do NOT allow saving records without pdf_url for new entries
+
+```
+
+---
+
+#### Visualizzazione PDF
+
+- Mostrare SEMPRE:
+  - firma immagine (se tablet)
+  - E SOTTO link PDF
+
+---
+
+#### 🔴 VALIDAZIONE LINK PDF (NUOVA — OBBLIGATORIA)
+
+```txt
+PDF link must NOT be shown based only on pdf_url presence.
+
+Before rendering link:
+- verify file exists in storage
+
+If file does NOT exist:
+- DO NOT render clickable link
+- show label:
+  "PDF non disponibile"
+
+Never show broken links
+
+```
+
+---
+
+#### Fallback UI
+
+Se manca PDF:
+
+```txt
+PDF non disponibile per questo consenso (record antecedente alla generazione automatica)
+
+```
+
+---
+
+#### 🔵 PDF CONTENT (MIGLIORIA)
+
+```txt
+Include patient choice (acconsento / non_acconsento) inside PDF content
+
+```
+
+---
+
+### 3. `src/components/paziente/anamnesi-panel.tsx`
+
+#### Mostrare sempre PDF
+
+Sostituire logica:
+
+```ts
+isSigned && isCartaceo(data) && data.pdf_url
+
+```
+
+con:
+
+```ts
+data.stato === "signed" && data.pdf_url
+
+```
+
+---
+
+#### 🔴 VALIDAZIONE FILE ANAMNESI (NUOVA)
+
+```txt
+Before showing PDF link:
+- verify file exists in "anamnesi-pdf" bucket
+
+If missing:
+- show fallback text instead of clickable link
+
+```
+
+---
+
+#### Fallback
+
+```txt
+PDF non disponibile (versione anteriore al PDF automatico)
+
+```
+
+---
+
+### 4. `src/components/pdf-signed-link.tsx`
+
+#### Robustezza
+
+- verificare esistenza file prima di mostrare link
+- evitare link vuoti
+- gestire errore 404 / signed URL non valido
+
+---
+
+### 5. `src/routes/_authenticated/pazienti.$id.tsx`
+
+#### Alert anamnesi obsoleta
+
+```tsx
+{guard?.anamnesiObsoleta && (
+  <Alert variant="default" className="border-warning/40 bg-warning/10">
+    <AlertTriangle className="h-4 w-4 text-warning" />
+    <AlertTitle>Anamnesi: nuova versione in lavorazione</AlertTitle>
+    <AlertDescription>
+      È presente una nuova anamnesi non firmata. Stai operando su una versione precedente.
+    </AlertDescription>
+  </Alert>
+)}
+
+```
+
+---
 
 ## File toccati
 
-- `src/lib/access-guard.ts` (logica anamnesi)
-- `src/routes/_authenticated/pazienti.$id.tsx` (tab controllata + `load({ silent })`)
+- `src/components/ui/radio-group.tsx`
+- `src/components/paziente/consensi-panel.tsx`
+- `src/components/paziente/anamnesi-panel.tsx`
+- `src/components/pdf-signed-link.tsx`
+- `src/routes/_authenticated/pazienti.$id.tsx`
 
-## Cosa NON tocchiamo
+---
 
-- Schema DB, trigger, RLS — restano invariati.
-- Flusso di firma in `anamnesi-panel.tsx` (`firmaAnamnesi`, fork, upload PDF) — già corretto.
-- `consensi-panel.tsx` e altri panel.
+## Cosa NON toccare
+
+- DB
+- RLS
+- trigger
+- edge functions
+- signature-session-dialog
+- access-guard
+
+---
 
 ## Risultato atteso
 
-- Firma v2 → toast "Anamnesi firmata e bloccata", banner "Trattamenti bloccati / Anamnesi non firmata" sparisce, l'utente resta sulla tab "Anamnesi".
-- Se esiste sia una `signed` sia una `draft` v+1 in lavorazione, nessun blocco trattamenti (solo flag `anamnesiObsoleta` per UI futura).
+- radio centrati
+- GDPR corretto (scelta + firma sempre)
+- PDF SEMPRE generato per nuovi consensi
+- nessun link rotto
+- fallback chiaro se PDF mancante
+- PDF anamnesi sempre accessibile
+- alert anamnesi obsoleta visibile
+- nessun blocco trattamenti se esiste signed
