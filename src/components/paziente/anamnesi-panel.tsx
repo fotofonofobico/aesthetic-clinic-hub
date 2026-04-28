@@ -181,7 +181,7 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   ) {
     const editable = await ensureEditable();
     if (!editable) return;
-    setData((d) => {
+    setData((d: AnamnesiRow | null) => {
       const target = d?.id === editable.id ? d : editable;
       if (!target) return d;
       const current = (target[sez] ?? {}) as Record<string, unknown>;
