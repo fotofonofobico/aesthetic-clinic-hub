@@ -26,13 +26,14 @@ export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMiss
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    const pdfWindow = window.open("", "_blank", "noopener,noreferrer");
+    const pdfWindow = window.open("", "_blank");
     if (!pdfWindow) {
       busyRef.current = false;
       setBusy(false);
       toast.error("Abilita i popup per aprire il PDF.");
       return;
     }
+    pdfWindow.opener = null;
     pdfWindow.document.write(
       '<!doctype html><html lang="it"><head><title>Caricamento PDF…</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">Caricamento PDF…</body></html>',
     );
