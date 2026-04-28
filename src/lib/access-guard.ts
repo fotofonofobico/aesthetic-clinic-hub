@@ -46,12 +46,15 @@ export async function evaluateAccess(pazienteId: string): Promise<AccessEvaluati
   const img = ultimoPerCategoria(rows, "uso_immagini");
   const immaginiConsentite = !!img && !img.rifiutato && !statoIsBlocking(img.stato);
 
-  // Anamnesi (firma)
+  // Anamnesi (firma): basta che esista UNA riga signed per non bloccare;
+  // una draft posteriore indica solo una nuova versione in lavorazione.
   const anamRows = (anamRes.data ?? []) as Array<{
     stato: "draft" | "signed" | "superseded";
     firmata_il: string | null;
     updated_at: string;
   }>;
+  const signed = anamRows.find((a) => a.stato === "signed");
+  const draft = anamRows.find((a) => a.stato === "draft");
   let anamnesiStato: AccessEvaluation["anamnesiStato"] = "missing";
   let anamnesiObsoleta = false;
   let bloccoTrattamenti = bloccoTotale;
@@ -60,18 +63,13 @@ export async function evaluateAccess(pazienteId: string): Promise<AccessEvaluati
     anamnesiStato = "missing";
     bloccoTrattamenti = true;
     motivi.push("Anamnesi non compilata");
+  } else if (signed) {
+    anamnesiStato = "signed";
+    if (draft) anamnesiObsoleta = true;
   } else {
-    const ultima = anamRows[0];
-    anamnesiStato = ultima.stato;
-    if (ultima.stato !== "signed") {
-      bloccoTrattamenti = true;
-      motivi.push("Anamnesi non firmata");
-    }
-    // se esiste un draft posteriore alla firmata
-    const signed = anamRows.find((a) => a.stato === "signed");
-    if (signed && ultima.stato !== "signed") {
-      anamnesiObsoleta = true;
-    }
+    anamnesiStato = draft ? "draft" : "superseded";
+    bloccoTrattamenti = true;
+    motivi.push("Anamnesi non firmata");
   }
 
   return {
