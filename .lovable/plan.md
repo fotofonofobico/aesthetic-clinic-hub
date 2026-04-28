@@ -1,98 +1,83 @@
-# Fix crash Anamnesi + Refactor UI Consensi (template config)
+## Refactor "Nuovo trattamento" → Catalogo trattamenti standardizzato
 
-## 1. Bug — Crash su tab Anamnesi (`null is not an object (resolveDispatcher().useState)`)
+Trasformiamo il dialog in un form compatto con campi dinamici e collegamento obbligatorio a un consenso template.
 
-**Causa probabile**: errore nel rendering del sottoalbero della tab; React 19 rilancia come dispatcher null. Il sospetto principale è la combinazione tra `react-signature-canvas` (alpha) montato eagerly + `AnamnesiCronologia` montata sempre, dentro un `Tabs` Radix. Quando l'errore propaga, il `CatchBoundary` di TanStack mostra il messaggio "Error in route match".
+### Nota su DB (richiede conferma)
 
-**Interventi (minimi, non distruttivi)**:
+Il vincolo dice "NON modificare tabelle esistenti", ma i nuovi campi obbligatori (`tipo`, `durata_ciclo`, `consenso_template_id`) non hanno colonne dove salvarsi. Senza persistenza, il dato si perde a ogni reload e la logica firma non può leggerlo.
 
-- In `src/components/paziente/anamnesi-panel.tsx`:
-  - Sostituire gli import named `useState/useEffect/useRef` con `import * as React from "react"` e usare `React.useState` ecc. (allineato a `auth-context` e `signature-pad`, evita problemi di tree-shaking/HMR su React 19).
-  - Aggiungere guardia di rendering: se `data == null && !loading` mostrare placeholder + bottone "Inizializza anamnesi" invece di rendere i Card (oggi in pratica si entra sempre nel return principale dopo il fetch).
-  - Lazy-loadare `SignaturePad` (`React.lazy` + `Suspense`) DENTRO il dialog di firma, così l'alpha di `react-signature-canvas` non viene importato fino al primo "Firma e blocca" (riduce superficie di crash al primo mount della tab).
-- In `src/routes/_authenticated/pazienti.$id.tsx`:
-  - Aggiungere `errorComponent` alla `Route` con messaggio leggibile + bottone "Riprova" (`router.invalidate()`), così se un panel crasha l'utente non vede stack trace nudo.
+Proposta minima **additiva** (nessuna modifica a colonne esistenti, nessuna nuova tabella, nessuna FK rotta, nessun RLS toccato):
 
-Se il crash dovesse persistere dopo questi fix lo isoliamo aggiungendo un `<ErrorBoundary>` solo attorno a `<AnamnesiPanel/>` con log strutturato: lo decideremo dopo aver verificato.
+```sql
+ALTER TABLE trattamenti
+  ADD COLUMN IF NOT EXISTS tipo text CHECK (tipo IN ('singolo','ciclo')),
+  ADD COLUMN IF NOT EXISTS durata_ciclo_valore integer,
+  ADD COLUMN IF NOT EXISTS durata_ciclo_unita text CHECK (durata_ciclo_unita IN ('giorni','settimane','mesi')),
+  ADD COLUMN IF NOT EXISTS consenso_template_id uuid REFERENCES consenso_template(id);
+```
 
-## 2. Refactor UI — Sezione "Consensi" → gestione template
+Tutte nullable per non rompere righe esistenti. Se questa aggiunta non è accettabile, l'unica alternativa è degradare i nuovi campi a "solo UI" (non persistiti) — sconsigliato.
 
-Modifiche **solo UI** in `src/routes/_authenticated/consensi.index.tsx` (form `TemplateDialog`). **Nessuna modifica al backend, allo schema, alla signature session, al panel paziente.** Mantengo i valori esistenti delle enum di DB compatibili.
+### Modifiche UI (`src/routes/_authenticated/trattamenti.index.tsx`)
 
-### 2.1 Rinomina
+Form `TrattamentoDialog` ricostruito, compatto, in quest'ordine:
 
-- Bottone "Nuovo modello" → **"Nuovo template consenso"**.
-- Titolo dialog: "Nuovo template consenso" / "Modifica template consenso".
-- Label e copy aggiornati di conseguenza.
+1. **Nome trattamento** — `Input` testo, obbligatorio.
+2. **Tipo trattamento** — `RadioGroup` (`singolo` | `ciclo`), obbligatorio.
+3. **Durata ciclo** — visibile **solo se** `tipo === 'ciclo'`:
+   - input numerico (obbligatorio in quel caso)
+   - `Select` unità: `giorni` / `settimane` / `mesi`
+4. **Categoria** — `Select` chiuso con valori fissi:
+   `tossina_botulinica`, `filler`, `biostimolazione`, `peeling`, `device`, `altro`.
+5. **Consenso associato** — `Select` da `consenso_template` (solo `attivo = true`), obbligatorio.
+6. **Durata (minuti)** — `Input` numerico opzionale.
+7. **Prezzo indicativo (€)** — `Input` numerico opzionale.
 
-### 2.2 Categorie visibili (UI)
+Rimossi: campo `Descrizione` (Textarea) e categoria libera in input testo.
 
-Nel `Select` categoria mostrare solo:
+### Validazioni in `save()`
 
-- GDPR (`gdpr`)
-- Uso immagini (`uso_immagini`)
-- Trattamento (UI unica; mappa internamente a `trattamento_singolo` o `trattamento_ciclo` via "modalità validità", vedi 2.3)
-- Altro (`altro`)
+- `nome` non vuoto
+- `tipo` ∈ {singolo, ciclo}
+- se `tipo === 'ciclo'` → `durata_ciclo_valore > 0` e `durata_ciclo_unita` selezionata
+- `consenso_template_id` non vuoto
+- toast errore italiano per ogni regola
 
-Nascondere/rimuovere dalla UI: `anamnesi`, `trattamento_ciclo` come categoria a sé, "trattamento singolo" come categoria a sé. (Le costanti DB restano: niente migration, niente rotture su record esistenti.)
+### Card list (sezione catalogo)
 
-### 2.3 Logica dinamica del form
+Aggiornata per mostrare i nuovi metadati in modo discreto:
+- badge `Singolo` / `Ciclo Nx unità`
+- nome del consenso collegato (subtitle piccolo)
+- categoria già presente, ora dal set chiuso
 
-Stato locale aggiuntivo: `tipoUI: "gdpr" | "uso_immagini" | "trattamento" | "altro"`, `modValidita: "singola" | "ciclo"`, `cicloDurata: number`, `cicloUnita: "giorni" | "mesi"`.
+Nessuna modifica a stili globali.
 
-Comportamento:
+### Tipi (`src/types/trattamenti.ts`)
 
-- `tipoUI ≠ "trattamento"` → nascondere completamente: campo "validità mesi", switch ciclo/singola, durata, unità, select "trattamento collegato".
-  - Categoria salvata: `gdpr` / `uso_immagini` / `altro`.
-  - `validita_mesi = null`, `trattamento_id = null`.
-- `tipoUI = "trattamento"` → mostrare:
-  - Radio "Modalità validità": "Singola seduta" / "Ciclo".
-  - Se "Singola seduta": niente input durata. Categoria salvata = `trattamento_singolo`, `validita_mesi = null`.
-  - Se "Ciclo": input numerico "Durata" + select unità (Giorni / Mesi). Salvataggio: categoria = `trattamento_ciclo`, `validita_mesi = cicloDurata` (se mesi) oppure `Math.ceil(giorni/30)` (se giorni) — nota informativa sotto il campo: "La durata viene salvata in mesi".
-  - Select "Trattamento collegato" **obbligatorio** (validazione lato form, niente opzione "Nessuno").
+Estendere l'interfaccia `Trattamento` con i nuovi campi opzionali e aggiungere:
 
-### 2.4 Campi rimossi dalla UI
+```ts
+export type TrattamentoTipo = 'singolo' | 'ciclo';
+export type DurataUnita = 'giorni' | 'settimane' | 'mesi';
+export const TRATTAMENTO_CATEGORIE = [
+  'tossina_botulinica','filler','biostimolazione','peeling','device','altro'
+] as const;
+```
 
-- "Validità (mesi)" come input generico.
-- Helper "Vuoto = nessuna scadenza".
-- Categoria "Ciclo di trattamento" e "Anamnesi" dal select (anche se in DB restano).
+Label map italiana per il dropdown.
 
-### 2.5 Titolo auto-generato
+### Cosa NON tocco
 
-Quando l'utente seleziona/cambia `tipoUI` (e in modalità trattamento anche il trattamento collegato), proporre un titolo di default:
+- `consenso_template`, `consenso_firmato`, signature session, `anamnesi*`, RLS, edge functions, share link.
+- Logica firma esistente: il campo `consenso_template_id` su `trattamenti` viene **solo letto** dal flusso firma trattamento in iterazioni future; in questo task lo persistiamo soltanto.
 
-- `gdpr` → "Informativa privacy e GDPR"
-- `uso_immagini` → "Consenso uso immagini"
-- `altro` → "" (vuoto)
-- `trattamento` + trattamento scelto → "Consenso per `<nome trattamento>`"
+### File toccati
 
-Il titolo resta editabile manualmente. Se l'utente l'ha già modificato manualmente, non viene sovrascritto al cambio del tipo (flag `titoloDirty`).
+- `supabase/migrations/<timestamp>_trattamenti_catalogo.sql` (additivo)
+- `src/integrations/supabase/types.ts` (rigenerato)
+- `src/types/trattamenti.ts`
+- `src/routes/_authenticated/trattamenti.index.tsx`
 
-### 2.6 Mapping in apertura (edit)
+### Conferma richiesta
 
-Quando si apre un template esistente:
-
-- `categoria === "gdpr" | "uso_immagini" | "altro"` → `tipoUI` corrispondente.
-- `categoria === "trattamento_singolo"` → `tipoUI = "trattamento"`, `modValidita = "singola"`.
-- `categoria === "trattamento_ciclo"` → `tipoUI = "trattamento"`, `modValidita = "ciclo"`, `cicloDurata = validita_mesi ?? 12`, `cicloUnita = "mesi"`.
-- `categoria === "anamnesi"` (record legacy) → mostrato in sola lettura con avviso "Categoria deprecata, salvataggio convertirà a Altro" (oppure si lascia così disabilitando il salvataggio — scelgo la via meno invasiva: lasciare modificabile ma con warning).
-
-### 2.7 Validazioni
-
-- Tipo trattamento: `trattamento_id` obbligatorio.
-- Tipo trattamento + ciclo: `cicloDurata > 0`.
-- Titolo, testo: invariati (obbligatori).
-
-## File modificati
-
-- `src/components/paziente/anamnesi-panel.tsx` (fix crash)
-- `src/routes/_authenticated/pazienti.$id.tsx` (errorComponent)
-- `src/routes/_authenticated/consensi.index.tsx` (refactor UI `TemplateDialog`)
-
-## Cosa NON tocco
-
-- Schema DB e migration.
-- `consenso_firmato`, RPC `paziente_consensi_stato`, RLS.
-- `signature-session.ts`, `signature-session-dialog.tsx`.
-- `consensi-panel.tsx` (panel paziente).
-- Enum `ConsensoCategoria` e `CATEGORIA_LABELS` (i valori esistenti restano per retro-compat record già firmati/template).
+Procedo con la migrazione additiva sopra? È l'unico modo per rispettare sia "campi obbligatori persistiti" sia "nessuna nuova entità / nessuna modifica strutturale alle tabelle esistenti" (aggiunge solo colonne nullable).

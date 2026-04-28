@@ -857,40 +857,60 @@ export type Database = {
         Row: {
           attivo: boolean
           categoria: string | null
+          consenso_template_id: string | null
           created_at: string
           created_by: string | null
           descrizione: string | null
+          durata_ciclo_unita: string | null
+          durata_ciclo_valore: number | null
           durata_minuti: number | null
           id: string
           nome: string
           prezzo_indicativo: number | null
+          tipo: string | null
           updated_at: string
         }
         Insert: {
           attivo?: boolean
           categoria?: string | null
+          consenso_template_id?: string | null
           created_at?: string
           created_by?: string | null
           descrizione?: string | null
+          durata_ciclo_unita?: string | null
+          durata_ciclo_valore?: number | null
           durata_minuti?: number | null
           id?: string
           nome: string
           prezzo_indicativo?: number | null
+          tipo?: string | null
           updated_at?: string
         }
         Update: {
           attivo?: boolean
           categoria?: string | null
+          consenso_template_id?: string | null
           created_at?: string
           created_by?: string | null
           descrizione?: string | null
+          durata_ciclo_unita?: string | null
+          durata_ciclo_valore?: number | null
           durata_minuti?: number | null
           id?: string
           nome?: string
           prezzo_indicativo?: number | null
+          tipo?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trattamenti_consenso_template_id_fkey"
+            columns: ["consenso_template_id"]
+            isOneToOne: false
+            referencedRelation: "consenso_template"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trattamento_pacchetto: {
         Row: {
