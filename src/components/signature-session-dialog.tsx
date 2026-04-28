@@ -268,7 +268,7 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
 
           const ins = await supabase
             .from("consenso_firmato")
-            .insert(insertPayload)
+            .insert(insertPayload as never)
             .select("id")
             .single();
           if (ins.error) throw ins.error;
