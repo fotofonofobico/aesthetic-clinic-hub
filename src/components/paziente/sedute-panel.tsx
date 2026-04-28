@@ -306,6 +306,12 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
                 {oggi} oggi
               </Badge>
             )}
+            {daDefinire > 0 && (
+              <Badge variant="outline" className="gap-1">
+                <Calendar className="h-3 w-3" />
+                {daDefinire} da pianificare
+              </Badge>
+            )}
           </div>
           <Button onClick={() => setSpotOpen(true)} size="sm">
             <Plus className="h-4 w-4" />
