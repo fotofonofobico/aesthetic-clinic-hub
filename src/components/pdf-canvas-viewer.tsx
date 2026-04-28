@@ -71,7 +71,8 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
       } catch (e) {
         if (cancelled) return;
         const message = (e as Error).message || "Anteprima PDF non riuscita";
-        setError(message);
+        console.error("[pdf preview]", e);
+        setError("Anteprima PDF non riuscita su questo browser. Il file è comunque disponibile: usa Scarica PDF.");
         onError?.(message);
       } finally {
         if (!cancelled) setLoading(false);

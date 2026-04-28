@@ -116,7 +116,7 @@ function PdfViewerPage() {
             </div>
           </div>
         )}
-        {!loading && !error && blob && <PdfCanvasViewer blob={blob} onError={setError} />}
+        {!loading && !error && blob && <PdfCanvasViewer blob={blob} />}
       </main>
     </div>
   );
