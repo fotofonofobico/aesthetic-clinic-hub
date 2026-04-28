@@ -1307,6 +1307,14 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                                       Firma consenso
                                     </Button>
                                   )}
+                                  <span className="text-xs font-medium">
+                                    {formatEuro(
+                                      prezzoRiga(
+                                        trattamenti.find((t) => t.id === v.trattamento_id),
+                                        v.numero_sedute,
+                                      ),
+                                    )}
+                                  </span>
                                   <span className="text-xs text-muted-foreground">
                                     {completateVoce} / {v.numero_sedute} sedute
                                   </span>
