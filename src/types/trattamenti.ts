@@ -173,20 +173,41 @@ export interface PianoVoce {
 
 export interface Seduta {
   id: string;
-  piano_id: string;
+  piano_id: string | null;
   paziente_id: string;
   numero_seduta: number;
+  /** Data prevista / programmata della seduta */
   data_seduta: string;
+  /** Data clinica reale (può essere retroattiva) */
+  data_esecuzione_effettiva: string | null;
+  /** Quando l'operatore l'ha registrata nel sistema */
+  data_registrazione: string;
   durata_minuti: number | null;
   operatore_id: string | null;
   parametri_tecnici: Record<string, unknown>;
   note_cliniche: string | null;
   completata: boolean;
+  firmata_il: string | null;
+  firmata_da: string | null;
+  nota_diario_id: string | null;
   trattamento_id?: string | null;
   voce_id?: string | null;
   prodotti_previsti: ProdottoPrevisto[];
+  zone?: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface SedutaModifica {
+  id: string;
+  seduta_id: string;
+  modificata_da: string;
+  modificata_il: string;
+  campo: string;
+  valore_precedente: unknown;
+  valore_nuovo: unknown;
+  motivo: string | null;
+  oltre_48h: boolean;
 }
 
 export interface Followup {
