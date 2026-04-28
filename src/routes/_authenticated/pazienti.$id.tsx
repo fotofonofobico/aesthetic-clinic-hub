@@ -309,10 +309,12 @@ function CriticalBanner({
   flags,
   alerts,
   access,
+  consensiPianoMancanti,
 }: {
   flags: FlagRischio[];
   alerts: PazienteAlert[];
   access: AccessEvaluation | null;
+  consensiPianoMancanti: string[];
 }) {
   const critici = [
     ...flags.filter((f) => f.severity === "critico").map((f) => f.etichetta),
@@ -327,7 +329,13 @@ function CriticalBanner({
     !access.bloccoTotale &&
     !access.bloccoTrattamenti;
 
-  if (critici.length === 0 && blocchi.length === 0 && !showObsoletaWarning) return null;
+  if (
+    critici.length === 0 &&
+    blocchi.length === 0 &&
+    !showObsoletaWarning &&
+    consensiPianoMancanti.length === 0
+  )
+    return null;
 
   return (
     <div className="space-y-2">
@@ -337,6 +345,19 @@ function CriticalBanner({
           <div>
             <div className="font-semibold text-destructive">Attenzione clinica</div>
             <div className="mt-0.5 text-foreground">{critici.join(" · ")}</div>
+          </div>
+        </div>
+      )}
+      {consensiPianoMancanti.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
+          <FileSignature className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div>
+            <div className="font-semibold">
+              Consenso mancante per {consensiPianoMancanti.length} trattamento/i nei piani
+            </div>
+            <div className="mt-0.5 text-foreground">
+              {consensiPianoMancanti.join(" · ")}. Firma prima di iniziare le sedute.
+            </div>
           </div>
         </div>
       )}
