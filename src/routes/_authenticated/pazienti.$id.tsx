@@ -241,7 +241,12 @@ function PazienteDetailPage() {
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
-      <CriticalBanner flags={flags} alerts={alerts} access={access} />
+      <CriticalBanner
+        flags={flags}
+        alerts={alerts}
+        access={access}
+        consensiPianoMancanti={consensiPianoMancanti}
+      />
 
       <SignatureSessionDialog
         open={sessioneOpen}
