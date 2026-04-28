@@ -22,7 +22,7 @@ import { ConsensiPanel } from "@/components/paziente/consensi-panel";
 import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
-import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
+import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launcher";
