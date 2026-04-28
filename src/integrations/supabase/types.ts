@@ -20,36 +20,60 @@ export type Database = {
           created_at: string
           estetica: Json
           farmacologica: Json
+          firma_medico: string | null
+          firma_paziente: string | null
+          firmata_da_medico: string | null
+          firmata_il: string | null
           generale: Json
+          hash_integrita: string | null
           id: string
           note_libere: string | null
           patologica: Json
           paziente_id: string
+          pdf_url: string | null
+          stato: Database["public"]["Enums"]["anamnesi_stato"]
           updated_at: string
+          versione_numero: number
         }
         Insert: {
           compilata_da?: string | null
           created_at?: string
           estetica?: Json
           farmacologica?: Json
+          firma_medico?: string | null
+          firma_paziente?: string | null
+          firmata_da_medico?: string | null
+          firmata_il?: string | null
           generale?: Json
+          hash_integrita?: string | null
           id?: string
           note_libere?: string | null
           patologica?: Json
           paziente_id: string
+          pdf_url?: string | null
+          stato?: Database["public"]["Enums"]["anamnesi_stato"]
           updated_at?: string
+          versione_numero?: number
         }
         Update: {
           compilata_da?: string | null
           created_at?: string
           estetica?: Json
           farmacologica?: Json
+          firma_medico?: string | null
+          firma_paziente?: string | null
+          firmata_da_medico?: string | null
+          firmata_il?: string | null
           generale?: Json
+          hash_integrita?: string | null
           id?: string
           note_libere?: string | null
           patologica?: Json
           paziente_id?: string
+          pdf_url?: string | null
+          stato?: Database["public"]["Enums"]["anamnesi_stato"]
           updated_at?: string
+          versione_numero?: number
         }
         Relationships: [
           {
@@ -161,6 +185,8 @@ export type Database = {
           categoria_snapshot: Database["public"]["Enums"]["consenso_categoria"]
           created_at: string
           firma_immagine: string | null
+          firma_medico_immagine: string | null
+          firmato_da_medico: string | null
           firmato_il: string
           hash_integrita: string | null
           id: string
@@ -169,9 +195,12 @@ export type Database = {
           note: string | null
           operatore_testimone: string | null
           paziente_id: string
+          pdf_generato_url: string | null
           pdf_url: string | null
           revocato_da: string | null
           revocato_il: string | null
+          rifiutato: boolean
+          seduta_id: string | null
           template_id: string | null
           testo_snapshot: string
           titolo_snapshot: string
@@ -184,6 +213,8 @@ export type Database = {
           categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
           firma_immagine?: string | null
+          firma_medico_immagine?: string | null
+          firmato_da_medico?: string | null
           firmato_il?: string
           hash_integrita?: string | null
           id?: string
@@ -192,9 +223,12 @@ export type Database = {
           note?: string | null
           operatore_testimone?: string | null
           paziente_id: string
+          pdf_generato_url?: string | null
           pdf_url?: string | null
           revocato_da?: string | null
           revocato_il?: string | null
+          rifiutato?: boolean
+          seduta_id?: string | null
           template_id?: string | null
           testo_snapshot: string
           titolo_snapshot: string
@@ -207,6 +241,8 @@ export type Database = {
           categoria_snapshot?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
           firma_immagine?: string | null
+          firma_medico_immagine?: string | null
+          firmato_da_medico?: string | null
           firmato_il?: string
           hash_integrita?: string | null
           id?: string
@@ -215,9 +251,12 @@ export type Database = {
           note?: string | null
           operatore_testimone?: string | null
           paziente_id?: string
+          pdf_generato_url?: string | null
           pdf_url?: string | null
           revocato_da?: string | null
           revocato_il?: string | null
+          rifiutato?: boolean
+          seduta_id?: string | null
           template_id?: string | null
           testo_snapshot?: string
           titolo_snapshot?: string
@@ -251,6 +290,7 @@ export type Database = {
           created_by: string | null
           descrizione: string | null
           id: string
+          richiede_firma_medico: boolean
           testo: string
           titolo: string
           trattamento_id: string | null
@@ -265,6 +305,7 @@ export type Database = {
           created_by?: string | null
           descrizione?: string | null
           id?: string
+          richiede_firma_medico?: boolean
           testo: string
           titolo: string
           trattamento_id?: string | null
@@ -279,6 +320,7 @@ export type Database = {
           created_by?: string | null
           descrizione?: string | null
           id?: string
+          richiede_firma_medico?: boolean
           testo?: string
           titolo?: string
           trattamento_id?: string | null
@@ -545,7 +587,9 @@ export type Database = {
           note: string | null
           numero_sedute_previste: number
           paziente_id: string
+          prezzo_finale: number | null
           prezzo_totale: number | null
+          sconto: number
           stato: Database["public"]["Enums"]["piano_stato"]
           titolo: string
           trattamento_id: string | null
@@ -558,7 +602,9 @@ export type Database = {
           note?: string | null
           numero_sedute_previste?: number
           paziente_id: string
+          prezzo_finale?: number | null
           prezzo_totale?: number | null
+          sconto?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
           titolo: string
           trattamento_id?: string | null
@@ -571,7 +617,9 @@ export type Database = {
           note?: string | null
           numero_sedute_previste?: number
           paziente_id?: string
+          prezzo_finale?: number | null
           prezzo_totale?: number | null
+          sconto?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
           titolo?: string
           trattamento_id?: string | null
@@ -593,6 +641,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      piano_trattamento_voce: {
+        Row: {
+          created_at: string
+          id: string
+          numero_sedute: number
+          ordine: number
+          pacchetto_id: string | null
+          piano_id: string
+          prezzo_riga: number
+          prezzo_unitario: number
+          trattamento_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          numero_sedute?: number
+          ordine?: number
+          pacchetto_id?: string | null
+          piano_id: string
+          prezzo_riga?: number
+          prezzo_unitario?: number
+          trattamento_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          numero_sedute?: number
+          ordine?: number
+          pacchetto_id?: string | null
+          piano_id?: string
+          prezzo_riga?: number
+          prezzo_unitario?: number
+          trattamento_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -646,7 +730,9 @@ export type Database = {
           parametri_tecnici: Json
           paziente_id: string
           piano_id: string
+          trattamento_id: string | null
           updated_at: string
+          voce_id: string | null
         }
         Insert: {
           completata?: boolean
@@ -660,7 +746,9 @@ export type Database = {
           parametri_tecnici?: Json
           paziente_id: string
           piano_id: string
+          trattamento_id?: string | null
           updated_at?: string
+          voce_id?: string | null
         }
         Update: {
           completata?: boolean
@@ -674,7 +762,9 @@ export type Database = {
           parametri_tecnici?: Json
           paziente_id?: string
           piano_id?: string
+          trattamento_id?: string | null
           updated_at?: string
+          voce_id?: string | null
         }
         Relationships: [
           {
@@ -732,6 +822,39 @@ export type Database = {
         }
         Relationships: []
       }
+      trattamento_pacchetto: {
+        Row: {
+          attivo: boolean
+          created_at: string
+          id: string
+          nome: string
+          numero_sedute: number
+          prezzo_pacchetto: number
+          trattamento_id: string
+          updated_at: string
+        }
+        Insert: {
+          attivo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          numero_sedute: number
+          prezzo_pacchetto: number
+          trattamento_id: string
+          updated_at?: string
+        }
+        Update: {
+          attivo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          numero_sedute?: number
+          prezzo_pacchetto?: number
+          trattamento_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -771,6 +894,20 @@ export type Database = {
       }
       is_active_operator: { Args: { _user_id: string }; Returns: boolean }
       is_valid_cf: { Args: { _cf: string }; Returns: boolean }
+      paziente_consensi_stato: {
+        Args: { _paziente_id: string }
+        Returns: {
+          categoria: Database["public"]["Enums"]["consenso_categoria"]
+          consenso_id: string
+          firmato_il: string
+          rifiutato: boolean
+          stato: string
+          template_id: string
+          titolo: string
+          valido_fino_a: string
+          versione: string
+        }[]
+      }
     }
     Enums: {
       alert_severity: "info" | "attenzione" | "critico"
