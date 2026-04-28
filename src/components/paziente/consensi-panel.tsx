@@ -452,8 +452,13 @@ function NuovoConsensoDialog({
       return;
     }
     setSaving(true);
-    const firmatoIl = new Date();
+    // Per il cartaceo usiamo la data dichiarata; per tablet la data di firma effettiva
+    const firmatoIl =
+      modalita === "pdf_caricato" && dataFirmaCartaceo
+        ? new Date(`${dataFirmaCartaceo}T12:00:00`)
+        : new Date();
     const validoFinoA = calcValidoFinoA(tpl, firmatoIl);
+    const isRifiutato = modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento";
 
     let firmaImmagine: string | null = null;
     let pdfPath: string | null = null;
@@ -477,8 +482,18 @@ function NuovoConsensoDialog({
     const integrita = await sha256Hex(
       `${tpl.titolo}|${tpl.testo}|${tpl.versione}|${firmatoIl.toISOString()}|${
         firmaImmagine?.length ?? pdfFile?.size ?? 0
-      }`,
+      }|${modalita}|${isRifiutato ? "rif" : "acc"}`,
     );
+
+    const noteFinali =
+      modalita === "pdf_caricato"
+        ? [
+            `Firma cartacea — esito: ${isRifiutato ? "Non acconsento" : "Acconsento"}`,
+            note.trim() ? note.trim() : null,
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : note.trim() || null;
 
     const { error } = await supabase.from("consenso_firmato").insert({
       paziente_id: pazienteId,
@@ -492,11 +507,12 @@ function NuovoConsensoDialog({
       firma_immagine: firmaImmagine,
       pdf_url: pdfPath,
       firmato_il: firmatoIl.toISOString(),
-      valido_fino_a: validoFinoA,
+      valido_fino_a: isRifiutato ? null : validoFinoA,
       user_agent: navigator.userAgent,
       operatore_testimone: user?.id ?? null,
       hash_integrita: integrita,
-      note: note.trim() || null,
+      rifiutato: isRifiutato,
+      note: noteFinali,
     });
     setSaving(false);
     if (error) {
