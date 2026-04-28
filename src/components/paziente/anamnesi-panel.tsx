@@ -38,6 +38,8 @@ import {
 import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
+import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 
 type ReactNode = React.ReactNode;
 
