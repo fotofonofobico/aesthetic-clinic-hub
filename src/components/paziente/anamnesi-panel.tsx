@@ -375,23 +375,24 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           )}
           <span>
             {isSigned
-              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""}`
-              : `Bozza v${data.versione_numero ?? 1} — non ancora firmata`}
+              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""} — modifica un campo per creare una nuova versione`
+              : `Bozza v${data.versione_numero ?? 1} — richiede firma del paziente`}
           </span>
         </div>
         <div className="flex gap-2">
-          {isSigned ? (
-            <Button size="sm" variant="outline" onClick={() => void nuovaVersioneDraft()}>
-              Nuova versione
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => void firmaAnamnesi()} disabled={signing}>
+          {!isSigned && (
+            <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
               <FileSignature className="h-4 w-4" />
               {signing ? "Firma in corso…" : "Firma e blocca"}
             </Button>
           )}
         </div>
       </div>
+      {forking && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <History className="h-3 w-3" /> Creazione nuova versione in corso…
+        </p>
+      )}
 
       {/* === 1. GENERALE === */}
       <Card>
