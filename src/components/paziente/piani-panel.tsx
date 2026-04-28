@@ -390,6 +390,21 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       const completate = sedute.filter(
         (s) => s.voce_id === v.id && s.completata,
       ).length;
+      // Ricostruisci eventuale personalizzazione per-seduta dal jsonb
+      const rawPps = (v as unknown as { prodotti_per_seduta?: unknown })
+        .prodotti_per_seduta;
+      const pps: ProdottoForm[][] = Array.isArray(rawPps)
+        ? (rawPps as unknown[]).map((arr) =>
+            Array.isArray(arr)
+              ? parseProdotti(arr).map((p) => ({
+                  uid: uid(),
+                  prodotto_id: p.prodotto_id ?? "",
+                  quantita: p.quantita,
+                }))
+              : [],
+          )
+        : [];
+      const personalizzata = pps.length > 0;
       return {
         uid: uid(),
         voceId: v.id,
@@ -401,6 +416,10 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
           prodotto_id: p.prodotto_id ?? "",
           quantita: p.quantita,
         })),
+        personalizzaPerSeduta: personalizzata,
+        prodottiPerSeduta: personalizzata
+          ? allineaProdottiPerSeduta(pps, v.numero_sedute, [])
+          : [],
         zone: [...v.zone],
         zoneDraft: "",
         consensoOk: null,
