@@ -696,10 +696,16 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={save} disabled={saving}>
-          {saving ? "Salvataggio…" : "Salva anamnesi"}
+      <div className="flex justify-end gap-2">
+        <Button onClick={save} disabled={saving || isSigned} variant={isSigned ? "outline" : "default"}>
+          {saving ? "Salvataggio…" : isSigned ? "Anamnesi firmata (sola lettura)" : "Salva anamnesi"}
         </Button>
+        {!isSigned && (
+          <Button onClick={() => void firmaAnamnesi()} disabled={signing}>
+            <FileSignature className="h-4 w-4" />
+            {signing ? "Firma…" : "Firma e blocca"}
+          </Button>
+        )}
       </div>
 
       {/* Cronologia */}
