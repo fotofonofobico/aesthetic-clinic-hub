@@ -281,12 +281,23 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
 
   function onTrattamentoChange(rUid: string, trattamentoId: string) {
     const t = trattamenti.find((x) => x.id === trattamentoId);
-    patchRiga(rUid, {
-      trattamento_id: trattamentoId,
-      numero_sedute: defaultSedute(t),
-      consensoOk: null,
-      consensoMotivi: [],
-    });
+    const nuoveSedute = defaultSedute(t);
+    setRighe((cur) =>
+      cur.map((r) =>
+        r.uid === rUid
+          ? {
+              ...r,
+              trattamento_id: trattamentoId,
+              numero_sedute: nuoveSedute,
+              prodottiPerSeduta: r.personalizzaPerSeduta
+                ? allineaProdottiPerSeduta(r.prodottiPerSeduta, nuoveSedute, r.prodotti)
+                : r.prodottiPerSeduta,
+              consensoOk: null,
+              consensoMotivi: [],
+            }
+          : r,
+      ),
+    );
     void valutaConsenso(rUid, trattamentoId);
   }
 
