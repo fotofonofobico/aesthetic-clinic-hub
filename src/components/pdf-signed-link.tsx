@@ -55,15 +55,14 @@ export function PdfSignedLink({ bucket, path, label = "Apri PDF firmato", onMiss
         onMissing?.();
         return;
       }
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .download(path);
+      const { data, error } = await supabase.storage.from(bucket).download(path);
       if (error || !data) {
         toast.error(`PDF presente ma non scaricabile: ${error?.message ?? "n/d"}`);
         pdfWindow.close();
         return;
       }
-      const blob = data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
+      const blob =
+        data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       pdfWindow.location.replace(url);
       window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
