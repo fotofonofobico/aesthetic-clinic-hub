@@ -706,6 +706,29 @@ function NuovoConsensoDialog({
                 ? `Validità: ${tpl.validita_mesi} mesi dalla firma.`
                 : "Nessuna scadenza temporale (valido finché non cambia versione o non viene revocato)."}
             </p>
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 p-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Stampa cartacea (per firma a mano):
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void stampaModuloVuoto(true)}
+              >
+                <FileText className="h-4 w-4" />
+                Stampa per questo paziente
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void stampaModuloVuoto(false)}
+              >
+                <FileText className="h-4 w-4" />
+                Modulo generico vuoto
+              </Button>
+            </div>
           </>
         )}
 
