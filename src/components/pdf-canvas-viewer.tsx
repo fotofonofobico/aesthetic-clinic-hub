@@ -43,7 +43,7 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
     async function render() {
       try {
         const data = await pdfBlob.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        const pdf = await pdfjsLib.getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise;
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         const cssWidth = Math.max(280, width - 32);
 
