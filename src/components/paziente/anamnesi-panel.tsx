@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
-import { renderPdfInWindow } from "@/lib/pdf-viewer";
+import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 
 type ReactNode = React.ReactNode;
 
@@ -106,6 +106,8 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const [forking, setForking] = React.useState(false);
   const [signDlgOpen, setSignDlgOpen] = React.useState(false);
   const [cartaceoDlgOpen, setCartaceoDlgOpen] = React.useState(false);
+  const [draftPdfBlob, setDraftPdfBlob] = React.useState<Blob | null>(null);
+  const [draftPdfOpen, setDraftPdfOpen] = React.useState(false);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
