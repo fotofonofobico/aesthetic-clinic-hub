@@ -606,6 +606,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
         filename="bozza-anamnesi.pdf"
       />
 
+      <SignatureSessionDialog
+        open={visitaOpen}
+        session={visitaSession}
+        onClose={() => setVisitaOpen(false)}
+        onCompleted={() => {
+          setVisitaOpen(false);
+          void load();
+          onSaved();
+        }}
+      />
+
       {/* === 1. GENERALE === */}
       <Card>
         <CardHeader>
