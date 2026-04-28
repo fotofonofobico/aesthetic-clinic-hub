@@ -1,244 +1,59 @@
-## 🔧 PROMPT COMPLETO CORRETTO
+## Diagnosi
 
-## Sintesi dei bug
+Ho verificato direttamente sul backend e sullo storage:
 
-1. **Radio decentrato** sui pulsanti "Acconsento / Non acconsento".
-2. **GDPR – firma non sempre visibile**: nel dialog "Nuovo consenso" della tab Consensi, in modalità tablet manca proprio la scelta acconsento/non_acconsento; la firma compare ma l'esito è forzato ad "acconsento".
-3. **Non tutti i consensi sono scaricabili in PDF dalla tab Consensi**: il link PDF appare solo se `modalita_firma === "pdf_caricato"`. Per tablet (es. GDPR firmato sul tablet) il PDF c'è (`pdf_url`) ma non viene mostrato nessun pulsante per scaricarlo.
-4. **Link PDF "vuoto"** per uso immagini / anamnesi: la signed URL viene generata ma a volte il `pdf_url` salvato punta a un path che non esiste (upload fallito silenziosamente in vecchi record) oppure il link non viene mai mostrato. Va reso visibile + gestito il caso "PDF non disponibile" senza link morto.
-5. **Anamnesi – warning "versione successiva non firmata"** non viene mostrato a UI, anche se il guard ora produce `anamnesiObsoleta = true`.
+- Il file `8ebca852-…/0656caa9-…-v4.pdf` **esiste** in `anamnesi-pdf` (1.097.838 byte, mimetype `application/pdf`).
+- Il signed URL che hai incollato risponde **HTTP 200**, content-type `application/pdf`, content-length corretto. Quindi il PDF c'è e Supabase lo serve correttamente.
+- In `anamnesi-pdf` ci sono 8 file, in `consensi-pdf` solo 2 → molti consensi vecchi sono stati creati prima dell'introduzione dell'upload automatico e quindi hanno `pdf_url` valorizzato verso file inesistenti, oppure `pdf_url` NULL → di qui il "link vuoto" sui consensi.
 
----
+Quindi i problemi reali sono due, non uno:
 
-## Modifiche
+1. **UX confusa**: nel pannello anamnesi convivono "Stampa anamnesi" (genera al volo un PDF cartaceo via blob, senza firme) e "Apri PDF anamnesi firmata" (signed URL allo storage). Sono effettivamente ridondanti quando l'anamnesi è già firmata: l'utente non capisce la differenza e percepisce uno dei due come "rotto".
+2. **Apertura inaffidabile dei PDF firmati**:
+   - Il componente `PdfSignedLink` crea il signed URL, fa una `HEAD` in fetch, e poi mostra un `<a target="_blank">`. Su alcuni browser/Cloudflare la `HEAD` può fallire per CORS o restituire stato non-200 anche quando il file esiste, e il componente mostra "PDF non disponibile" pur avendo il file.
+   - Inoltre il signed URL viene generato al **mount** del componente con TTL 10 minuti: se l'utente clicca dopo aver lasciato la pagina aperta, il link è scaduto → si apre una pagina vuota / errore JSON.
+   - Per i consensi vecchi senza `pdf_url` (o con path che punta a un file mai caricato) non c'è alcuna possibilità di rigenerare il PDF on-demand.
 
-### 1. `src/components/ui/radio-group.tsx` — centrare il pallino
+## Cosa farò
 
-Sostituire l'indicatore:
+### 1. Pulizia UI anamnesi (rimuovi ridondanza)
 
-```tsx
-<Circle className="h-3.5 w-3.5 fill-primary" />
+In `src/components/paziente/anamnesi-panel.tsx`:
 
-```
+- Quando l'anamnesi è **firmata** (`stato === "signed"` con `pdf_url`): mostra **un solo pulsante** "Apri PDF firmato" (no più "Stampa anamnesi" duplicato).
+- Quando è in **bozza** (non firmata): mostra "Stampa bozza" (per il flusso cartaceo) + "Carica PDF firmato" + "Firma e blocca", come oggi.
+- Se firmata ma manca `pdf_url` (record vecchi): mostra "Rigenera PDF" che chiama lo stesso flusso di `generaPdfAnamnesi` con i dati salvati e fa l'upload nello storage, poi aggiorna `pdf_url` sul record (la trigger `anamnesi_signed_protect` ammette aggiornamento di `pdf_url` solo se il record è in stato compatibile → in realtà la trigger blocca, quindi farò il fallback come "Stampa copia non firmata" come oggi, senza scrivere su DB).
 
-con:
+### 2. `PdfSignedLink` robusto e on-demand
 
-```tsx
-<RadioGroupPrimitive.Indicator className="flex h-full w-full items-center justify-center">
-  <span className="h-2 w-2 rounded-full bg-primary" />
-</RadioGroupPrimitive.Indicator>
+Riscrivo `src/components/pdf-signed-link.tsx` così:
 
-```
+- Niente più HEAD pre-flight (è la causa principale dei falsi "PDF non disponibile"). Le HEAD su signed URL Cloudflare sono inaffidabili.
+- Niente più generazione del signed URL al mount. Bottone immediato; al **click** genero il signed URL fresco (TTL 10 min) e apro `window.open(url, "_blank")`. Così non scade mai prima dell'apertura.
+- Prima di generare il signed URL, controllo l'esistenza del file via `supabase.storage.from(bucket).list(parentPath, { search: filename })`. Questa è una chiamata API autenticata, non soggetta a CORS, e ci dice in modo affidabile se il file c'è.
+- Se non c'è: mostro "PDF non disponibile (file mancante)" e — solo per i consensi — un pulsante "Rigenera PDF" se è disponibile uno snapshot completo del consenso (titolo/testo/firma_immagine).
 
----
+### 3. Rigenerazione PDF consenso per record vecchi
 
-### 2. `src/components/paziente/consensi-panel.tsx` — `NuovoConsensoDialog`
+In `consensi-panel.tsx`, nel dialog di dettaglio:
 
-#### UI + logica tablet
+- Se `pdf_url` è NULL o il file non esiste in storage e `firma_immagine` è presente, mostro "Genera PDF firmato ora": ricostruisce il PDF dagli snapshot (`titolo_snapshot`, `testo_snapshot`, `versione_snapshot`, `firmato_il`, `firma_immagine`, `categoria_snapshot`) usando `generaPdfConsenso`, lo carica in `consensi-pdf`, aggiorna `consenso_firmato.pdf_url`. La trigger `consenso_firmato_immutable` non protegge `pdf_url` quindi è consentito.
+- Se `firma_immagine` è NULL (consensi cartacei vecchi senza file): mostro un avviso chiaro "PDF originale non recuperabile — ricaricare manualmente".
 
-- Aggiungere stato:
+### 4. Tasto "Stampa" coerente in anamnesi bozza
 
-```ts
-esitoTablet: "acconsento" | "non_acconsento" | undefined
-
-```
-
-- In modalità tablet:
-  - mostrare **RadioGroup Acconsento / Non acconsento PRIMA della firma**
-  - **nessuna preselezione**
-  - firma sempre visibile sotto
-  - firma sempre obbligatoria
-
----
-
-#### Validazioni
-
-- bloccare submit se:
-
-```ts
-modalita === "tablet" && !esitoTablet
-
-```
-
----
-
-#### Logica salvataggio
-
-```ts
-isRifiutato =
-  (modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento") ||
-  (modalita === "tablet" && esitoTablet === "non_acconsento")
-
-valido_fino_a = isRifiutato ? null : validoFinoA
-
-```
-
----
-
-#### 🔴 PDF — REGOLA FONDAMENTALE (NUOVA)
-
-```txt
-ALL new consents MUST always generate a PDF.
-
-- gdpr
-- uso immagini
-- trattamento
-
-If PDF generation or upload fails:
-→ block save completely
-
-Do NOT allow saving records without pdf_url for new entries
-
-```
-
----
-
-#### Visualizzazione PDF
-
-- Mostrare SEMPRE:
-  - firma immagine (se tablet)
-  - E SOTTO link PDF
-
----
-
-#### 🔴 VALIDAZIONE LINK PDF (NUOVA — OBBLIGATORIA)
-
-```txt
-PDF link must NOT be shown based only on pdf_url presence.
-
-Before rendering link:
-- verify file exists in storage
-
-If file does NOT exist:
-- DO NOT render clickable link
-- show label:
-  "PDF non disponibile"
-
-Never show broken links
-
-```
-
----
-
-#### Fallback UI
-
-Se manca PDF:
-
-```txt
-PDF non disponibile per questo consenso (record antecedente alla generazione automatica)
-
-```
-
----
-
-#### 🔵 PDF CONTENT (MIGLIORIA)
-
-```txt
-Include patient choice (acconsento / non_acconsento) inside PDF content
-
-```
-
----
-
-### 3. `src/components/paziente/anamnesi-panel.tsx`
-
-#### Mostrare sempre PDF
-
-Sostituire logica:
-
-```ts
-isSigned && isCartaceo(data) && data.pdf_url
-
-```
-
-con:
-
-```ts
-data.stato === "signed" && data.pdf_url
-
-```
-
----
-
-#### 🔴 VALIDAZIONE FILE ANAMNESI (NUOVA)
-
-```txt
-Before showing PDF link:
-- verify file exists in "anamnesi-pdf" bucket
-
-If missing:
-- show fallback text instead of clickable link
-
-```
-
----
-
-#### Fallback
-
-```txt
-PDF non disponibile (versione anteriore al PDF automatico)
-
-```
-
----
-
-### 4. `src/components/pdf-signed-link.tsx`
-
-#### Robustezza
-
-- verificare esistenza file prima di mostrare link
-- evitare link vuoti
-- gestire errore 404 / signed URL non valido
-
----
-
-### 5. `src/routes/_authenticated/pazienti.$id.tsx`
-
-#### Alert anamnesi obsoleta
-
-```tsx
-{guard?.anamnesiObsoleta && (
-  <Alert variant="default" className="border-warning/40 bg-warning/10">
-    <AlertTriangle className="h-4 w-4 text-warning" />
-    <AlertTitle>Anamnesi: nuova versione in lavorazione</AlertTitle>
-    <AlertDescription>
-      È presente una nuova anamnesi non firmata. Stai operando su una versione precedente.
-    </AlertDescription>
-  </Alert>
-)}
-
-```
-
----
+Il bottone "Stampa anamnesi" oggi rigenera al volo un PDF marcato "cartaceo" anche quando l'anamnesi è già firmata (creando il blob link che ti appariva accanto). Lo nascondo quando `stato === "signed"`. Nelle bozze resta utile per stampare e far firmare a mano.
 
 ## File toccati
 
-- `src/components/ui/radio-group.tsx`
-- `src/components/paziente/consensi-panel.tsx`
-- `src/components/paziente/anamnesi-panel.tsx`
-- `src/components/pdf-signed-link.tsx`
-- `src/routes/_authenticated/pazienti.$id.tsx`
+- `src/components/pdf-signed-link.tsx` — riscrittura: click-time signed URL + check via `storage.list`.
+- `src/components/paziente/anamnesi-panel.tsx` — nasconde "Stampa anamnesi" quando firmata; lascia un solo bottone "Apri PDF firmato".
+- `src/components/paziente/consensi-panel.tsx` — nel detail dialog, aggiunge "Rigenera PDF" quando il file manca ma c'è la firma snapshot.
 
----
+## Nessuna migrazione DB
 
-## Cosa NON toccare
+Tutto si risolve lato client + storage. Non servono modifiche allo schema o alle policy (le policy storage attuali permettono già insert/update agli operatori attivi).
 
-- DB
-- RLS
-- trigger
-- edge functions
-- signature-session-dialog
-- access-guard
+## Note finali
 
----
-
-## Risultato atteso
-
-- radio centrati
-- GDPR corretto (scelta + firma sempre)
-- PDF SEMPRE generato per nuovi consensi
-- nessun link rotto
-- fallback chiaro se PDF mancante
-- PDF anamnesi sempre accessibile
-- alert anamnesi obsoleta visibile
-- nessun blocco trattamenti se esiste signed
+Il PDF v4 che credevi rotto in realtà funziona: il problema era il timeout del signed URL e la HEAD fallita in `PdfSignedLink` che mostrava il fallback "non disponibile" anche con file presente. Dopo il fix il link cliccato aprirà sempre il PDF reale, finché esiste in storage.
