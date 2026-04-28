@@ -292,8 +292,44 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
   const fa = data.farmacologica ?? {};
   const es = data.estetica ?? {};
 
+  const isSigned = data.stato === "signed";
+
   return (
     <div className="space-y-4">
+      {/* === Stato firma === */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 p-3 text-sm ${
+          isSigned
+            ? "border-success/40 bg-success/10"
+            : "border-warning/40 bg-warning/10"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          {isSigned ? (
+            <Lock className="h-4 w-4 text-success" />
+          ) : (
+            <FileSignature className="h-4 w-4 text-warning" />
+          )}
+          <span>
+            {isSigned
+              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""}`
+              : `Bozza v${data.versione_numero ?? 1} — non ancora firmata`}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {isSigned ? (
+            <Button size="sm" variant="outline" onClick={() => void nuovaVersioneDraft()}>
+              Nuova versione
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => void firmaAnamnesi()} disabled={signing}>
+              <FileSignature className="h-4 w-4" />
+              {signing ? "Firma in corso…" : "Firma e blocca"}
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* === 1. GENERALE === */}
       <Card>
         <CardHeader>
