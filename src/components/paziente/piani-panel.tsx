@@ -1241,13 +1241,25 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                         value={p.stato}
                         onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
                       >
-                        <SelectTrigger className="h-8 w-36">
+                        <SelectTrigger
+                          className="h-8 w-36"
+                          title={
+                            p.stato === "completato"
+                              ? "Stato impostato automaticamente al termine di tutte le sedute"
+                              : undefined
+                          }
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="attivo">Attivo</SelectItem>
                           <SelectItem value="sospeso">Sospeso</SelectItem>
                           <SelectItem value="annullato">Annullato</SelectItem>
+                          {p.stato === "completato" && (
+                            <SelectItem value="completato" disabled>
+                              Completato (auto)
+                            </SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
