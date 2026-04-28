@@ -449,6 +449,10 @@ function NuovoConsensoDialog({
       toast.error("Seleziona un modello");
       return;
     }
+    if (modalita === "tablet" && !esitoTablet) {
+      toast.error("Seleziona Acconsento o Non acconsento");
+      return;
+    }
     if (modalita === "tablet" && (!sigRef.current || sigRef.current.isEmpty())) {
       toast.error("La firma è obbligatoria");
       return;
@@ -464,7 +468,9 @@ function NuovoConsensoDialog({
         ? new Date(`${dataFirmaCartaceo}T12:00:00`)
         : new Date();
     const validoFinoA = calcValidoFinoA(tpl, firmatoIl);
-    const isRifiutato = modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento";
+    const isRifiutato =
+      (modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento") ||
+      (modalita === "tablet" && esitoTablet === "non_acconsento");
 
     let firmaImmagine: string | null = null;
     let pdfPath: string | null = null;
