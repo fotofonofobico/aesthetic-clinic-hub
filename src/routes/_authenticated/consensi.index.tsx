@@ -119,12 +119,12 @@ function ConsensiPage() {
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <FileSignature className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nessun modello di consenso ancora creato.
+              Nessun template consenso ancora creato.
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Crea il primo modello
+                Crea il primo template
               </Button>
             )}
           </CardContent>
