@@ -25,6 +25,7 @@ import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
+import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launcher";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -150,6 +151,7 @@ function PazienteDetailPage() {
             <FileSignature className="h-4 w-4" />
             Firma visita
           </Button>
+          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load()} />
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}

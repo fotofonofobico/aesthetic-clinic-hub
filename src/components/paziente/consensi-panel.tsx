@@ -43,6 +43,7 @@ import {
   type ConsensoModalitaFirma,
 } from "@/types/trattamenti";
 import { STATO_BADGE } from "@/lib/consensi-engine";
+import { ShareConsensoButton } from "@/components/share-consenso-button";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
@@ -294,17 +295,20 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
                   </p>
                 )}
 
-                {isMedico && !viewing.revocato_il && (
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void revoca(viewing)}
-                      className="text-destructive"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Revoca consenso
-                    </Button>
+                {!viewing.revocato_il && (
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                    <ShareConsensoButton consensoId={viewing.id} />
+                    {isMedico && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void revoca(viewing)}
+                        className="text-destructive"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Revoca consenso
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -360,6 +364,13 @@ function NuovoConsensoDialog({
   const [signed, setSigned] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  // Metadati cartaceo
+  const [dataFirmaCartaceo, setDataFirmaCartaceo] = useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [esitoCartaceo, setEsitoCartaceo] = useState<"acconsento" | "non_acconsento">(
+    "acconsento",
+  );
   const sigRef = React.useRef<SignaturePadHandle>(null);
 
   const tpl = templates.find((t) => t.id === tplId) ?? null;
@@ -370,7 +381,45 @@ function NuovoConsensoDialog({
     setNote("");
     setSigned(false);
     setPdfFile(null);
+    setDataFirmaCartaceo(new Date().toISOString().slice(0, 10));
+    setEsitoCartaceo("acconsento");
     sigRef.current?.clear();
+  }
+
+  function stampaTemplate() {
+    if (!tpl) return;
+    const w = window.open("", "_blank");
+    if (!w) {
+      toast.error("Abilita i popup per stampare");
+      return;
+    }
+    const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${tpl.titolo}</title><style>
+      body{font-family:Georgia,serif;max-width:780px;margin:32px auto;padding:0 24px;color:#111}
+      h1{font-size:20px;margin:0 0 4px}
+      .meta{font-size:11px;color:#666;margin-bottom:18px}
+      pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.5}
+      .firme{margin-top:48px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+      .firma{border-top:1px solid #333;padding-top:6px;font-size:11px;color:#444}
+      .scelta{margin:24px 0;font-size:13px}
+      .scelta label{display:inline-flex;align-items:center;gap:6px;margin-right:18px}
+      @media print{body{margin:0}}
+      </style></head><body>
+      <h1>${tpl.titolo}</h1>
+      <div class="meta">Versione ${tpl.versione} · da firmare a mano</div>
+      <pre>${tpl.testo.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>
+      <div class="scelta">
+        Scelta del paziente:
+        <label>☐ Acconsento</label>
+        <label>☐ Non acconsento</label>
+      </div>
+      <div class="firme">
+        <div class="firma">Firma del paziente · data __________</div>
+        <div class="firma">Firma del medico · data __________</div>
+      </div>
+      <script>window.onload=()=>setTimeout(()=>window.print(),200)</script>
+      </body></html>`;
+    w.document.write(html);
+    w.document.close();
   }
 
   function calcValidoFinoA(t: ConsensoTemplate, firmatoIl: Date): string | null {
@@ -403,8 +452,13 @@ function NuovoConsensoDialog({
       return;
     }
     setSaving(true);
-    const firmatoIl = new Date();
+    // Per il cartaceo usiamo la data dichiarata; per tablet la data di firma effettiva
+    const firmatoIl =
+      modalita === "pdf_caricato" && dataFirmaCartaceo
+        ? new Date(`${dataFirmaCartaceo}T12:00:00`)
+        : new Date();
     const validoFinoA = calcValidoFinoA(tpl, firmatoIl);
+    const isRifiutato = modalita === "pdf_caricato" && esitoCartaceo === "non_acconsento";
 
     let firmaImmagine: string | null = null;
     let pdfPath: string | null = null;
@@ -428,8 +482,18 @@ function NuovoConsensoDialog({
     const integrita = await sha256Hex(
       `${tpl.titolo}|${tpl.testo}|${tpl.versione}|${firmatoIl.toISOString()}|${
         firmaImmagine?.length ?? pdfFile?.size ?? 0
-      }`,
+      }|${modalita}|${isRifiutato ? "rif" : "acc"}`,
     );
+
+    const noteFinali =
+      modalita === "pdf_caricato"
+        ? [
+            `Firma cartacea — esito: ${isRifiutato ? "Non acconsento" : "Acconsento"}`,
+            note.trim() ? note.trim() : null,
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : note.trim() || null;
 
     const { error } = await supabase.from("consenso_firmato").insert({
       paziente_id: pazienteId,
@@ -443,11 +507,12 @@ function NuovoConsensoDialog({
       firma_immagine: firmaImmagine,
       pdf_url: pdfPath,
       firmato_il: firmatoIl.toISOString(),
-      valido_fino_a: validoFinoA,
+      valido_fino_a: isRifiutato ? null : validoFinoA,
       user_agent: navigator.userAgent,
       operatore_testimone: user?.id ?? null,
       hash_integrita: integrita,
-      note: note.trim() || null,
+      rifiutato: isRifiutato,
+      note: noteFinali,
     });
     setSaving(false);
     if (error) {
@@ -531,18 +596,59 @@ function NuovoConsensoDialog({
             />
           </div>
         ) : (
-          <div>
-            <Label>PDF firmato *</Label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label>PDF firmato a mano *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={stampaTemplate}
+                disabled={!tpl}
+              >
+                <FileText className="h-4 w-4" />
+                Stampa modulo vuoto
+              </Button>
+            </div>
             <Input
               type="file"
               accept="application/pdf,image/*"
               onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
             />
             {pdfFile && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {pdfFile.name} · {(pdfFile.size / 1024).toFixed(0)} KB
               </p>
             )}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label>Data firma *</Label>
+                <Input
+                  type="date"
+                  value={dataFirmaCartaceo}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDataFirmaCartaceo(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Esito *</Label>
+                <Select
+                  value={esitoCartaceo}
+                  onValueChange={(v) => setEsitoCartaceo(v as "acconsento" | "non_acconsento")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="acconsento">Acconsento</SelectItem>
+                    <SelectItem value="non_acconsento">Non acconsento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cartaceo e digitale hanno lo stesso valore: stati, scadenze e blocchi vengono applicati allo stesso modo.
+            </p>
           </div>
         )}
 
