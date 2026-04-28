@@ -497,24 +497,46 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
           )}
           <span>
             {isSigned
-              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""} — modifica un campo per creare una nuova versione`
+              ? `Firmata v${data.versione_numero}${data.firmata_il ? ` il ${new Date(data.firmata_il).toLocaleString("it-IT")}` : ""}${isCartaceo(data) ? " · cartacea" : ""} — modifica un campo per creare una nuova versione`
               : `Bozza v${data.versione_numero ?? 1} — richiede firma del paziente`}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void stampaAnamnesi()}>
+            <Printer className="h-4 w-4" />
+            Stampa anamnesi
+          </Button>
           {!isSigned && (
-            <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
-              <FileSignature className="h-4 w-4" />
-              {signing ? "Firma in corso…" : "Firma e blocca"}
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={() => setCartaceoDlgOpen(true)} disabled={signing || forking}>
+                <Upload className="h-4 w-4" />
+                Carica PDF firmato
+              </Button>
+              <Button size="sm" onClick={openSignDialog} disabled={signing || forking}>
+                <FileSignature className="h-4 w-4" />
+                {signing ? "Firma in corso…" : "Firma e blocca"}
+              </Button>
+            </>
           )}
         </div>
       </div>
+      {isSigned && isCartaceo(data) && data.pdf_url && (
+        <PdfSignedLink bucket="anamnesi-pdf" path={data.pdf_url} label="Apri PDF cartaceo firmato" />
+      )}
       {forking && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <History className="h-3 w-3" /> Creazione nuova versione in corso…
         </p>
       )}
+
+      {/* Dialog upload cartaceo */}
+      <CartaceoUploadDialog
+        open={cartaceoDlgOpen}
+        onClose={() => setCartaceoDlgOpen(false)}
+        onConfirm={(file, dataFirma) => caricaCartaceo(file, dataFirma)}
+        saving={signing}
+      />
+
 
       {/* === 1. GENERALE === */}
       <Card>
