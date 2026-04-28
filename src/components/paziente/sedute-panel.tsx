@@ -228,16 +228,27 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
 
   const programmate = righe
     .filter((r) => !r.completata)
-    .sort((a, b) => new Date(a.data_seduta).getTime() - new Date(b.data_seduta).getTime());
+    .sort((a, b) => {
+      // "Da definire" in fondo
+      if (!a.data_seduta && !b.data_seduta) return 0;
+      if (!a.data_seduta) return 1;
+      if (!b.data_seduta) return -1;
+      return new Date(a.data_seduta).getTime() - new Date(b.data_seduta).getTime();
+    });
   const eseguite = righe
     .filter((r) => r.completata)
-    .sort(
-      (a, b) =>
-        new Date(dataClinica(b)).getTime() - new Date(dataClinica(a)).getTime(),
-    );
+    .sort((a, b) => {
+      const da = dataClinica(a);
+      const db = dataClinica(b);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return new Date(db).getTime() - new Date(da).getTime();
+    });
 
   const inRitardo = programmate.filter((r) => statoSeduta(r) === "in_ritardo").length;
   const oggi = programmate.filter((r) => statoSeduta(r) === "oggi").length;
+  const daDefinire = programmate.filter((r) => statoSeduta(r) === "da_definire").length;
 
   const visibili =
     filtro === "programmate"
