@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
 import { sha256Hex } from "@/lib/hash";
+import { generaPdfConsenso } from "@/lib/pdf-consenso";
 import {
   CATEGORIA_LABELS,
   type ConsensoFirmato,
