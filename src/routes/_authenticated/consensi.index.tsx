@@ -254,12 +254,18 @@ function TemplateDialog({
   const [versione, setVersione] = useState(editing?.versione ?? "1.0");
   const [tipoUI, setTipoUI] = useState<TipoUI>(initialMap.tipo);
   const [modValidita, setModValidita] = useState<ModValidita>(initialMap.mod);
+  const [cicloDurataTipo, setCicloDurataTipo] = useState<"mesi" | "sedute">(
+    editing?.durata_tipo === "sedute" ? "sedute" : "mesi",
+  );
   const [cicloDurata, setCicloDurata] = useState<string>(
     editing?.categoria === "trattamento_ciclo"
-      ? String(editing.validita_mesi ?? 12)
+      ? String(
+          editing.durata_tipo === "sedute"
+            ? editing.durata_sedute ?? 3
+            : editing.validita_mesi ?? 12,
+        )
       : "12",
   );
-  const [cicloUnita, setCicloUnita] = useState<"giorni" | "mesi">("mesi");
   const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
   const [trattamentoId, setTrattamentoId] = useState<string>(
     editing?.trattamento_id ?? "",
@@ -279,12 +285,16 @@ function TemplateDialog({
     setVersione(editing?.versione ?? "1.0");
     setTipoUI(map.tipo);
     setModValidita(map.mod);
+    setCicloDurataTipo(editing?.durata_tipo === "sedute" ? "sedute" : "mesi");
     setCicloDurata(
       editing?.categoria === "trattamento_ciclo"
-        ? String(editing.validita_mesi ?? 12)
+        ? String(
+            editing.durata_tipo === "sedute"
+              ? editing.durata_sedute ?? 3
+              : editing.validita_mesi ?? 12,
+          )
         : "12",
     );
-    setCicloUnita("mesi");
     setDescrizione(editing?.descrizione ?? "");
     setTrattamentoId(editing?.trattamento_id ?? "");
     setLegacyAnamnesi(editing?.categoria === "anamnesi");
