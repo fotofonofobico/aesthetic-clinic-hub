@@ -669,6 +669,7 @@ function NuovoConsensoDialog({
   }
 
   return (
+    <>
     <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-display">Nuovo consenso informato</DialogTitle>
