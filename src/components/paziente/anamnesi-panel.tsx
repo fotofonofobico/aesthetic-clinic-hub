@@ -379,13 +379,20 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
     onSaved();
   }
 
-  function openSignDialog() {
+  async function openSignDialog() {
     if (!data) return;
     if (data.stato === "signed") {
       toast.info("Già firmata. Modifica un campo per creare una nuova versione.");
       return;
     }
-    setSignDlgOpen(true);
+    // Avvia sessione visita unificata: anamnesi + eventuali consensi GDPR/uso immagini
+    const session = await buildVisitaSession(pazienteId);
+    if (!session) {
+      toast.success("Tutto in regola: nessuna firma necessaria");
+      return;
+    }
+    setVisitaSession(session);
+    setVisitaOpen(true);
   }
 
   function confermaFirma() {
