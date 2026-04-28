@@ -43,6 +43,7 @@ interface TemplateOption {
   id: string;
   titolo: string;
   versione: string;
+  categoria: string;
 }
 
 function TrattamentiPage() {
@@ -64,8 +65,9 @@ function TrattamentiPage() {
       supabase.from("trattamenti").select("*").order("nome"),
       supabase
         .from("consenso_template")
-        .select("id, titolo, versione")
+        .select("id, titolo, versione, categoria")
         .eq("attivo", true)
+        .in("categoria", ["trattamento_singolo", "trattamento_ciclo"])
         .order("titolo"),
     ]);
     if (tratt.error) toast.error(tratt.error.message);
@@ -303,6 +305,15 @@ function TrattamentoDialog({
       toast.error("Collega un consenso al trattamento");
       return;
     }
+    const selectedTemplate = templates.find((t) => t.id === consensoId);
+    if (tipo === "ciclo" && selectedTemplate?.categoria !== "trattamento_ciclo") {
+      toast.error("Per un ciclo serve un consenso ciclo");
+      return;
+    }
+    if (tipo === "singolo" && selectedTemplate?.categoria !== "trattamento_singolo") {
+      toast.error("Per un trattamento singolo serve consenso singolo");
+      return;
+    }
 
     setSaving(true);
     const payload = {
@@ -432,9 +443,28 @@ function TrattamentoDialog({
           </Select>
           {templates.length === 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Crea prima un template consenso nella sezione Consensi.
+              Crea prima un template consenso (categoria trattamento) nella sezione Consensi.
             </p>
           )}
+          {(() => {
+            const sel = templates.find((t) => t.id === consensoId);
+            if (!sel) return null;
+            if (sel.categoria === "trattamento_singolo") {
+              return (
+                <p className="mt-1 text-xs text-success">
+                  ✔ Consenso singolo: verrà richiesto a ogni seduta
+                </p>
+              );
+            }
+            if (sel.categoria === "trattamento_ciclo") {
+              return (
+                <p className="mt-1 text-xs text-success">
+                  ✔ Consenso ciclo: valido per tutta la durata del trattamento
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
