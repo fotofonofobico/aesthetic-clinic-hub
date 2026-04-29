@@ -37,7 +37,7 @@ export async function listMarche(soloAttive = true): Promise<Marca[]> {
 }
 
 export async function creaMarca(nome: string): Promise<Marca> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { data, error } = await supabase
     .from("prodotto_marca")
     .insert({ nome: nome.trim(), created_by: uid })
@@ -72,7 +72,7 @@ export async function creaFornitore(input: {
   nome: string;
   contatti?: Fornitore["contatti"];
 }): Promise<Fornitore> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { data, error } = await supabase
     .from("prodotto_fornitore")
     .insert({ nome: input.nome.trim(), contatti: input.contatti ?? {}, created_by: uid })
@@ -159,7 +159,7 @@ export interface CreaProdottoInput {
 }
 
 export async function creaProdotto(input: CreaProdottoInput): Promise<Prodotto> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { data, error } = await supabase
     .from("prodotto")
     .insert({
@@ -234,7 +234,7 @@ export interface CreaLottoInput {
 
 /** Crea lotto + movimento di carico */
 export async function creaLotto(input: CreaLottoInput): Promise<Lotto> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { data, error } = await supabase
     .from("prodotto_lotto")
     .insert({
@@ -272,7 +272,7 @@ export async function aggiungiCarico(
   quantita: number,
   costo?: number | null,
 ): Promise<void> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { error } = await supabase.from("magazzino_movimento").insert({
     prodotto_id,
     lotto_id,
@@ -292,7 +292,7 @@ export async function registraScaricoManuale(input: {
   tipo: "scarico" | "scarto_scadenza";
   motivazione: string;
 }): Promise<void> {
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { error } = await supabase.from("magazzino_movimento").insert({
     prodotto_id: input.prodotto_id,
     lotto_id: input.lotto_id,
@@ -317,7 +317,7 @@ export async function rettificaInventario(input: {
   }
   const delta = input.quantita_reale - input.quantita_attuale;
   if (delta === 0) return;
-  const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+  const uid = await requireUserId();
   const { error } = await supabase.from("magazzino_movimento").insert({
     prodotto_id: input.prodotto_id,
     lotto_id: input.lotto_id,
