@@ -1,56 +1,50 @@
-## Cosa cambia
+# Fix bug "Invia a tablet"
 
-**Principio**: ovunque compaia il **trackpad bianco** per firmare (paziente o medico), deve esserci subito accanto un'alternativa **"Invia a tablet"** che chiude il flusso locale e delega la firma al device in modalità firma. Inoltre rimuovo le doppie esposizioni del bottone fatte nello step precedente in `AnamnesiPanel` / `ConsensiPanel` (header), perché vanno **dentro** ai dialog di firma, non fuori.
+Tre problemi distinti, una causa comune di fondo (dialog Mac che si smonta troppo presto), più due problemi di UI sul tablet.
 
-### 1. Rinomina universale del bottone
-Tutte le occorrenze di **"📱 Invia a tablet"** diventano **"Invia a tablet"** (l'icona `Tablet` di lucide è già nel `SendToTabletButton`).
+## Bug 1 — Mac non riceve la firma → loop apparente (causa principale)
 
-### 2. Rimozione bottoni dagli header dei panel paziente
-- `src/components/paziente/anamnesi-panel.tsx`: rimuovo il `SendToTabletButton` aggiunto accanto a "Firma e blocca" nell'header.
-- `src/components/paziente/consensi-panel.tsx`: rimuovo l'intera sezione "Sessione visita" (sia "Firma sul Mac" sia "Invia a tablet") nell'header.
-- La prop `pazienteNome` resta in entrambi i panel — la useremo nei punti inline (vedi 4 e 5).
+**Cosa succede oggi.** Quando dentro `SignatureSessionDialog` (sul Mac) si clicca "Invia a tablet" del helper interno `OppureInviaTablet`, l'`onSent` chiama `onClose()` del dialog padre. Questo smonta `SignatureSessionDialog` e con esso anche il `SendToTabletButton` interno, che è l'unico componente che ha montato `WaitForTabletDialog` + `MedicoFinalizeDialog`. Risultato: l'iPad firma, scrive `stato=signed` su `firma_sessione`, ma sul Mac non c'è più nessun listener Realtime → nessun popup di finalizzazione, niente salvataggio. L'utente ripreme "Firma consenso", crea una NUOVA sessione, l'iPad la apre → sembra un loop.
 
-### 3. "Invia a tablet" dentro `SignatureSessionDialog`
-File: `src/components/signature-session-dialog.tsx`.
+**Fix.** Promuovere la gestione "invio a tablet" a livello del **chiamante** del `SignatureSessionDialog`, non dentro al dialog. Concretamente:
 
-In ognuna delle tre fasi che mostrano un `SignaturePad` (consensi combinati, anamnesi singolo, trattamento singolo), aggiungo subito sotto il pad una riga separatore con testo "oppure" e un `<SendToTabletButton>` che:
-- usa `buildSession={async () => session}` (passa la stessa sessione corrente);
-- `pazienteNome` ricavato dalla sessione (passata già al dialog);
-- `onSent`: chiude il dialog locale (`onClose()`) — la finalizzazione avverrà via `MedicoFinalizeDialog` aperto dal SendToTabletButton stesso;
-- `onCompleted`: invoca l'`onCompleted()` del dialog per aggiornare i panel a monte.
+1. In `signature-session-dialog.tsx` rimuovere il helper interno `OppureInviaTablet` accanto ai trackpad. Al suo posto un bottone semplice "Invia a tablet" che invoca una nuova prop `onInviaTablet?: (session) => void`. Quando cliccato:
+   - chiude il dialog locale (chiamando `onClose()`)
+   - delega al genitore la creazione della sessione tablet
 
-Il dialog locale viene chiuso appena la sessione tablet è creata, così non ci sono due flussi sovrapposti.
+2. Aggiungere nei componenti chiamanti (sedute-panel, anamnesi-panel, consensi-panel, piani-panel, firma-trattamento-launcher) uno stato `tabletSession` e renderizzare **fuori** dal `SignatureSessionDialog` il `SendToTabletButton` "headless" — cioè un wrapper che riceve già la sessione costruita e apre direttamente i suoi `WaitForTabletDialog` e `MedicoFinalizeDialog`. Un piccolo componente `TabletSessionRunner` può incapsulare questa logica per non duplicarla.
 
-Il `pazienteNome` non è in `SignatureSession`: aggiungo una prop opzionale `pazienteNome?: string` al componente `SignatureSessionDialog` (default ricavato come stringa vuota → fallback "Paziente"); viene passato dai chiamanti (`AnamnesiPanel`, `ConsensiPanel`, `SeduteList`, `PianiPanel`, `FirmaTrattamentoLauncher`).
+3. Conseguenza: anche se il dialog locale si chiude, `TabletSessionRunner` resta montato → riceve l'evento Realtime `signed` → apre `MedicoFinalizeDialog` → l'utente conferma, viene chiamato `salvaSessioneFirme` + `marcaConsumed`. Loop risolto.
 
-### 4. "Invia a tablet" accanto al `SignaturePad` inline in `consensi-panel.tsx`
-Riga ~857 (firma del singolo consenso compilato inline, fuori dal SessionDialog). Aggiungo `SendToTabletButton` con una `buildSession` lazy che costruisce una mini-sessione monodocumento per quel consenso (riusando la riga di template già caricata). Su `onSent` chiudo il dialog/sezione di firma inline. `onCompleted` ricarica.
+## Bug 2 — Pulsante X morto sul tablet
 
-### 5. "Invia a tablet" accanto ai `SignaturePad` di `anamnesi-panel.tsx` (righe 1017–1023)
-Sezione di firma anamnesi inline (paziente + medico). Aggiungo `SendToTabletButton` con `buildSession` che ritorna `buildVisitaSession(pazienteId)` (già usato qui). Su `onSent` chiude la sezione di firma; `onCompleted` ricarica.
+In `tablet-paziente-sign-dialog.tsx` il `<Dialog open={open}>` non ha `onOpenChange`, quindi il bottone X di shadcn (`DialogPrimitive.Close`) chiama un handler inesistente. In più non esiste alcun modo per il paziente di "passare" o per l'operatore di interrompere lato tablet.
 
-### 6. `sedute-panel.tsx` e `piani-panel.tsx` e `firma-trattamento-launcher.tsx`
-Usano già `SignatureSessionDialog`. Coperti automaticamente dal punto 3. Devo solo:
-- passare `pazienteNome` al dialog dove disponibile;
-- rinominare eventuali stringhe "📱 Invia a tablet" → "Invia a tablet" se presenti come bottoni esterni nel launcher.
+**Fix.** Aggiungere `onOpenChange` al `Dialog` che, se l'utente chiude, chiama `rifiutaFirmaSessione(sessId, "Sessione interrotta dal tablet")` e poi `onCompleted()` per liberare la schermata. Mostrare un piccolo `AlertDialog` di conferma ("Sicuro di interrompere la sessione di firma?") prima di rifiutare, così un tocco accidentale non perde tutto.
 
-## Note tecniche
+## Bug 3 — Layout iPhone non si adatta
 
-- `SendToTabletButton` è già self-contained: gestisce creazione sessione, `WaitForTabletDialog`, `MedicoFinalizeDialog`. Riutilizzato così com'è.
-- Nessuna modifica DB, edge functions, RLS, route, sidebar, types.
-- Nessun cambio al `SignaturePad`.
+Cause:
+- Il `DialogContent` standard ha `w-full max-w-lg`, ma il dialog usa `!max-w-3xl` (forza larghezza grande) → su iPhone la classe `w-full` lo riporta a 100% del viewport, ma con il padding fisso `px-6` e i bottoni `grid-cols-2` di altezza `min-h-[64px]` la viewport verticale diventa troppo piena.
+- Il `SignaturePad` con `height={280}` ha un canvas con larghezza misurata in pixel al primo render: se la dialog è ancora in animazione la larghezza viene sottocalcolata → overflow orizzontale.
+- Il pulsante X di shadcn si sovrappone al pulsante "Documento 1 di 1" del header custom.
 
-## File modificati (stima)
+**Fix UI.**
+1. Rimuovere `!max-w-3xl` e usare `w-[100vw] sm:w-auto sm:max-w-3xl`, aggiungere `h-[100dvh] sm:h-auto sm:max-h-[95vh]` e `flex flex-col` per dare un layout a colonne (header / body scrollabile / footer fisso) — pattern "fullscreen su mobile, dialog su desktop".
+2. Body con `flex-1 overflow-y-auto`, footer con `shrink-0`.
+3. Sul mobile portare i due bottoni "Acconsento / Non acconsento" da `grid-cols-2` a `grid-cols-1 sm:grid-cols-2`, riducendo `min-h-[64px]` a `min-h-[56px]`.
+4. SignaturePad: aggiungere un `ResizeObserver` (o `key={step}` + un breve `requestAnimationFrame`) per ridimensionare il canvas dopo il mount. Già esiste in `signature-pad.tsx`? Da verificare e se manca aggiungere ridisegno on-resize. In ogni caso ridurre `height` su mobile (es. `height={220}` con `sm:height={280}` via prop responsive o calcolata).
+5. Spostare il bottone X del dialog: aggiungere `[&>button]:hidden` sul `DialogContent` per disabilitare il close shadcn nativo, e mettere un nostro bottone "Chiudi" nell'header custom, allineato a destra accanto al countdown.
 
-```text
-src/components/signature-session-dialog.tsx          +70  (3 blocchi "oppure invia a tablet" + prop pazienteNome)
-src/components/paziente/anamnesi-panel.tsx           +12 / -8   (rimozione header bottone, aggiunta inline pad, pass-through)
-src/components/paziente/consensi-panel.tsx           +15 / -55  (rimozione sezione visita header, aggiunta inline pad, pass-through)
-src/components/paziente/sedute-panel.tsx             +1         (passa pazienteNome al dialog)
-src/components/paziente/piani-panel.tsx              +1         (passa pazienteNome al dialog)
-src/components/firma-trattamento-launcher.tsx        +2 / -1    (passa pazienteNome + rinomina)
-```
+## File toccati
 
-## Risultato per l'utente
+- `src/components/signature-session-dialog.tsx` — rimuovere `OppureInviaTablet`, sostituire con bottone che chiama nuova prop `onInviaTablet`.
+- `src/components/firma/tablet-paziente-sign-dialog.tsx` — fix layout responsive, X funzionante con conferma, rifiuto sessione.
+- `src/components/firma/send-to-tablet-button.tsx` — esporre anche una variante "headless" (oppure aggiungere prop `autoStart`) che non renderizza il bottone ma solo i due dialog di attesa/finalizzazione, comandata da una sessione esterna.
+- `src/components/paziente/sedute-panel.tsx`, `consensi-panel.tsx`, `anamnesi-panel.tsx`, `piani-panel.tsx`, `firma-trattamento-launcher.tsx` — montare il runner tablet a livello pannello e gestire `onInviaTablet` del SignatureSessionDialog.
+- (eventuale) `src/components/signature-pad.tsx` — ridisegno canvas su resize se manca.
 
-Ogni volta che vede il **trackpad bianco** — sia nel SessionDialog (visita/trattamento), sia nel form anamnesi inline, sia nella firma di un singolo consenso — trova subito sotto un bottone "Invia a tablet" che trasferisce la firma al device del paziente. I bottoni nell'header dei tab Anamnesi/Consensi spariscono.
+## Note
+
+- Nessuna modifica al DB o alle Edge Function: la pipeline `firma_sessione` → Realtime → `salvaSessioneFirme` resta uguale, fixiamo solo il ciclo di vita lato React.
+- L'X del tablet rifiuta la sessione (stato `refused`): il Mac la vede e chiude il `WaitForTabletDialog` mostrando "il paziente ha rifiutato".
