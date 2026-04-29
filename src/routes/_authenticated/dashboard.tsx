@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, ClipboardList, FileSignature, Syringe, ShieldCheck } from "lucide-react";
+import { CalendarioWidget } from "@/components/calendario/calendario-widget";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
