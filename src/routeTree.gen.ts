@@ -16,6 +16,7 @@ import { Route as AuthenticatedPdfViewerRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedTrattamentiIndexRouteImport } from './routes/_authenticated/trattamenti.index'
 import { Route as AuthenticatedPazientiIndexRouteImport } from './routes/_authenticated/pazienti.index'
+import { Route as AuthenticatedMagazzinoIndexRouteImport } from './routes/_authenticated/magazzino.index'
 import { Route as AuthenticatedConsensiIndexRouteImport } from './routes/_authenticated/consensi.index'
 import { Route as ShareConsensoTokenRouteImport } from './routes/share.consenso.$token'
 import { Route as AuthenticatedPazientiIdRouteImport } from './routes/_authenticated/pazienti.$id'
@@ -57,6 +58,12 @@ const AuthenticatedPazientiIndexRoute =
     path: '/pazienti/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedMagazzinoIndexRoute =
+  AuthenticatedMagazzinoIndexRouteImport.update({
+    id: '/magazzino/',
+    path: '/magazzino/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedConsensiIndexRoute =
   AuthenticatedConsensiIndexRouteImport.update({
     id: '/consensi/',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi/': typeof AuthenticatedConsensiIndexRoute
+  '/magazzino/': typeof AuthenticatedMagazzinoIndexRoute
   '/pazienti/': typeof AuthenticatedPazientiIndexRoute
   '/trattamenti/': typeof AuthenticatedTrattamentiIndexRoute
   '/pazienti/$id/edit': typeof AuthenticatedPazientiIdEditRoute
@@ -100,6 +108,7 @@ export interface FileRoutesByTo {
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi': typeof AuthenticatedConsensiIndexRoute
+  '/magazzino': typeof AuthenticatedMagazzinoIndexRoute
   '/pazienti': typeof AuthenticatedPazientiIndexRoute
   '/trattamenti': typeof AuthenticatedTrattamentiIndexRoute
   '/pazienti/$id/edit': typeof AuthenticatedPazientiIdEditRoute
@@ -114,6 +123,7 @@ export interface FileRoutesById {
   '/_authenticated/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/_authenticated/consensi/': typeof AuthenticatedConsensiIndexRoute
+  '/_authenticated/magazzino/': typeof AuthenticatedMagazzinoIndexRoute
   '/_authenticated/pazienti/': typeof AuthenticatedPazientiIndexRoute
   '/_authenticated/trattamenti/': typeof AuthenticatedTrattamentiIndexRoute
   '/_authenticated/pazienti/$id/edit': typeof AuthenticatedPazientiIdEditRoute
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi/'
+    | '/magazzino/'
     | '/pazienti/'
     | '/trattamenti/'
     | '/pazienti/$id/edit'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi'
+    | '/magazzino'
     | '/pazienti'
     | '/trattamenti'
     | '/pazienti/$id/edit'
@@ -153,6 +165,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pazienti/$id'
     | '/share/consenso/$token'
     | '/_authenticated/consensi/'
+    | '/_authenticated/magazzino/'
     | '/_authenticated/pazienti/'
     | '/_authenticated/trattamenti/'
     | '/_authenticated/pazienti/$id/edit'
@@ -216,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPazientiIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/magazzino/': {
+      id: '/_authenticated/magazzino/'
+      path: '/magazzino'
+      fullPath: '/magazzino/'
+      preLoaderRoute: typeof AuthenticatedMagazzinoIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/consensi/': {
       id: '/_authenticated/consensi/'
       path: '/consensi'
@@ -266,6 +286,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPdfViewerRoute: typeof AuthenticatedPdfViewerRoute
   AuthenticatedPazientiIdRoute: typeof AuthenticatedPazientiIdRouteWithChildren
   AuthenticatedConsensiIndexRoute: typeof AuthenticatedConsensiIndexRoute
+  AuthenticatedMagazzinoIndexRoute: typeof AuthenticatedMagazzinoIndexRoute
   AuthenticatedPazientiIndexRoute: typeof AuthenticatedPazientiIndexRoute
   AuthenticatedTrattamentiIndexRoute: typeof AuthenticatedTrattamentiIndexRoute
 }
@@ -275,6 +296,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPdfViewerRoute: AuthenticatedPdfViewerRoute,
   AuthenticatedPazientiIdRoute: AuthenticatedPazientiIdRouteWithChildren,
   AuthenticatedConsensiIndexRoute: AuthenticatedConsensiIndexRoute,
+  AuthenticatedMagazzinoIndexRoute: AuthenticatedMagazzinoIndexRoute,
   AuthenticatedPazientiIndexRoute: AuthenticatedPazientiIndexRoute,
   AuthenticatedTrattamentiIndexRoute: AuthenticatedTrattamentiIndexRoute,
 }
