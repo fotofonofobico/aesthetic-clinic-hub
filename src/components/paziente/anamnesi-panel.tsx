@@ -1005,6 +1005,24 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
               <div>
                 <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
                 <SignaturePad ref={sigPazRef} />
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    oppure
+                  </span>
+                  <SendToTabletButton
+                    session={null}
+                    pazienteNome={pazienteNome || "Paziente"}
+                    label="Invia a tablet"
+                    size="sm"
+                    buildSession={async () => buildVisitaSession(pazienteId)}
+                    onSent={() => setSignDlgOpen(false)}
+                    onCompleted={() => {
+                      void load();
+                      onSaved();
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <p className="mb-2 text-sm font-medium">
