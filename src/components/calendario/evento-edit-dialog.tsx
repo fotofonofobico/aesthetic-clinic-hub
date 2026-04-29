@@ -12,12 +12,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { CalendarioEventoTipo, EventoCalendario } from "@/types/calendario";
 import { TIPO_LABEL, toLocalInput, fromLocalInput } from "@/lib/calendario";
-
-interface PazienteMin {
-  id: string;
-  nome: string;
-  cognome: string;
-}
+import { PazienteSearch } from "@/components/paziente/paziente-search";
 
 interface Props {
   open: boolean;
