@@ -51,6 +51,7 @@ import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
 import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
 import { ConsumoMagazzinoStep, righeToRigheConsumo, type ConsumoRiga } from "@/components/magazzino/consumo-step";
 import { consumaSeduta } from "@/lib/magazzino";
+import { creaFollowupSePrevisto } from "@/lib/calendario-followup";
 import {
   dataClinica,
   diffPerAudit,
