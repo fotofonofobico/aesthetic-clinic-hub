@@ -49,6 +49,9 @@ import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
