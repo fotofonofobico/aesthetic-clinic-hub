@@ -162,7 +162,7 @@ function allineaProdottiPerSeduta(
 // ---------- consenso per voce piano (lazy) ----------
 type ConsensoVoce = { ok: boolean; motivi: string[]; loading: boolean };
 
-export function PianiPanel({ pazienteId }: { pazienteId: string }) {
+export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
   const { user } = useAuth();
   const [piani, setPiani] = useState<PianoTrattamento[]>([]);
   const [sedutePerPiano, setSedutePerPiano] = useState<Record<string, Seduta[]>>({});
