@@ -152,6 +152,19 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [pendingExecAfterFirma, setPendingExecAfterFirma] = useState<Seduta | null>(null);
 
+  // Foto baseline non bloccante
+  const [baselineDialog, setBaselineDialog] = useState<{
+    seduta: Seduta;
+    incoerenza: boolean;
+  } | null>(null);
+  // Upload rapido foto (post-seduta DOPO o caricamento baseline da dialog)
+  const [uploadFoto, setUploadFoto] = useState<{
+    paziente_id: string;
+    piano_id: string;
+    seduta_id: string | null;
+    momento: FotoMomento;
+  } | null>(null);
+
   useEffect(() => {
     void load();
   }, [pazienteId]);
@@ -264,11 +277,27 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
         ? eseguite
         : [...programmate, ...eseguite];
 
-  function handleEsegui(s: Seduta) {
+  async function handleEsegui(s: Seduta) {
     const c = consensoMap.get(s.id);
     if (c && !c.ok && s.trattamento_id) {
       toast.error("Consenso mancante: firma prima di eseguire la seduta");
       return;
+    }
+    // Check baseline foto non bloccante
+    if (s.piano_id) {
+      const snoozeKey = `foto-baseline-snooze:${s.piano_id}`;
+      const snoozeUntil = Number(localStorage.getItem(snoozeKey) || 0);
+      if (snoozeUntil < Date.now()) {
+        try {
+          const stato = await getStatoPiano(s.piano_id);
+          if (stato && stato.stato === "baseline_mancante") {
+            setBaselineDialog({ seduta: s, incoerenza: stato.incoerenza_data });
+            return;
+          }
+        } catch {
+          // fail silent: non blocchiamo l'esecuzione per un errore foto
+        }
+      }
     }
     setEseguiSeduta(s);
   }
