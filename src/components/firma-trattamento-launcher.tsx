@@ -15,6 +15,7 @@ import { Syringe, Loader2 } from "lucide-react";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 
 interface TrattamentoLite {
   id: string;
@@ -35,6 +36,7 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
   const [building, setBuilding] = useState(false);
   const [session, setSession] = useState<SignatureSession | null>(null);
   const [sessionOpen, setSessionOpen] = useState(false);
+  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
 
   useEffect(() => {
     if (!openSel) return;
@@ -152,9 +154,22 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
       <SignatureSessionDialog
         open={sessionOpen}
         session={session}
+        pazienteNome={pazienteNome}
         onClose={() => setSessionOpen(false)}
         onCompleted={() => {
           setSessionOpen(false);
+          setSelected(new Set());
+          onCompleted?.();
+        }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
           setSelected(new Set());
           onCompleted?.();
         }}
