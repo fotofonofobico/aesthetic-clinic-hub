@@ -23,7 +23,7 @@ import {
   type SignatureSession,
 } from "@/lib/signature-session";
 import { CheckCircle2, ChevronLeft, FileSignature, Loader2 } from "lucide-react";
-import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { Tablet } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -31,6 +31,14 @@ interface Props {
   pazienteNome?: string;
   onClose: () => void;
   onCompleted: () => void;
+  /**
+   * Se fornito, mostra accanto ad ogni trackpad un bottone "Invia a tablet".
+   * Quando cliccato, il dialog si chiude e viene invocato con la sessione
+   * corrente, così che il chiamante possa montare il runner tablet *fuori*
+   * da questo dialog (altrimenti i listener Realtime morirebbero alla
+   * chiusura del dialog → bug "firma inviata ma il Mac non riceve nulla").
+   */
+  onInviaTablet?: (session: SignatureSession) => void;
 }
 
 type Stato = "compilazione" | "salvataggio" | "fatto";
@@ -38,7 +46,10 @@ type Phase = "consensi" | "anamnesi" | "trattamento";
 
 type Scelta = "acconsento" | "non_acconsento";
 
-export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted }: Props) {
+export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted, onInviaTablet }: Props) {
+  // pazienteNome è usato solo dai consumer esterni che mostrano il dialog
+  // tablet — qui non serve più, ma manteniamo la prop per compatibilità.
+  void pazienteNome;
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
   const [stato, setStato] = useState<Stato>("compilazione");
@@ -545,12 +556,8 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                     ref={sigConsensiRef}
                     onChange={(empty) => setFirmaConsensiReady(!empty)}
                   />
-                  <OppureInviaTablet
-                    session={session}
-                    pazienteNome={pazienteNome}
-                    onSent={onClose}
-                    onCompleted={onCompleted}
-                  />
+                  <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
+
                 </div>
               </div>
             )}
@@ -602,12 +609,8 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
                   />
-                  <OppureInviaTablet
-                    session={session}
-                    pazienteNome={pazienteNome}
-                    onSent={onClose}
-                    onCompleted={onCompleted}
-                  />
+                  <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
+
                 </div>
                 {docs[anamnesiIdx].richiedeFirmaMedico && (
                   <div>
@@ -672,12 +675,8 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
                   />
-                  <OppureInviaTablet
-                    session={session}
-                    pazienteNome={pazienteNome}
-                    onSent={onClose}
-                    onCompleted={onCompleted}
-                  />
+                  <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
+
                 </div>
                 {docs[currentTratt].richiedeFirmaMedico && (
                   <div>
@@ -763,39 +762,40 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
 }
 
 /**
- * Bottone alternativo posizionato sotto ogni SignaturePad: permette di
- * delegare la firma a un dispositivo tablet in "modalità firma".
- * Quando la sessione tablet è stata creata con successo, chiude il dialog
- * locale (onSent) per evitare due flussi sovrapposti; il completamento
- * avviene poi tramite il MedicoFinalizeDialog interno a SendToTabletButton.
+ * Bottone "Invia a tablet" posizionato sotto ogni SignaturePad. Non gestisce
+ * direttamente la sessione tablet (sarebbe smontato alla chiusura del dialog
+ * e perderebbe i listener Realtime): chiude il dialog corrente e delega la
+ * creazione della sessione al chiamante via `onClick(session)`.
  */
 function OppureInviaTablet({
   session,
-  pazienteNome,
-  onSent,
-  onCompleted,
+  onClick,
+  onClose,
 }: {
   session: SignatureSession | null;
-  pazienteNome: string;
-  onSent: () => void;
-  onCompleted: () => void;
+  onClick?: (session: SignatureSession) => void;
+  onClose: () => void;
 }) {
-  if (!session) return null;
+  if (!session || !onClick) return null;
   return (
     <div className="mt-3 flex items-center gap-3">
       <div className="h-px flex-1 bg-border" />
       <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
         oppure
       </span>
-      <SendToTabletButton
-        session={session}
-        pazienteNome={pazienteNome || "Paziente"}
-        label="Invia a tablet"
+      <Button
+        type="button"
+        variant="outline"
         size="sm"
-        buildSession={async () => session}
-        onSent={onSent}
-        onCompleted={onCompleted}
-      />
+        onClick={() => {
+          onClose();
+          onClick(session);
+        }}
+      >
+        <Tablet className="h-4 w-4" />
+        Invia a tablet
+      </Button>
     </div>
   );
 }
+

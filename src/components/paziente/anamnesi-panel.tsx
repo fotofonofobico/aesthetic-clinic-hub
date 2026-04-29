@@ -39,6 +39,7 @@ import type { SignaturePadHandle } from "@/components/signature-pad";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
@@ -117,6 +118,7 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
   // Sessione firma visita unificata (consensi GDPR/uso immagini + anamnesi)
   const [visitaSession, setVisitaSession] = React.useState<SignatureSession | null>(null);
   const [visitaOpen, setVisitaOpen] = React.useState(false);
+  const [tabletSession, setTabletSession] = React.useState<SignatureSession | null>(null);
   const sigPazRef = React.useRef<SignaturePadHandle>(null);
   const sigMedRef = React.useRef<SignaturePadHandle>(null);
   // Lock per evitare fork concorrenti (es. utente digita veloce su record signed)
@@ -615,6 +617,18 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
         onClose={() => setVisitaOpen(false)}
         onCompleted={() => {
           setVisitaOpen(false);
+          void load();
+          onSaved();
+        }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
           void load();
           onSaved();
         }}

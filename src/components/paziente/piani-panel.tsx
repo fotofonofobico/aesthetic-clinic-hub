@@ -54,6 +54,7 @@ import {
 } from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
 
 const STATO_LABELS: Record<PianoStato, string> = {
@@ -186,6 +187,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
   const [firmaSession, setFirmaSession] = useState<SignatureSession | null>(null);
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [firmaVoceKey, setFirmaVoceKey] = useState<string | null>(null);
+  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
 
   useEffect(() => {
     void load();
@@ -1683,6 +1685,20 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
         }}
         onCompleted={() => {
           setFirmaOpen(false);
+          if (firmaVoceKey) {
+            const [pid, vid, tid] = firmaVoceKey.split("::");
+            if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
+          }
+        }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
           if (firmaVoceKey) {
             const [pid, vid, tid] = firmaVoceKey.split("::");
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);

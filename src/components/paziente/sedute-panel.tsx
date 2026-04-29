@@ -65,6 +65,7 @@ import {
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoBaselineDialog } from "@/components/foto/foto-baseline-dialog";
 import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
 import { FotoGrid } from "@/components/foto/foto-grid";
@@ -152,6 +153,7 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
   const [firmaSession, setFirmaSession] = useState<SignatureSession | null>(null);
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [pendingExecAfterFirma, setPendingExecAfterFirma] = useState<Seduta | null>(null);
+  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
 
   // Foto baseline non bloccante
   const [baselineDialog, setBaselineDialog] = useState<{
@@ -533,7 +535,20 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
             "Consenso firmato. Puoi registrare la seduta quando vuoi.",
           );
         }}
+        onInviaTablet={(s) => setTabletSession(s)}
       />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
+          void load();
+          toast.success("Consenso firmato sul tablet.");
+        }}
+      />
+
 
       {/* Foto baseline mancanti — non bloccante prima di "Esegui" */}
       {baselineDialog && baselineDialog.seduta.piano_id && (

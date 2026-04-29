@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, FileSignature, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, FileSignature, Clock, X } from "lucide-react";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
 import {
   rifiutaFirmaSessione,
@@ -33,6 +43,7 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
   const [scelte, setScelte] = useState<Record<string, Scelta>>({});
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const padRef = useRef<SignaturePadHandle>(null);
 
   // Reset alla nuova sessione
@@ -112,129 +123,196 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
     }
   }
 
+  async function annullaSessione() {
+    if (!row) return;
+    setSaving(true);
+    try {
+      await rifiutaFirmaSessione(row.id, "Sessione interrotta dal tablet");
+      onCompleted();
+    } finally {
+      setSaving(false);
+      setConfirmCloseOpen(false);
+    }
+  }
+
   return (
-    <Dialog open={open}>
-      <DialogContent
-        className="!max-w-3xl max-h-[95vh] overflow-y-auto p-0 sm:rounded-xl"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        {/* Header tablet */}
-        <div className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
-          <div className="flex items-center gap-3">
-            <FileSignature className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-display text-lg font-semibold leading-tight">
-                {isFirmaStep ? "Firma" : `Documento ${step + 1} di ${docs.length}`}
-              </p>
-              <p className="text-xs text-muted-foreground">{row.payload.pazienteNome}</p>
+    <>
+      <Dialog open={open} onOpenChange={(v) => !v && setConfirmCloseOpen(true)}>
+        <DialogContent
+          aria-describedby={undefined}
+          className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden p-0 sm:h-auto sm:max-h-[95vh] sm:w-full sm:!max-w-3xl sm:rounded-xl [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => {
+            e.preventDefault();
+            setConfirmCloseOpen(true);
+          }}
+        >
+          {/* Header tablet */}
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <FileSignature className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6" />
+              <div className="min-w-0">
+                <p className="font-display truncate text-base font-semibold leading-tight sm:text-lg">
+                  {isFirmaStep ? "Firma" : `Documento ${step + 1} di ${docs.length}`}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{row.payload.pazienteNome}</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-mono tabular-nums">
-            <Clock className="h-3.5 w-3.5" />
-            {formatRemain(remaining)}
-          </div>
-        </div>
-
-        {/* Body */}
-        {!isFirmaStep && docCorrente && (
-          <div className="space-y-5 px-6 py-5">
-            <div>
-              <h2 className="font-display text-2xl font-semibold">{docCorrente.titolo}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Versione {docCorrente.versione}
-              </p>
-            </div>
-            <div className="max-h-[40vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-4 text-sm leading-relaxed">
-              {docCorrente.testo}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="hidden items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 font-mono text-xs tabular-nums sm:flex">
+                <Clock className="h-3.5 w-3.5" />
+                {formatRemain(remaining)}
+              </div>
+              <Button
                 type="button"
-                onClick={() => setScelta(docCorrente.localId, "acconsento")}
-                className={`flex min-h-[64px] items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-base font-semibold transition-all ${
-                  scelte[docCorrente.localId] === "acconsento"
-                    ? "border-success bg-success/10 text-success"
-                    : "border-border bg-card text-foreground hover:border-success/50"
-                }`}
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => setConfirmCloseOpen(true)}
+                disabled={saving}
+                aria-label="Chiudi sessione"
               >
-                <CheckCircle2 className="h-6 w-6" />
-                Acconsento
-              </button>
-              <button
-                type="button"
-                onClick={() => setScelta(docCorrente.localId, "non_acconsento")}
-                className={`flex min-h-[64px] items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-base font-semibold transition-all ${
-                  scelte[docCorrente.localId] === "non_acconsento"
-                    ? "border-destructive bg-destructive/10 text-destructive"
-                    : "border-border bg-card text-foreground hover:border-destructive/50"
-                }`}
-              >
-                <XCircle className="h-6 w-6" />
-                Non acconsento
-              </button>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
           </div>
-        )}
 
-        {isFirmaStep && (
-          <div className="space-y-5 px-6 py-5">
-            <div>
-              <h2 className="font-display text-2xl font-semibold">Apponi la firma</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Una sola firma vale per tutti i documenti accettati.
-              </p>
+          {/* Countdown su mobile (sotto header) */}
+          <div className="flex shrink-0 items-center justify-end border-b border-border bg-card px-4 py-1.5 sm:hidden">
+            <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 font-mono text-[11px] tabular-nums">
+              <Clock className="h-3 w-3" />
+              {formatRemain(remaining)}
             </div>
-            {/* Riepilogo */}
-            <div className="space-y-1.5 rounded-lg border border-border bg-muted/40 p-3">
-              {docs.map((d) => (
-                <div key={d.localId} className="flex items-center justify-between text-sm">
-                  <span className="truncate pr-2">{d.titolo}</span>
-                  {scelte[d.localId] === "acconsento" ? (
-                    <span className="flex items-center gap-1 text-xs font-medium text-success">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Acconsento
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs font-medium text-destructive">
-                      <XCircle className="h-3.5 w-3.5" /> Non acconsento
-                    </span>
-                  )}
+          </div>
+
+          {/* Body scrollabile */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {!isFirmaStep && docCorrente && (
+              <div className="space-y-4 px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5">
+                <div>
+                  <h2 className="font-display text-xl font-semibold sm:text-2xl">{docCorrente.titolo}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Versione {docCorrente.versione}
+                  </p>
                 </div>
-              ))}
+                <div className="max-h-[40vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 text-sm leading-relaxed sm:p-4">
+                  {docCorrente.testo}
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setScelta(docCorrente.localId, "acconsento")}
+                    className={`flex min-h-[56px] items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-base font-semibold transition-all ${
+                      scelte[docCorrente.localId] === "acconsento"
+                        ? "border-success bg-success/10 text-success"
+                        : "border-border bg-card text-foreground hover:border-success/50"
+                    }`}
+                  >
+                    <CheckCircle2 className="h-6 w-6" />
+                    Acconsento
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScelta(docCorrente.localId, "non_acconsento")}
+                    className={`flex min-h-[56px] items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-base font-semibold transition-all ${
+                      scelte[docCorrente.localId] === "non_acconsento"
+                        ? "border-destructive bg-destructive/10 text-destructive"
+                        : "border-border bg-card text-foreground hover:border-destructive/50"
+                    }`}
+                  >
+                    <XCircle className="h-6 w-6" />
+                    Non acconsento
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isFirmaStep && (
+              <div className="space-y-4 px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5">
+                <div>
+                  <h2 className="font-display text-xl font-semibold sm:text-2xl">Apponi la firma</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Una sola firma vale per tutti i documenti accettati.
+                  </p>
+                </div>
+                {/* Riepilogo */}
+                <div className="space-y-1.5 rounded-lg border border-border bg-muted/40 p-3">
+                  {docs.map((d) => (
+                    <div key={d.localId} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate pr-2">{d.titolo}</span>
+                      {scelte[d.localId] === "acconsento" ? (
+                        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-success">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Acconsento
+                        </span>
+                      ) : (
+                        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-destructive">
+                          <XCircle className="h-3.5 w-3.5" /> Non acconsento
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <SignaturePad ref={padRef} height={220} />
+              </div>
+            )}
+          </div>
+
+          {/* Footer fisso */}
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-card px-4 py-3 sm:px-6 sm:py-4">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={indietro}
+              disabled={step === 0 || saving}
+            >
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Indietro</span>
+            </Button>
+
+            <div className="text-[11px] text-muted-foreground sm:text-xs">
+              Step {Math.min(step + 1, totalSteps)} di {totalSteps}
             </div>
-            <SignaturePad ref={padRef} height={280} />
+
+            {!isFirmaStep ? (
+              <Button size="default" onClick={avanti} disabled={saving}>
+                Avanti
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            ) : (
+              <Button size="default" onClick={conferma} disabled={saving}>
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">Conferma firma</span>
+                <span className="sm:hidden">Conferma</span>
+              </Button>
+            )}
           </div>
-        )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 border-t border-border bg-card px-6 py-4">
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={indietro}
-            disabled={step === 0 || saving}
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Indietro
-          </Button>
-
-          <div className="text-xs text-muted-foreground">
-            Step {Math.min(step + 1, totalSteps)} di {totalSteps}
-          </div>
-
-          {!isFirmaStep ? (
-            <Button size="lg" onClick={avanti} disabled={saving}>
-              Avanti
-              <ArrowRight className="h-5 w-5" />
-            </Button>
-          ) : (
-            <Button size="lg" onClick={conferma} disabled={saving}>
-              <CheckCircle2 className="h-5 w-5" />
-              Conferma firma
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Interrompere la sessione di firma?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le scelte e l'eventuale firma non verranno inviate al medico. La sessione sarà
+              annullata e potrai riceverne una nuova.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Continua a firmare</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void annullaSessione();
+              }}
+              disabled={saving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Interrompi sessione
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

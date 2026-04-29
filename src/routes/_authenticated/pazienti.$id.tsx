@@ -25,6 +25,7 @@ import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
@@ -77,6 +78,7 @@ function PazienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [sessione, setSessione] = useState<SignatureSession | null>(null);
   const [sessioneOpen, setSessioneOpen] = useState(false);
+  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
   const [tab, setTab] = useState<string>("diario");
 
   async function avviaFirmaVisita() {
@@ -254,9 +256,21 @@ function PazienteDetailPage() {
       <SignatureSessionDialog
         open={sessioneOpen}
         session={sessione}
+        pazienteNome={paziente ? `${paziente.nome} ${paziente.cognome}` : ""}
         onClose={() => setSessioneOpen(false)}
         onCompleted={() => {
           setSessioneOpen(false);
+          void load({ silent: true });
+        }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={paziente ? `${paziente.nome} ${paziente.cognome}` : ""}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
           void load({ silent: true });
         }}
       />
