@@ -49,6 +49,8 @@ import type {
 } from "@/types/trattamenti";
 import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
 import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
+import { ConsumoMagazzinoStep, righeToRigheConsumo, type ConsumoRiga } from "@/components/magazzino/consumo-step";
+import { consumaSeduta } from "@/lib/magazzino";
 import {
   dataClinica,
   diffPerAudit,
@@ -769,6 +771,7 @@ function EseguiSedutaDialog({
       : "",
   );
   const [note, setNote] = useState(seduta.note_cliniche ?? "");
+  const [consumoRighe, setConsumoRighe] = useState<ConsumoRiga[]>([]);
   const [saving, setSaving] = useState(false);
 
   function toggleZona(z: string) {
