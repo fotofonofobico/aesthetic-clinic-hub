@@ -64,6 +64,11 @@ import {
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { FotoBaselineDialog } from "@/components/foto/foto-baseline-dialog";
+import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
+import { FotoGrid } from "@/components/foto/foto-grid";
+import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
+import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
