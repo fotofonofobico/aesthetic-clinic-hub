@@ -1603,3 +1603,80 @@ function AuditSedutaDialog({
     </Dialog>
   );
 }
+
+// ───────────────────────────── Foto seduta inline (dialog Esegui) ─────────────────────────────
+
+function FotoSedutaInline({
+  paziente_id,
+  piano_id,
+  seduta_id,
+}: {
+  paziente_id: string;
+  piano_id: string | null;
+  seduta_id: string;
+}) {
+  const [foto, setFoto] = useState<FotoClinica[]>([]);
+  const [uploadOpen, setUploadOpen] = useState<FotoMomento | null>(null);
+
+  const reload = useMemo(
+    () => async () => {
+      if (!piano_id) return;
+      try {
+        const all = await listFotoByPiano(piano_id);
+        setFoto(all.filter((f) => f.seduta_id === seduta_id));
+      } catch {
+        setFoto([]);
+      }
+    },
+    [piano_id, seduta_id],
+  );
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  if (!piano_id) return null;
+
+  return (
+    <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">Foto seduta (opzionale)</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setUploadOpen("prima")}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            PRIMA
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setUploadOpen("dopo")}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            DOPO
+          </Button>
+        </div>
+      </div>
+      <FotoGrid foto={foto} emptyHint="Nessuna foto per questa seduta." />
+      {uploadOpen && (
+        <FotoUploadDialog
+          open
+          onOpenChange={(v) => !v && setUploadOpen(null)}
+          paziente_id={paziente_id}
+          piano_id={piano_id}
+          seduta_id={seduta_id}
+          defaultMomento={uploadOpen}
+          onUploaded={() => {
+            setUploadOpen(null);
+            void reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
