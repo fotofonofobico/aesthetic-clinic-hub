@@ -1,66 +1,120 @@
-## Problema
 
-Cliccando **"+ Riga"** in *Consumo magazzino* dentro il dialog *Esegui seduta* la scheda paziente va in errore con:
+# Modulo Foto Cliniche — Piano + Seduta
 
-> `null is not an object (evaluating 'resolveDispatcher().useMemo')`
+## Architettura dati
 
-È un errore React interno: un hook (`useMemo`) viene invocato fuori da un render valido. La causa più probabile, leggendo il codice attuale, è il sotto-componente `ProdottoCombobox` che monta `<Popover>` + `<Command>` (cmdk) **dentro un `<Dialog>` Radix nidificato** (il dialog "Esegui seduta") e fa partire subito un `useEffect` con `listProdotti()`. La combinazione (Popover/Command + portal in dialog + render multipli all'aggiunta di righe) fa esplodere cmdk in modo non recuperabile.
+**Bucket storage privato**: `foto-cliniche` (RLS: solo operatori attivi).
 
-In più:
-- Il `useEffect` di `ProdottoCombobox` ha `[open]` come deps ⇒ rifà la query a ogni apertura, e parte subito al mount. Più righe = più fetch in parallelo, e ogni nuovo prodotto creato non aggiorna le altre combobox.
-- Il `<Select>` lotto usa il valore sentinella `"__auto__"` / `"__new__"` ma è dentro un Dialog — funziona, ma l'errore ne impedisce l'apertura.
-- `ProdottoFormDialog` è renderizzato **dentro** `ConsumoMagazzinoStep` ⇒ Dialog dentro Dialog dentro Popover. Anche questo contribuisce alla fragilità.
+**Tabella `foto_clinica`** — un'unica tabella, livello determinato da quali FK sono valorizzate:
 
-## Soluzione
+| Campo | Tipo | Note |
+|---|---|---|
+| `id` | uuid PK | |
+| `paziente_id` | uuid NOT NULL | sempre |
+| `piano_id` | uuid NOT NULL | sempre (foto sempre legata a un piano) |
+| `seduta_id` | uuid NULL | NULL → foto **piano**; valorizzato → foto **seduta** |
+| `momento` | enum `prima` \| `dopo` | flag obbligatorio (no campo libero) |
+| `livello` | enum generato `piano` \| `seduta` | computed: NULL → piano |
+| `zona` | text NULL | facoltativo, da lista `ZONE_TRATTAMENTO` esistente |
+| `storage_path` | text NOT NULL | path in bucket |
+| `data_scatto` | date NOT NULL | retroattiva ammessa, default oggi |
+| `data_caricamento` | timestamptz default now() | |
+| `note` | text NULL | unico campo libero, opzionale |
+| `created_by` | uuid | |
 
-Sostituisco la combobox con un **componente più semplice e robusto** dedicato all'uso *inline in seduta*, eliminando Popover+Command annidati nel Dialog. Il selettore prodotto diventa:
+**Tabella `piano_foto_stato`** (1:1 col piano, gestita da trigger):
 
-- **`<Select>` Radix** (stesso pattern già usato altrove nel dialog seduta, quindi sicuro).
-- Una **`<Input>` di ricerca** sopra al Select per filtrare la lista (no cmdk).
-- Pulsante **"+ Nuovo prodotto"** che apre `ProdottoFormDialog` **a livello del dialog seduta** (non dentro al Popover), così non ci sono nesting strani.
+| Campo | Tipo |
+|---|---|
+| `piano_id` PK | uuid |
+| `stato` | enum `completo` \| `baseline_mancante` \| `non_eseguibile` |
+| `motivazione` | text NULL (richiesta solo per `non_eseguibile`) |
+| `cambiato_da` | uuid |
+| `cambiato_il` | timestamptz |
+| `incoerenza_data` | bool (foto PRIMA con data > prima seduta) |
 
-Carico la lista prodotti **una sola volta** a livello di `ConsumoMagazzinoStep` (non per ogni riga) e la passo per props alle righe → meno fetch, refresh corretto dopo creazione di un nuovo prodotto.
+**Tabella `piano_foto_stato_log`**: audit di ogni cambio (stato precedente/nuovo, utente, timestamp, motivazione).
 
-### Cosa cambia in concreto
+## Logica automatica (trigger su `foto_clinica` + `seduta`)
 
-1. **`src/components/magazzino/consumo-step.tsx`**
-   - `useEffect` unico che carica `listProdotti({ includiStandby: false })` e mantiene `prodotti` in stato locale.
-   - Funzione `refreshProdotti()` chiamata dopo creazione inline.
-   - Ogni riga riceve `prodotti` per props e usa un nuovo `<ProdottoSelectInline>` (vedi sotto) al posto di `ProdottoCombobox`.
-   - `ProdottoFormDialog` montato **una sola volta** nel componente, fuori dal mapping delle righe.
-   - Per il select lotto: aggiungo guardia: se `r._lotti` non è array lo tratto come `[]`; valori sentinella restano `__auto__` / `__new__` (mai stringa vuota).
-   - Migliore gestione errori in `onProdottoSelect` (try/catch con toast).
+1. **Sblocco automatico**: all'INSERT di una foto con `livello=piano`, `momento=prima`, `data_scatto <= MIN(data_seduta della seduta #1)` → stato torna `completo`.
+2. **Incoerenza**: se data_scatto > data prima seduta → stato resta `baseline_mancante` + flag `incoerenza_data=true` (alert giallo dedicato).
+3. **Init**: alla creazione del piano, riga in `piano_foto_stato` con stato `baseline_mancante`.
+4. **`non_eseguibile`**: settabile solo via RPC `piano_foto_marca_non_eseguibile(_piano_id, _motivazione)` con check `has_role(auth.uid(), 'medico')` + motivazione obbligatoria. Loggato.
 
-2. **Nuovo `src/components/magazzino/prodotto-select-inline.tsx`**
-   - Riceve `prodotti`, `value`, `onChange(id, prodotto)`, `onCreaNuovo`.
-   - Render: piccolo `Input` di ricerca + `Select` con opzioni filtrate + opzione finale "➕ Nuovo prodotto…" (sentinella `__new__`).
-   - Usa solo Radix `Select` (no cmdk, no Popover) → niente conflitti dentro Dialog.
-   - Mostra badge modalità (Tracciato/Solo uso) accanto al nome.
+## UI — integrazione con quanto esiste
 
-3. **`src/components/magazzino/prodotto-combobox.tsx`** — **lasciato com'è** per la pagina `/magazzino` (lì funziona, non è dentro un Dialog).
+### A. Tab "Foto" nel dettaglio piano (`piani-panel.tsx`)
+Nuova sezione `FotoPianoPanel` con due aree:
+- **Baseline (PRIMA piano)**: griglia thumbnail. CTA "Carica foto baseline" → dialog upload multiplo.
+- **Finali (DOPO piano)**: griglia thumbnail, opzionale.
+- **Timeline sedute**: accordion per seduta con eventuali foto prima/dopo della seduta (read-only qui, si caricano dalla seduta).
 
-### File toccati
+**Badge stato piano** sempre visibile in header:
+- 🟢 `Completo` · 🟡 `Baseline mancante` · ⚫ `Non eseguibile`
+- Click sul badge giallo → dropdown: "Carica foto ora" / "Marca non eseguibile" (solo medico).
 
-- `src/components/magazzino/consumo-step.tsx` (refactor)
-- `src/components/magazzino/prodotto-select-inline.tsx` (nuovo)
+### B. In `consumo-step.tsx` / step esecuzione seduta
+Sezione compatta **"Foto seduta (opzionale)"** con due bottoni rapidi: `+ PRIMA` `+ DOPO`. Nessun blocco.
 
-### Cosa NON cambio
+### C. Alert non bloccanti (riuso pattern `Alert` esistente)
+- **Su `pazienti.$id.tsx`** in cima: banner persistente giallo se almeno un piano del paziente è in `baseline_mancante`.
+- **Apertura "Esegui seduta"** (prima volta del piano): dialog non bloccante con due CTA → `Procedi comunque` / `Marca non eseguibile` (medico) / `Carica baseline ora`. Se "Procedi comunque" → stato resta giallo, seduta parte normalmente.
+- **Post-seduta** (al completamento): toast con "Aggiungi foto DOPO seduta?" + link rapido (snoozable per 24h via localStorage).
+- **Pre-seduta successiva**: stesso dialog non bloccante della prima volta finché baseline manca.
 
-- Logica di `consumaSeduta`, RPC, RLS, tipi, schema DB.
-- Comportamento FEFO, lotto inline, "solo uso".
-- Pagina `/magazzino` e gli altri dialog magazzino.
+### D. Upload foto — dialog unificato `FotoUploadDialog`
+Zero campi liberi tranne `note`:
+- Drop zone / file picker (multi)
+- Radio obbligatorio: `Prima` / `Dopo`
+- Date picker `data_scatto` (default oggi, retroattiva ammessa) — usa shadcn-datepicker con `pointer-events-auto`
+- Select `zona` (facoltativo) — opzioni da `ZONE_TRATTAMENTO`
+- Textarea `note` (opzionale, l'unico libero)
+- Submit → upload a storage + insert riga + trigger ricalcola stato
 
-## Risultato atteso
+## Reminder (solo in-app, come da scelta)
 
-- "+ Riga" non crasha più.
-- Selezione prodotto funzionante anche con tastiera.
-- Creazione "Nuovo prodotto" inline funzionante; il prodotto compare subito nella select.
-- Selezione lotto FEFO/manuale/nuovo lotto invariata e funzionante.
+| Trigger | UI |
+|---|---|
+| Apertura scheda paziente | Banner giallo persistente se ≥1 piano `baseline_mancante` |
+| Apertura tab piano | Badge stato + alert in cima al tab |
+| Click "Esegui seduta" con baseline mancante | Dialog non bloccante (Procedi / Carica / Non eseguibile) |
+| Completamento seduta | Toast "Aggiungi foto DOPO?" |
+| Foto PRIMA con data > prima seduta | Alert dedicato "Incoerenza data — questa foto non funge da baseline" |
 
-## Test manuale dopo il fix
+Nessuna edge function, nessun cron — tutto reattivo.
 
-1. Apri scheda paziente → seduta → **Esegui**.
-2. Premi **+ Riga** in *Consumo magazzino* — deve aggiungere la riga senza errore.
-3. Seleziona un prodotto esistente *tracciato* → compare dropdown lotto con FEFO/lotti.
-4. **+ Nuovo prodotto** → crea → torna alla riga col prodotto già selezionato.
-5. Su un tracciato senza lotti scegli **+ Nuovo lotto inline** → compila → completa la seduta → verifica scarico.
+## Sicurezza
+
+- RLS `foto_clinica`: SELECT/INSERT operatori attivi, UPDATE solo `created_by` o medico, DELETE solo medico.
+- RLS bucket `foto-cliniche`: privato, path pattern `{paziente_id}/{piano_id}/...`, signed URL on demand (1h).
+- RPC `piano_foto_marca_non_eseguibile`: SECURITY DEFINER + `has_role(... 'medico')`.
+- Audit completo in `piano_foto_stato_log`.
+
+## File coinvolti
+
+**Nuovi**:
+- migration: tabelle `foto_clinica`, `piano_foto_stato`, `piano_foto_stato_log`, bucket, RLS, trigger, RPC
+- `src/types/foto-clinica.ts`
+- `src/lib/foto-clinica.ts` (CRUD + signed URL)
+- `src/components/foto/foto-upload-dialog.tsx`
+- `src/components/foto/foto-grid.tsx` (thumbnail + lightbox + zona/data/momento overlay)
+- `src/components/foto/foto-piano-panel.tsx` (tab piano)
+- `src/components/foto/foto-stato-badge.tsx`
+- `src/components/foto/foto-baseline-alert.tsx` (dialog non bloccante riusabile)
+
+**Modificati**:
+- `src/components/paziente/piani-panel.tsx` — aggiunta tab "Foto" + badge stato
+- `src/components/paziente/sedute-panel.tsx` — gancio dialog pre-seduta + toast post-seduta
+- `src/components/magazzino/consumo-step.tsx` — sezione "Foto seduta (opzionale)"
+- `src/routes/_authenticated/pazienti.$id.tsx` — banner globale piani con baseline mancante
+
+## Punti che NON faccio (per restare snelli)
+
+- ❌ Zona obbligatoria (hai scelto facoltativa)
+- ❌ Notifiche email/push (solo in-app)
+- ❌ Auto-tag AI / face detection
+- ❌ Confronto side-by-side avanzato (in v1: tap sulla foto PRIMA + tap sulla DOPO della stessa zona apre lightbox affiancato — semplice)
+- ❌ Versioning foto (ogni foto è immutabile, eliminazione solo medico con audit)
+
+Procedo con questa architettura quando approvi.
