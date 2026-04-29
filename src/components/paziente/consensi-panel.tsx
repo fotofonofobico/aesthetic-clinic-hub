@@ -817,6 +817,29 @@ function NuovoConsensoDialog({
                 ref={sigRef}
                 onChange={(empty) => setSigned(!empty)}
               />
+              {tpl && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    oppure
+                  </span>
+                  <SendToTabletButton
+                    session={null}
+                    pazienteNome={pazienteNome || "Paziente"}
+                    label="Invia a tablet"
+                    size="sm"
+                    buildSession={async () =>
+                      buildSingleConsensoSession(pazienteId, tpl)
+                    }
+                    onSent={() => {
+                      onClose();
+                    }}
+                    onCompleted={() => {
+                      onSaved();
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
