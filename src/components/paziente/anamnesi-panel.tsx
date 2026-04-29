@@ -95,11 +95,12 @@ const TERAPIE = [
 
 interface Props {
   pazienteId: string;
+  pazienteNome?: string;
   sesso: Sesso | null;
   onSaved: () => void;
 }
 
-export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
+export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }: Props) {
   const { user } = useAuth();
   const [data, setData] = React.useState<AnamnesiRow | null>(null);
   const [lastSigned, setLastSigned] = React.useState<AnamnesiRow | null>(null);
