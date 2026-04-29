@@ -48,6 +48,7 @@ import {
 import { ProdottoFormDialog } from "@/components/magazzino/prodotto-form-dialog";
 import { LottoFormDialog } from "@/components/magazzino/lotto-form-dialog";
 import { RettificaDialog } from "@/components/magazzino/rettifica-dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/magazzino/")({
   component: MagazzinoPage,
