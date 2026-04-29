@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Syringe, Loader2 } from "lucide-react";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 interface TrattamentoLite {
   id: string;
@@ -112,10 +113,27 @@ export function FirmaTrattamentoLauncher({ pazienteId, onCompleted }: Props) {
               Verranno richiesti solo i consensi mancanti, scaduti o legati alla seduta.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="ghost" onClick={() => setOpenSel(false)}>
               Annulla
             </Button>
+            <SendToTabletButton
+              session={null}
+              pazienteNome=""
+              label="Invia a tablet"
+              disabled={building || selected.size === 0}
+              buildSession={async () => {
+                setBuilding(true);
+                const s = await buildTrattamentoSession(pazienteId, Array.from(selected));
+                setBuilding(false);
+                if (s) setOpenSel(false);
+                return s;
+              }}
+              onCompleted={() => {
+                setSelected(new Set());
+                onCompleted?.();
+              }}
+            />
             <Button onClick={() => void avvia()} disabled={building || selected.size === 0}>
               {building ? (
                 <>
@@ -123,7 +141,7 @@ export function FirmaTrattamentoLauncher({ pazienteId, onCompleted }: Props) {
                   Verifica consensi…
                 </>
               ) : (
-                <>Avvia firma</>
+                <>Firma sul Mac</>
               )}
             </Button>
           </DialogFooter>
