@@ -545,6 +545,12 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                     ref={sigConsensiRef}
                     onChange={(empty) => setFirmaConsensiReady(!empty)}
                   />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
+                  />
                 </div>
               </div>
             )}
@@ -595,6 +601,12 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                   <SignaturePad
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
                   />
                 </div>
                 {docs[anamnesiIdx].richiedeFirmaMedico && (
@@ -659,6 +671,12 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                   <SignaturePad
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
                   />
                 </div>
                 {docs[currentTratt].richiedeFirmaMedico && (
