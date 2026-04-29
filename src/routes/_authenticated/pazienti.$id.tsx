@@ -291,11 +291,11 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="piani">
-          <PianiPanel pazienteId={id} />
+          <PianiPanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
         </TabsContent>
 
         <TabsContent value="sedute">
-          <SedutePanel pazienteId={id} />
+          <SedutePanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
         </TabsContent>
 
         <TabsContent value="foto">

@@ -24,10 +24,11 @@ interface TrattamentoLite {
 
 interface Props {
   pazienteId: string;
+  pazienteNome?: string;
   onCompleted?: () => void;
 }
 
-export function FirmaTrattamentoLauncher({ pazienteId, onCompleted }: Props) {
+export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onCompleted }: Props) {
   const [openSel, setOpenSel] = useState(false);
   const [trattamenti, setTrattamenti] = useState<TrattamentoLite[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());

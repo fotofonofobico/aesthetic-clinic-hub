@@ -50,8 +50,7 @@ import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
-import { SignatureSessionDialog } from "@/components/signature-session-dialog";
-import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
+import type { SignatureSession, SessionDoc, SessionDocKind } from "@/lib/signature-session";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
@@ -64,10 +63,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
-  const [visitaSession, setVisitaSession] = useState<SignatureSession | null>(null);
-  const [visitaOpen, setVisitaOpen] = useState(false);
-  const [buildingVisita, setBuildingVisita] = useState(false);
-  
 
   useEffect(() => {
     void load();
@@ -175,21 +170,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
     }
   }
 
-  async function avviaVisitaMac() {
-    setBuildingVisita(true);
-    try {
-      const s = await buildVisitaSession(pazienteId);
-      if (!s || s.documenti.length === 0) {
-        toast.success("Tutti i consensi richiesti sono già validi");
-        return;
-      }
-      setVisitaSession(s);
-      setVisitaOpen(true);
-    } finally {
-      setBuildingVisita(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -200,22 +180,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => void avviaVisitaMac()}
-            disabled={buildingVisita}
-          >
-            <PenLine className="h-4 w-4" />
-            Sessione visita (Mac)
-          </Button>
-          <SendToTabletButton
-            session={null}
-            pazienteNome={pazienteNome}
-            label="📱 Invia a tablet"
-            disabled={buildingVisita}
-            buildSession={async () => buildVisitaSession(pazienteId)}
-            onCompleted={() => void load()}
-          />
           <Dialog open={openDlg} onOpenChange={setOpenDlg}>
             <DialogTrigger asChild>
               <Button>
@@ -225,6 +189,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
             </DialogTrigger>
             <NuovoConsensoDialog
               pazienteId={pazienteId}
+              pazienteNome={pazienteNome}
               templates={templates}
               onClose={() => setOpenDlg(false)}
               onSaved={() => {
@@ -236,15 +201,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
         </div>
       </div>
 
-      <SignatureSessionDialog
-        open={visitaOpen}
-        session={visitaSession}
-        onClose={() => setVisitaOpen(false)}
-        onCompleted={() => {
-          setVisitaOpen(false);
-          void load();
-        }}
-      />
+
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
@@ -457,11 +414,13 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
 
 function NuovoConsensoDialog({
   pazienteId,
+  pazienteNome = "",
   templates,
   onClose,
   onSaved,
 }: {
   pazienteId: string;
+  pazienteNome?: string;
   templates: ConsensoTemplate[];
   onClose: () => void;
   onSaved: () => void;
@@ -858,6 +817,29 @@ function NuovoConsensoDialog({
                 ref={sigRef}
                 onChange={(empty) => setSigned(!empty)}
               />
+              {tpl && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    oppure
+                  </span>
+                  <SendToTabletButton
+                    session={null}
+                    pazienteNome={pazienteNome || "Paziente"}
+                    label="Invia a tablet"
+                    size="sm"
+                    buildSession={async () =>
+                      buildSingleConsensoSession(pazienteId, tpl)
+                    }
+                    onSent={() => {
+                      onClose();
+                    }}
+                    onCompleted={() => {
+                      onSaved();
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -939,4 +921,48 @@ function NuovoConsensoDialog({
     />
     </>
   );
+}
+
+/**
+ * Costruisce una SignatureSession mono-documento per un singolo consenso
+ * specifico (usato dal bottone "Invia a tablet" inline accanto al SignaturePad
+ * del NuovoConsensoDialog).
+ */
+function buildSingleConsensoSession(
+  pazienteId: string,
+  tpl: ConsensoTemplate,
+): SignatureSession {
+  let kind: SessionDocKind;
+  if (tpl.categoria === "gdpr") {
+    kind = { kind: "gdpr", templateId: tpl.id };
+  } else if (tpl.categoria === "uso_immagini") {
+    kind = { kind: "uso_immagini", templateId: tpl.id };
+  } else {
+    kind = {
+      kind: "trattamento",
+      templateId: tpl.id,
+      trattamentoId: tpl.trattamento_id ?? "",
+      categoria:
+        tpl.categoria === "trattamento_ciclo"
+          ? "trattamento_ciclo"
+          : "trattamento_singolo",
+    };
+  }
+  const doc: SessionDoc = {
+    localId: crypto.randomUUID(),
+    kind,
+    titolo: tpl.titolo,
+    testo: tpl.testo,
+    versione: tpl.versione,
+    validitaMesi: tpl.validita_mesi,
+    durataTipo: tpl.durata_tipo === "sedute" ? "sedute" : "mesi",
+    duratSedute: tpl.durata_tipo === "sedute" ? tpl.durata_sedute : null,
+    richiedeFirmaMedico: tpl.richiede_firma_medico,
+    completato: false,
+  };
+  return {
+    tipo: tpl.categoria === "gdpr" || tpl.categoria === "uso_immagini" ? "visita" : "trattamento",
+    pazienteId,
+    documenti: [doc],
+  };
 }

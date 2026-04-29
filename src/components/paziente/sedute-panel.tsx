@@ -134,7 +134,7 @@ interface Riga extends Seduta {
 
 // ───────────────────────────── Componente principale ─────────────────────────────
 
-export function SedutePanel({ pazienteId }: { pazienteId: string }) {
+export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
   const { user, hasRole } = useAuth();
   const [sedute, setSedute] = useState<Seduta[]>([]);
   const [piani, setPiani] = useState<PianoTrattamento[]>([]);
@@ -520,6 +520,7 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
       <SignatureSessionDialog
         open={firmaOpen}
         session={firmaSession}
+        pazienteNome={pazienteNome}
         onClose={() => {
           setFirmaOpen(false);
           setPendingExecAfterFirma(null);

@@ -23,10 +23,12 @@ import {
   type SignatureSession,
 } from "@/lib/signature-session";
 import { CheckCircle2, ChevronLeft, FileSignature, Loader2 } from "lucide-react";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 interface Props {
   open: boolean;
   session: SignatureSession | null;
+  pazienteNome?: string;
   onClose: () => void;
   onCompleted: () => void;
 }
@@ -36,7 +38,7 @@ type Phase = "consensi" | "anamnesi" | "trattamento";
 
 type Scelta = "acconsento" | "non_acconsento";
 
-export function SignatureSessionDialog({ open, session, onClose, onCompleted }: Props) {
+export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted }: Props) {
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
   const [stato, setStato] = useState<Stato>("compilazione");
@@ -543,6 +545,12 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
                     ref={sigConsensiRef}
                     onChange={(empty) => setFirmaConsensiReady(!empty)}
                   />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
+                  />
                 </div>
               </div>
             )}
@@ -593,6 +601,12 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
                   <SignaturePad
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
                   />
                 </div>
                 {docs[anamnesiIdx].richiedeFirmaMedico && (
@@ -657,6 +671,12 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
                   <SignaturePad
                     ref={sigSingoloRef}
                     onChange={(empty) => setFirmaSingoloReady(!empty)}
+                  />
+                  <OppureInviaTablet
+                    session={session}
+                    pazienteNome={pazienteNome}
+                    onSent={onClose}
+                    onCompleted={onCompleted}
                   />
                 </div>
                 {docs[currentTratt].richiedeFirmaMedico && (
@@ -739,5 +759,43 @@ export function SignatureSessionDialog({ open, session, onClose, onCompleted }: 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Bottone alternativo posizionato sotto ogni SignaturePad: permette di
+ * delegare la firma a un dispositivo tablet in "modalità firma".
+ * Quando la sessione tablet è stata creata con successo, chiude il dialog
+ * locale (onSent) per evitare due flussi sovrapposti; il completamento
+ * avviene poi tramite il MedicoFinalizeDialog interno a SendToTabletButton.
+ */
+function OppureInviaTablet({
+  session,
+  pazienteNome,
+  onSent,
+  onCompleted,
+}: {
+  session: SignatureSession | null;
+  pazienteNome: string;
+  onSent: () => void;
+  onCompleted: () => void;
+}) {
+  if (!session) return null;
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        oppure
+      </span>
+      <SendToTabletButton
+        session={session}
+        pazienteNome={pazienteNome || "Paziente"}
+        label="Invia a tablet"
+        size="sm"
+        buildSession={async () => session}
+        onSent={onSent}
+        onCompleted={onCompleted}
+      />
+    </div>
   );
 }

@@ -567,17 +567,6 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
               </Button>
-              <SendToTabletButton
-                session={null}
-                pazienteNome={pazienteNome}
-                label="📱 Invia a tablet"
-                disabled={signing || forking || data?.stato === "signed"}
-                buildSession={async () => buildVisitaSession(pazienteId)}
-                onCompleted={() => {
-                  void load();
-                  onSaved();
-                }}
-              />
             </>
           )}
         </div>
@@ -622,6 +611,7 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       <SignatureSessionDialog
         open={visitaOpen}
         session={visitaSession}
+        pazienteNome={pazienteNome}
         onClose={() => setVisitaOpen(false)}
         onCompleted={() => {
           setVisitaOpen(false);
@@ -1015,6 +1005,24 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
               <div>
                 <p className="mb-2 text-sm font-medium">Firma del paziente *</p>
                 <SignaturePad ref={sigPazRef} />
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    oppure
+                  </span>
+                  <SendToTabletButton
+                    session={null}
+                    pazienteNome={pazienteNome || "Paziente"}
+                    label="Invia a tablet"
+                    size="sm"
+                    buildSession={async () => buildVisitaSession(pazienteId)}
+                    onSent={() => setSignDlgOpen(false)}
+                    onCompleted={() => {
+                      void load();
+                      onSaved();
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <p className="mb-2 text-sm font-medium">
