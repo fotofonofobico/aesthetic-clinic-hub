@@ -232,20 +232,46 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
 
   async function aggiungiNota() {
     if (!testo.trim()) return;
-    const { error } = await supabase.from("paziente_nota").insert({
-      paziente_id: pazienteId,
-      tipo,
-      testo: testo.trim(),
-      data_evento: new Date(dataEvento).toISOString(),
-      created_by: user?.id,
-    });
+    const dataIso = new Date(dataEvento).toISOString();
+    const testoTrim = testo.trim();
+    const { data: nota, error } = await supabase
+      .from("paziente_nota")
+      .insert({
+        paziente_id: pazienteId,
+        tipo,
+        testo: testoTrim,
+        data_evento: dataIso,
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
     if (error) {
       toast.error(`Errore: ${error.message}`);
       return;
     }
+
+    // Opzionale: crea anche evento calendario collegato
+    if (aggiungiAlCalendario && nota) {
+      const titolo = testoTrim.length > 60 ? testoTrim.slice(0, 60) + "…" : testoTrim;
+      const { error: evErr } = await supabase.from("evento_calendario").insert({
+        titolo,
+        descrizione: testoTrim,
+        tipo: "promemoria",
+        data_inizio: dataIso,
+        paziente_id: pazienteId,
+        sincronizza_diario: true,
+        nota_diario_id: nota.id,
+        created_by: user?.id,
+      });
+      if (evErr) {
+        toast.warning("Nota salvata, ma evento calendario non creato");
+      }
+    }
+
     setTesto("");
     setTipo("clinica");
     setDataEvento(new Date().toISOString().slice(0, 16));
+    setAggiungiAlCalendario(false);
     toast.success("Nota aggiunta al diario");
     void load();
   }
@@ -315,7 +341,14 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               />
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={aggiungiAlCalendario}
+                onCheckedChange={(v) => setAggiungiAlCalendario(!!v)}
+              />
+              <span className="text-muted-foreground">Aggiungi anche al calendario</span>
+            </label>
             <Button onClick={aggiungiNota} disabled={!testo.trim()}>
               <Plus className="h-4 w-4" />
               Aggiungi
