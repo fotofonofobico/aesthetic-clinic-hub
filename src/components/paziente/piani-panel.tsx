@@ -163,7 +163,15 @@ function allineaProdottiPerSeduta(
 // ---------- consenso per voce piano (lazy) ----------
 type ConsensoVoce = { ok: boolean; motivi: string[]; loading: boolean };
 
-export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
+export function PianiPanel({
+  pazienteId,
+  pazienteNome = "",
+  onChanged,
+}: {
+  pazienteId: string;
+  pazienteNome?: string;
+  onChanged?: () => void;
+}) {
   const { user } = useAuth();
   const [piani, setPiani] = useState<PianoTrattamento[]>([]);
   const [sedutePerPiano, setSedutePerPiano] = useState<Record<string, Seduta[]>>({});
@@ -242,6 +250,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
 
     setTrattamenti((tRes.data ?? []) as Trattamento[]);
     setLoading(false);
+    onChanged?.();
   }
 
   // ---------- gestione righe form ----------
