@@ -51,7 +51,7 @@ function BackupPage() {
     try {
       const { data, error } = await supabase.from(table).select(select).limit(10000);
       if (error) throw error;
-      const csv = toCsv((data ?? []) as Record<string, unknown>[]);
+      const csv = toCsv((data ?? []) as unknown as Record<string, unknown>[]);
       if (!csv) {
         toast.info("Nessun dato da esportare");
         return;
