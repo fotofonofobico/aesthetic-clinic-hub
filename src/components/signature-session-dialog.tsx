@@ -46,7 +46,10 @@ type Phase = "consensi" | "anamnesi" | "trattamento";
 
 type Scelta = "acconsento" | "non_acconsento";
 
-export function SignatureSessionDialog({ open, session, pazienteNome: _pazienteNome = "", onClose, onCompleted, onInviaTablet }: Props) {
+export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted, onInviaTablet }: Props) {
+  // pazienteNome è usato solo dai consumer esterni che mostrano il dialog
+  // tablet — qui non serve più, ma manteniamo la prop per compatibilità.
+  void pazienteNome;
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
   const [stato, setStato] = useState<Stato>("compilazione");
