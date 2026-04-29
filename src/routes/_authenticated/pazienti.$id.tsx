@@ -284,6 +284,7 @@ function PazienteDetailPage() {
         <TabsContent value="anamnesi">
           <AnamnesiPanel
             pazienteId={id}
+            pazienteNome={`${paziente.nome} ${paziente.cognome}`}
             sesso={paziente.sesso}
             onSaved={() => void load({ silent: true })}
           />
