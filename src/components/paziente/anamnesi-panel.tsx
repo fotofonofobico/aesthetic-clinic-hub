@@ -567,17 +567,6 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
               </Button>
-              <SendToTabletButton
-                session={null}
-                pazienteNome={pazienteNome}
-                label="📱 Invia a tablet"
-                disabled={signing || forking || data?.stato === "signed"}
-                buildSession={async () => buildVisitaSession(pazienteId)}
-                onCompleted={() => {
-                  void load();
-                  onSaved();
-                }}
-              />
             </>
           )}
         </div>
