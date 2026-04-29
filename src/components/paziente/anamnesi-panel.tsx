@@ -40,6 +40,7 @@ import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 type ReactNode = React.ReactNode;
 
@@ -95,11 +96,12 @@ const TERAPIE = [
 
 interface Props {
   pazienteId: string;
+  pazienteNome?: string;
   sesso: Sesso | null;
   onSaved: () => void;
 }
 
-export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
+export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }: Props) {
   const { user } = useAuth();
   const [data, setData] = React.useState<AnamnesiRow | null>(null);
   const [lastSigned, setLastSigned] = React.useState<AnamnesiRow | null>(null);
@@ -565,6 +567,17 @@ export function AnamnesiPanel({ pazienteId, sesso, onSaved }: Props) {
                 <FileSignature className="h-4 w-4" />
                 {signing ? "Firma in corso…" : "Firma e blocca"}
               </Button>
+              <SendToTabletButton
+                session={null}
+                pazienteNome={pazienteNome}
+                label="📱 Invia a tablet"
+                disabled={signing || forking || data?.stato === "signed"}
+                buildSession={async () => buildVisitaSession(pazienteId)}
+                onCompleted={() => {
+                  void load();
+                  onSaved();
+                }}
+              />
             </>
           )}
         </div>

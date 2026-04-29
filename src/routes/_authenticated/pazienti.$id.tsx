@@ -284,6 +284,7 @@ function PazienteDetailPage() {
         <TabsContent value="anamnesi">
           <AnamnesiPanel
             pazienteId={id}
+            pazienteNome={`${paziente.nome} ${paziente.cognome}`}
             sesso={paziente.sesso}
             onSaved={() => void load({ silent: true })}
           />
@@ -302,7 +303,7 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="consensi">
-          <ConsensiPanel pazienteId={id} />
+          <ConsensiPanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
         </TabsContent>
 
         <TabsContent value="alert">

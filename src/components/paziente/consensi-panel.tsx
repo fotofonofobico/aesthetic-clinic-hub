@@ -49,10 +49,13 @@ import { STATO_BADGE } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
-export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
+export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
   const { user, hasRole } = useAuth();
   const isMedico = hasRole("medico");
   const [firmati, setFirmati] = useState<ConsensoFirmato[]>([]);
@@ -61,6 +64,9 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
+  const [visitaSession, setVisitaSession] = useState<SignatureSession | null>(null);
+  const [visitaOpen, setVisitaOpen] = useState(false);
+  const [buildingVisita, setBuildingVisita] = useState(false);
   
 
   useEffect(() => {
@@ -169,33 +175,76 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
     }
   }
 
+  async function avviaVisitaMac() {
+    setBuildingVisita(true);
+    try {
+      const s = await buildVisitaSession(pazienteId);
+      if (!s || s.documenti.length === 0) {
+        toast.success("Tutti i consensi richiesti sono già validi");
+        return;
+      }
+      setVisitaSession(s);
+      setVisitaOpen(true);
+    } finally {
+      setBuildingVisita(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-base font-semibold">Consensi firmati</h3>
           <p className="text-xs text-muted-foreground">
             Archivio storico immutabile. Stato calcolato in tempo reale.
           </p>
         </div>
-        <Dialog open={openDlg} onOpenChange={setOpenDlg}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4" />
-              Nuovo consenso
-            </Button>
-          </DialogTrigger>
-          <NuovoConsensoDialog
-            pazienteId={pazienteId}
-            templates={templates}
-            onClose={() => setOpenDlg(false)}
-            onSaved={() => {
-              setOpenDlg(false);
-              void load();
-            }}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void avviaVisitaMac()}
+            disabled={buildingVisita}
+          >
+            <PenLine className="h-4 w-4" />
+            Sessione visita (Mac)
+          </Button>
+          <SendToTabletButton
+            session={null}
+            pazienteNome={pazienteNome}
+            label="📱 Invia a tablet"
+            disabled={buildingVisita}
+            buildSession={async () => buildVisitaSession(pazienteId)}
+            onCompleted={() => void load()}
           />
-        </Dialog>
+          <Dialog open={openDlg} onOpenChange={setOpenDlg}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4" />
+                Nuovo consenso
+              </Button>
+            </DialogTrigger>
+            <NuovoConsensoDialog
+              pazienteId={pazienteId}
+              templates={templates}
+              onClose={() => setOpenDlg(false)}
+              onSaved={() => {
+                setOpenDlg(false);
+                void load();
+              }}
+            />
+          </Dialog>
+        </div>
       </div>
+
+      <SignatureSessionDialog
+        open={visitaOpen}
+        session={visitaSession}
+        onClose={() => setVisitaOpen(false)}
+        onCompleted={() => {
+          setVisitaOpen(false);
+          void load();
+        }}
+      />
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
