@@ -24,9 +24,6 @@ import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
-import { SignatureSessionDialog } from "@/components/signature-session-dialog";
-import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
-import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 
@@ -76,21 +73,7 @@ function PazienteDetailPage() {
   const [access, setAccess] = useState<AccessEvaluation | null>(null);
   const [consensiPianoMancanti, setConsensiPianoMancanti] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sessione, setSessione] = useState<SignatureSession | null>(null);
-  const [sessioneOpen, setSessioneOpen] = useState(false);
-  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
   const [tab, setTab] = useState<string>("diario");
-
-  async function avviaFirmaVisita() {
-    if (!paziente) return;
-    const s = await buildVisitaSession(paziente.id);
-    if (!s) {
-      toast.success("Tutto in regola: nessuna firma necessaria");
-      return;
-    }
-    setSessione(s);
-    setSessioneOpen(true);
-  }
 
   useEffect(() => {
     if (isChildRoute) {
@@ -215,7 +198,7 @@ function PazienteDetailPage() {
         </Button>
       </div>
 
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">
             {paziente.cognome} {paziente.nome}
@@ -227,19 +210,6 @@ function PazienteDetailPage() {
             {paziente.sesso ? ` · ${paziente.sesso}` : ""}
             {paziente.codice_fiscale ? ` · ${paziente.codice_fiscale}` : ""}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={avviaFirmaVisita}>
-            <FileSignature className="h-4 w-4" />
-            Firma visita & anamnesi
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
-          >
-            <Pencil className="h-4 w-4" />
-            Modifica anagrafica
-          </Button>
         </div>
       </header>
 
@@ -253,30 +223,8 @@ function PazienteDetailPage() {
 
       <FotoBaselineBanner paziente_id={id} onClickPiano={() => setTab("foto")} />
 
-      <SignatureSessionDialog
-        open={sessioneOpen}
-        session={sessione}
-        pazienteNome={paziente ? `${paziente.nome} ${paziente.cognome}` : ""}
-        onClose={() => setSessioneOpen(false)}
-        onCompleted={() => {
-          setSessioneOpen(false);
-          void load({ silent: true });
-        }}
-        onInviaTablet={(s) => setTabletSession(s)}
-      />
-
-      <TabletSessionRunner
-        session={tabletSession}
-        pazienteNome={paziente ? `${paziente.nome} ${paziente.cognome}` : ""}
-        onClose={() => setTabletSession(null)}
-        onCompleted={() => {
-          setTabletSession(null);
-          void load({ silent: true });
-        }}
-      />
-
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="diario">Diario</TabsTrigger>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
@@ -292,7 +240,10 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="anagrafica">
-          <AnagraficaPanel paziente={paziente} />
+          <AnagraficaPanel
+            paziente={paziente}
+            onEdit={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
+          />
         </TabsContent>
 
         <TabsContent value="anamnesi">
@@ -305,7 +256,11 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="piani">
-          <PianiPanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
+          <PianiPanel
+            pazienteId={id}
+            pazienteNome={`${paziente.nome} ${paziente.cognome}`}
+            onChanged={() => void load({ silent: true })}
+          />
         </TabsContent>
 
         <TabsContent value="sedute">
