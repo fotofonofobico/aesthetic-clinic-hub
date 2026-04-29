@@ -272,7 +272,11 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="consensi">
-          <ConsensiPanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
+          <ConsensiPanel
+            pazienteId={id}
+            pazienteNome={`${paziente.nome} ${paziente.cognome}`}
+            onChanged={() => void load({ silent: true })}
+          />
         </TabsContent>
 
         <TabsContent value="alert">
