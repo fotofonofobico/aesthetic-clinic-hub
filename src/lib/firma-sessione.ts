@@ -169,7 +169,7 @@ export function useFirmaSessione(id: string | null) {
       .maybeSingle()
       .then(({ data }) => {
         if (active) {
-          setRow((data as FirmaSessioneRow | null) ?? null);
+          setRow((data as unknown as FirmaSessioneRow | null) ?? null);
           setLoading(false);
         }
       });
