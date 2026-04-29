@@ -1690,6 +1690,20 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
           }
         }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
+          if (firmaVoceKey) {
+            const [pid, vid, tid] = firmaVoceKey.split("::");
+            if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
+          }
+        }}
       />
     </div>
   );
