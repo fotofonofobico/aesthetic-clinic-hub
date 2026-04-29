@@ -51,6 +51,7 @@ import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
 import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
 import { ConsumoMagazzinoStep, righeToRigheConsumo, type ConsumoRiga } from "@/components/magazzino/consumo-step";
 import { consumaSeduta } from "@/lib/magazzino";
+import { creaFollowupSePrevisto } from "@/lib/calendario-followup";
 import {
   dataClinica,
   diffPerAudit,
@@ -958,6 +959,18 @@ function EseguiSedutaDialog({
     }
 
     toast.success("Seduta firmata e aggiunta al diario");
+
+    // Follow-up automatico opzionale (silenzioso, non blocca il flusso)
+    if (user?.id) {
+      void creaFollowupSePrevisto({
+        user_id: user.id,
+        paziente_id: seduta.paziente_id,
+        seduta_id: seduta.id,
+        data_seduta: new Date(dataIso),
+        trattamento_nome: trattamento?.nome ?? null,
+      });
+    }
+
     onSaved();
   }
 

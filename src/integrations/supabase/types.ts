@@ -180,6 +180,33 @@ export type Database = {
         }
         Relationships: []
       }
+      calendario_preferenze: {
+        Row: {
+          created_at: string
+          followup_auto_attivo: boolean
+          followup_giorni_offset: number
+          updated_at: string
+          user_id: string
+          vista_default: string
+        }
+        Insert: {
+          created_at?: string
+          followup_auto_attivo?: boolean
+          followup_giorni_offset?: number
+          updated_at?: string
+          user_id: string
+          vista_default?: string
+        }
+        Update: {
+          created_at?: string
+          followup_auto_attivo?: boolean
+          followup_giorni_offset?: number
+          updated_at?: string
+          user_id?: string
+          vista_default?: string
+        }
+        Relationships: []
+      }
       consenso_firmato: {
         Row: {
           categoria_snapshot: Database["public"]["Enums"]["consenso_categoria"]
@@ -425,6 +452,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      evento_calendario: {
+        Row: {
+          colore: string | null
+          completato: boolean
+          created_at: string
+          created_by: string | null
+          data_fine: string | null
+          data_inizio: string
+          descrizione: string | null
+          id: string
+          nota_diario_id: string | null
+          paziente_id: string | null
+          seduta_id: string | null
+          sincronizza_diario: boolean
+          tipo: Database["public"]["Enums"]["calendario_evento_tipo"]
+          titolo: string
+          tutto_il_giorno: boolean
+          updated_at: string
+        }
+        Insert: {
+          colore?: string | null
+          completato?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_fine?: string | null
+          data_inizio: string
+          descrizione?: string | null
+          id?: string
+          nota_diario_id?: string | null
+          paziente_id?: string | null
+          seduta_id?: string | null
+          sincronizza_diario?: boolean
+          tipo?: Database["public"]["Enums"]["calendario_evento_tipo"]
+          titolo: string
+          tutto_il_giorno?: boolean
+          updated_at?: string
+        }
+        Update: {
+          colore?: string | null
+          completato?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_fine?: string | null
+          data_inizio?: string
+          descrizione?: string | null
+          id?: string
+          nota_diario_id?: string | null
+          paziente_id?: string | null
+          seduta_id?: string | null
+          sincronizza_diario?: boolean
+          tipo?: Database["public"]["Enums"]["calendario_evento_tipo"]
+          titolo?: string
+          tutto_il_giorno?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       followup: {
         Row: {
@@ -1530,6 +1614,7 @@ export type Database = {
       alert_severity: "info" | "attenzione" | "critico"
       anamnesi_stato: "draft" | "signed" | "superseded"
       app_role: "medico" | "collaboratore"
+      calendario_evento_tipo: "promemoria" | "follow_up" | "attivita" | "altro"
       consenso_categoria:
         | "gdpr"
         | "trattamento_singolo"
@@ -1679,6 +1764,7 @@ export const Constants = {
       alert_severity: ["info", "attenzione", "critico"],
       anamnesi_stato: ["draft", "signed", "superseded"],
       app_role: ["medico", "collaboratore"],
+      calendario_evento_tipo: ["promemoria", "follow_up", "attivita", "altro"],
       consenso_categoria: [
         "gdpr",
         "trattamento_singolo",
