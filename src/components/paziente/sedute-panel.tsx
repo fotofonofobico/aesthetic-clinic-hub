@@ -501,6 +501,57 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
           );
         }}
       />
+
+      {/* Foto baseline mancanti — non bloccante prima di "Esegui" */}
+      {baselineDialog && baselineDialog.seduta.piano_id && (
+        <FotoBaselineDialog
+          open
+          onOpenChange={(v) => !v && setBaselineDialog(null)}
+          piano_id={baselineDialog.seduta.piano_id}
+          paziente_id={pazienteId}
+          incoerenza={baselineDialog.incoerenza}
+          onProcedi={() => {
+            const key = `foto-baseline-snooze:${baselineDialog.seduta.piano_id}`;
+            localStorage.setItem(
+              key,
+              String(Date.now() + 24 * 60 * 60 * 1000),
+            );
+            const s = baselineDialog.seduta;
+            setBaselineDialog(null);
+            setEseguiSeduta(s);
+          }}
+          onCarica={() => {
+            const s = baselineDialog.seduta;
+            setBaselineDialog(null);
+            setUploadFoto({
+              paziente_id: pazienteId,
+              piano_id: s.piano_id!,
+              seduta_id: null,
+              momento: "prima",
+            });
+          }}
+          onNonEseguibile={() => {
+            setBaselineDialog(null);
+            void load();
+          }}
+        />
+      )}
+
+      {/* Upload rapido foto (baseline o post-seduta) */}
+      {uploadFoto && (
+        <FotoUploadDialog
+          open
+          onOpenChange={(v) => !v && setUploadFoto(null)}
+          paziente_id={uploadFoto.paziente_id}
+          piano_id={uploadFoto.piano_id}
+          seduta_id={uploadFoto.seduta_id}
+          defaultMomento={uploadFoto.momento}
+          onUploaded={() => {
+            setUploadFoto(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
