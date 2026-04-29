@@ -439,8 +439,39 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
           voce={eseguiSeduta.voce_id ? voceMap.get(eseguiSeduta.voce_id) : undefined}
           onClose={() => setEseguiSeduta(null)}
           onSaved={() => {
+            const completata = eseguiSeduta;
             setEseguiSeduta(null);
             void load();
+            // Toast non bloccante: proponi foto DOPO se la seduta è dentro un piano
+            if (completata?.piano_id) {
+              const snoozeKey = `foto-dopo-snooze:${completata.piano_id}`;
+              const snoozeUntil = Number(localStorage.getItem(snoozeKey) || 0);
+              if (snoozeUntil < Date.now()) {
+                toast("Aggiungi foto DOPO la seduta?", {
+                  description: "Documentazione fotografica del risultato.",
+                  duration: 10000,
+                  action: {
+                    label: "Carica",
+                    onClick: () =>
+                      setUploadFoto({
+                        paziente_id: pazienteId,
+                        piano_id: completata.piano_id!,
+                        seduta_id: completata.id,
+                        momento: "dopo",
+                      }),
+                  },
+                  cancel: {
+                    label: "Più tardi",
+                    onClick: () => {
+                      localStorage.setItem(
+                        snoozeKey,
+                        String(Date.now() + 24 * 60 * 60 * 1000),
+                      );
+                    },
+                  },
+                });
+              }
+            }
           }}
         />
       )}
