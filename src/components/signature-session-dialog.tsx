@@ -761,3 +761,41 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
     </Dialog>
   );
 }
+
+/**
+ * Bottone alternativo posizionato sotto ogni SignaturePad: permette di
+ * delegare la firma a un dispositivo tablet in "modalità firma".
+ * Quando la sessione tablet è stata creata con successo, chiude il dialog
+ * locale (onSent) per evitare due flussi sovrapposti; il completamento
+ * avviene poi tramite il MedicoFinalizeDialog interno a SendToTabletButton.
+ */
+function OppureInviaTablet({
+  session,
+  pazienteNome,
+  onSent,
+  onCompleted,
+}: {
+  session: SignatureSession | null;
+  pazienteNome: string;
+  onSent: () => void;
+  onCompleted: () => void;
+}) {
+  if (!session) return null;
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        oppure
+      </span>
+      <SendToTabletButton
+        session={session}
+        pazienteNome={pazienteNome || "Paziente"}
+        label="Invia a tablet"
+        size="sm"
+        buildSession={async () => session}
+        onSent={onSent}
+        onCompleted={onCompleted}
+      />
+    </div>
+  );
+}
