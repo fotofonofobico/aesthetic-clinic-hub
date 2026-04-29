@@ -1698,6 +1698,7 @@ export function PianiPanel({
         onCompleted={() => {
           setFirmaOpen(false);
           void load();
+          onChanged?.();
           if (firmaVoceKey) {
             const [pid, vid, tid] = firmaVoceKey.split("::");
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
@@ -1713,6 +1714,7 @@ export function PianiPanel({
         onCompleted={() => {
           setTabletSession(null);
           void load();
+          onChanged?.();
           if (firmaVoceKey) {
             const [pid, vid, tid] = firmaVoceKey.split("::");
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
