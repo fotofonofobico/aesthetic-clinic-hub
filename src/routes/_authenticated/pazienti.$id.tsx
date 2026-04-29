@@ -380,9 +380,16 @@ function CriticalBanner({
   );
 }
 
-function AnagraficaPanel({ paziente }: { paziente: Paziente }) {
+function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () => void }) {
   return (
     <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle className="font-display text-base">Anagrafica</CardTitle>
+        <Button variant="outline" size="sm" onClick={onEdit} className="w-full sm:w-auto">
+          <Pencil className="h-4 w-4" />
+          Modifica anagrafica
+        </Button>
+      </CardHeader>
       <CardContent className="grid gap-4 p-6 md:grid-cols-2">
         <Info label="Telefono" value={paziente.telefono} />
         <Info label="Email" value={paziente.email} />
