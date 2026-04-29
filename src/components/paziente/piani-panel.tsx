@@ -1513,19 +1513,8 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                     </div>
                   </div>
 
-                  {/* Alert consenso aggregato */}
-                  {!isLegacy && isOpen && vociMancanti.length > 0 && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>
-                        Consenso mancante per {vociMancanti.length} trattamento/i
-                      </AlertTitle>
-                      <AlertDescription>
-                        Firma il consenso prima di iniziare le sedute. Lo trovi
-                        accanto a ogni trattamento qui sotto.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* Alert consenso aggregato rimosso: ridondante con i pallini per voce qui sotto */}
+
 
                   {isOpen && (
                     <div className="space-y-3 border-t border-border pt-3">
