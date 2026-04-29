@@ -1451,6 +1451,63 @@ export type Database = {
           },
         ]
       }
+      studio_info: {
+        Row: {
+          cap: string | null
+          citta: string | null
+          codice_fiscale: string | null
+          direttore_sanitario: string | null
+          email: string | null
+          id: string
+          indirizzo: string | null
+          logo_url: string | null
+          partita_iva: string | null
+          pec: string | null
+          provincia: string | null
+          ragione_sociale: string | null
+          sito_web: string | null
+          telefono: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cap?: string | null
+          citta?: string | null
+          codice_fiscale?: string | null
+          direttore_sanitario?: string | null
+          email?: string | null
+          id?: string
+          indirizzo?: string | null
+          logo_url?: string | null
+          partita_iva?: string | null
+          pec?: string | null
+          provincia?: string | null
+          ragione_sociale?: string | null
+          sito_web?: string | null
+          telefono?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cap?: string | null
+          citta?: string | null
+          codice_fiscale?: string | null
+          direttore_sanitario?: string | null
+          email?: string | null
+          id?: string
+          indirizzo?: string | null
+          logo_url?: string | null
+          partita_iva?: string | null
+          pec?: string | null
+          provincia?: string | null
+          ragione_sociale?: string | null
+          sito_web?: string | null
+          telefono?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       trattamenti: {
         Row: {
           attivo: boolean
