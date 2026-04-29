@@ -1673,6 +1673,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
       <SignatureSessionDialog
         open={firmaOpen}
         session={firmaSession}
+        pazienteNome={pazienteNome}
         onClose={() => {
           setFirmaOpen(false);
           if (firmaVoceKey) {

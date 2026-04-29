@@ -520,6 +520,7 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
       <SignatureSessionDialog
         open={firmaOpen}
         session={firmaSession}
+        pazienteNome={pazienteNome}
         onClose={() => {
           setFirmaOpen(false);
           setPendingExecAfterFirma(null);
