@@ -246,7 +246,7 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
             setCreaProdottoOpen(o);
             if (!o) setCreaIdx(null);
           }}
-          onSaved={(p) => {
+          onCreated={(p) => {
             if (creaIdx != null) {
               void onProdottoSelect(creaIdx, p.id, p as ProdottoConDettagli);
             }
