@@ -303,7 +303,7 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="consensi">
-          <ConsensiPanel pazienteId={id} />
+          <ConsensiPanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
         </TabsContent>
 
         <TabsContent value="alert">
