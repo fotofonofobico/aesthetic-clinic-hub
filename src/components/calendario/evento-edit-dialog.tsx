@@ -12,12 +12,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { CalendarioEventoTipo, EventoCalendario } from "@/types/calendario";
 import { TIPO_LABEL, toLocalInput, fromLocalInput } from "@/lib/calendario";
-
-interface PazienteMin {
-  id: string;
-  nome: string;
-  cognome: string;
-}
+import { PazienteSearch } from "@/components/paziente/paziente-search";
 
 interface Props {
   open: boolean;
@@ -48,7 +43,6 @@ export function EventoEditDialog({
   const [pazienteId, setPazienteId] = useState<string | null>(null);
   const [sincronizzaDiario, setSincronizzaDiario] = useState(false);
   const [completato, setCompletato] = useState(false);
-  const [pazienti, setPazienti] = useState<PazienteMin[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -76,16 +70,6 @@ export function EventoEditDialog({
       setCompletato(false);
     }
   }, [open, evento, defaultStart, defaultPazienteId]);
-
-  useEffect(() => {
-    if (!open) return;
-    supabase
-      .from("pazienti")
-      .select("id, nome, cognome")
-      .order("cognome")
-      .limit(500)
-      .then(({ data }) => setPazienti((data ?? []) as PazienteMin[]));
-  }, [open]);
 
   const handleSave = async () => {
     if (!titolo.trim()) {
@@ -240,18 +224,7 @@ export function EventoEditDialog({
             </div>
             <div className="space-y-1">
               <Label>Paziente (opzionale)</Label>
-              <Select
-                value={pazienteId ?? "__none__"}
-                onValueChange={(v) => setPazienteId(v === "__none__" ? null : v)}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— nessuno —</SelectItem>
-                  {pazienti.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.cognome} {p.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <PazienteSearch value={pazienteId} onChange={setPazienteId} />
             </div>
           </div>
 

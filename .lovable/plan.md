@@ -1,131 +1,123 @@
-## Modulo Calendario — non invasivo
+# Piano finale — refactor UI
 
-### Principio
-Il calendario è un **layer di lettura aggiuntivo** sopra le entità esistenti + una **nuova entità isolata** (`evento_calendario`). Zero modifiche a `seduta`, `piano_trattamento`, `magazzino_movimento`, `prodotto_lotto`, `paziente_nota`. Nessun trigger nuovo sulle tabelle core.
+## Decisioni recepite
+- Sidebar: rimuovo Audit & Sicurezza e Impostazioni dalla lista (no placeholder "Presto")
+- KPI: opzione 3 → 2 KPI reali subito (nuovi pazienti mese, n. trattamenti mese), gli altri 2 dopo
+- Alert "Follow-up necessari": **non implementato** ora, in sospeso
+- Diario→Calendario: checkbox **default OFF** sempre, l'utente lo attiva esplicitamente
 
----
+## 1. Sidebar (`src/components/app-layout.tsx`)
 
-### 1. Database — solo entità nuove
+Voci finali:
+- Dashboard
+- **Calendario** (nuovo, icona `CalendarDays`)
+- Pazienti
+- Trattamenti
+- Consensi
+- Magazzino
 
-**Nuova tabella `evento_calendario`** (isolata, RLS standard operatore attivo):
-- `id`, `created_at`, `updated_at`, `created_by`
-- `titolo` (text, obbligatorio)
-- `descrizione` (text, opzionale)
-- `data_inizio` (timestamptz), `data_fine` (timestamptz, opzionale)
-- `tutto_il_giorno` (boolean, default false)
-- `tipo` enum: `promemoria | follow_up | attivita | altro`
-- `paziente_id` (uuid, nullable — link soft, no FK cascade duro lato app)
-- `seduta_id` (uuid, nullable — solo riferimento per follow-up generati)
-- `colore` (text, opzionale)
-- `completato` (boolean, default false)
-- `sincronizza_diario` (boolean, default false) — flag manuale richiesto dall'utente
-- `nota_diario_id` (uuid, nullable) — popolato se l'evento ha generato una nota
+Rimosse: Anamnesi (resta tab paziente), nessun placeholder.
+Footer sidebar: lascio com'è (Impostazioni placeholder solo per medico).
 
-**Nuova tabella `calendario_preferenze`** (1 riga per utente):
-- `user_id` (PK), `followup_auto_attivo` (bool default false), `followup_giorni_offset` (int default 7), `vista_default` (text: `settimana|giorno`)
+## 2. Dashboard operativa (`src/routes/_authenticated/dashboard.tsx`)
 
-**Nessuna modifica a tabelle esistenti.** Le scadenze lotti e le sedute si leggono via SELECT normali — non si toccano i loro schemi.
+Layout 2 colonne desktop, stack mobile:
 
----
+```text
+┌─────────────────────────┬───────────────────┐
+│ Agenda 7 giorni         │ Azioni rapide     │
+│ (colonna principale)    │ Alerts            │
+│                         │ KPI 2 card        │
+├─────────────────────────┴───────────────────┤
+│ Attività recente (pazienti | sedute)        │
+└─────────────────────────────────────────────┘
+```
 
-### 2. Sorgenti eventi (tutte aggregate client-side / via server function)
+Rimosso: blocco "Iterazione 1", tutte le `ModuleCard`, funzione helper.
 
-| Sorgente | Origine | Scrittura | Drag&drop |
-|---|---|---|---|
-| Sedute pianificate | `seduta.data_seduta` | read-only | NO (preparato per il futuro) |
-| Promemoria/attività/eventi paziente | `evento_calendario` | full CRUD | SI |
-| Follow-up auto | `evento_calendario` (tipo=follow_up) | generato opzionalmente | SI |
-| Scadenze lotti | `prodotto_lotto.data_scadenza` | read-only | NO |
+### Sezioni
 
-Una server function `getCalendarioEventi({ from, to, filtri })` ritorna l'array unificato già normalizzato (`{ id, source, titolo, start, end, color, paziente_id?, meta }`). Le pagine esistenti non la chiamano mai.
+**Agenda (`agenda-section.tsx`)**
+- `useCalendarioEventi(oggi → +7gg)`
+- Lista raggruppata per giorno, max 10 item visibili
+- Empty: "Nessun appuntamento nei prossimi 7 giorni"
+- CTA "Aggiungi appuntamento" → apre `EventoEditDialog`
+- Click evento → `/calendario` (o paziente se collegato)
 
----
+**Azioni rapide (`azioni-rapide.tsx`)**
+- 3 bottoni: Nuovo paziente → `/pazienti`, Nuovo trattamento → `/trattamenti`, Nuovo consenso → `/consensi`
 
-### 3. UI
+**Alerts (`alerts-section.tsx`)**
+Calcolati al volo:
+- **Consensi mancanti** (rosso): paziente con seduta pianificata nei prossimi 7gg senza consenso firmato collegato
+- **Anamnesi incomplete** (giallo): paziente senza riga in `anamnesi` o `updated_at > 12 mesi`
+- **Scorte basse** (rosso se 0, giallo se sotto soglia): da `prodotto_lotto`
+- ~~Follow-up necessari~~ → in sospeso
 
-**Nuova rotta `/calendario`** (`src/routes/_authenticated/calendario.tsx`):
-- Vista **Settimana** (default) e **Giorno**, toggle in header
-- Filtri: tipo evento (sedute/promemoria/follow-up/scadenze), paziente (search)
-- Drag & drop SOLO eventi `evento_calendario` (sedute disabilitate con tooltip "Modifica dalla scheda paziente")
-- Click su evento seduta → naviga a `/pazienti/$id` (no editing inline)
-- Click su evento calendario → dialog edit (titolo, data, paziente opzionale, flag "sincronizza nel diario")
-- Bottone "+ Nuovo evento" sempre visibile, nessun popup bloccante
+Render: pallino colorato + testo + count, click → vista filtrata.
+Tutto ok → singola riga "Tutto in regola" con pallino verde.
 
-**Widget dashboard** (`CalendarioWidget` in `dashboard.tsx`):
-- Card compatta "Prossimi 7 giorni" con max 6 prossimi eventi
-- Link "Apri calendario" → `/calendario`
-- Skeleton di caricamento, nessun blocco se la query fallisce
+**KPI (`kpi-griglia.tsx` + `use-kpi-mese.ts`)**
+2 card reali:
+- **Nuovi pazienti del mese**: count `pazienti` con `created_at >= inizio_mese`
+- **Trattamenti del mese**: count `seduta` con `data_seduta >= inizio_mese AND completata = true`
 
-**Componenti nuovi** (cartella isolata `src/components/calendario/`):
-- `calendario-vista.tsx` — vista settimana/giorno con grid oraria
-- `calendario-evento-card.tsx` — render singolo evento per tipo
-- `evento-edit-dialog.tsx` — crea/modifica `evento_calendario`
-- `calendario-widget.tsx` — widget dashboard
-- `calendario-filtri.tsx` — barra filtri
-- `use-calendario-eventi.ts` — hook che chiama la server function
+Card structure pronta per accettare 4 valori in futuro (fatturato, ticket medio quando ci sarà fatturazione).
+Skeleton durante loading. No mock.
 
-Libreria drag&drop: `@dnd-kit/core` (già leggera, no dipendenze pesanti tipo fullcalendar). Niente librerie calendar pre-fatte → controllo totale UX e zero stili invasivi.
+**Attività recente (`attivita-recente.tsx`)**
+- Ultimi 5 pazienti (`order by created_at desc limit 5`) → click `/pazienti/$id`
+- Ultime 5 sedute completate con nome paziente → click paziente
+- Empty state per ciascuna lista
 
----
+## 3. Ricerca paziente (`src/components/paziente/paziente-search.tsx`)
 
-### 4. Sincronizzazione diario (manuale con flag)
+Combobox riusabile basato su `Command` + `Popover` (pattern di `prodotto-combobox`).
+- Input con debounce 200ms
+- Query Supabase `pazienti` filtrata `cognome ilike` o `nome ilike`, limit 20
+- Voce "— nessuno —" sempre in cima
+- Trigger mostra "Cognome Nome" se selezionato
 
-- Nel dialog evento: checkbox **"Crea/aggiorna nota nel diario paziente"** (visibile solo se `paziente_id` impostato)
-- Su salvataggio con flag attivo: server function inserisce/aggiorna riga in `paziente_nota` (tipo `clinica`, `auto_generata=true`) e salva l'`id` in `evento_calendario.nota_diario_id`
-- Su unflag o delete evento: la nota collegata viene eliminata (solo se `auto_generata=true` e creata dal calendario)
-- Le note esistenti del diario **non** diventano automaticamente eventi (decisione utente)
+Sostituisce il `<Select>` paziente in `EventoEditDialog`.
 
----
+## 4. Diario → Calendario (`src/components/paziente/diario-panel.tsx`)
 
-### 5. Follow-up automatici (opt-in)
+Aggiungo checkbox **"Aggiungi anche al calendario"** sotto il textarea — **default OFF sempre**.
 
-- Disattivati di default in `calendario_preferenze`
-- Quando attivi: alla creazione di una nota con `seduta_id` (post-completamento), una server function `creaFollowupSePrevisto` crea un `evento_calendario` tipo `follow_up` a `data_seduta + N giorni`
-- **Non chiamata da trigger DB** → invocata esplicitamente da un piccolo hook lato client dopo il completamento seduta, in `try/catch` silenzioso. Se fallisce, la seduta è già salvata.
-- Toggle nelle preferenze utente (pagina `/calendario` → menu impostazioni)
+Quando attivo, alla creazione nota inserisce anche `evento_calendario`:
+- `titolo` = primi 60 char del testo
+- `descrizione` = testo completo
+- `tipo` = `promemoria`
+- `data_inizio` = `data_evento`
+- `paziente_id` = pazienteId
+- `sincronizza_diario` = true
+- `nota_diario_id` = id nota appena creata
 
----
+Errore evento NON blocca creazione nota (toast warning).
+Eliminazione nota NON elimina l'evento (calendario non vincolante).
 
-### 6. Architettura per future estensioni (preparata, non attiva)
+## 5. UX globali
 
-- La server function di update evento accetta un parametro `target` (oggi solo `evento_calendario`). Quando in futuro si vorrà spostare sedute, basterà aggiungere `seduta` come target con conferma + log in `seduta_modifica`.
-- Tabella `seduta_modifica` esiste già → il futuro audit del drag su sedute riusa quella infrastruttura.
+- Card e item liste cliccabili (cursor-pointer + hover bg)
+- Indicatori stato: `bg-success`, `bg-warning`, `bg-destructive`
+- Niente testi descrittivi superflui
+- Nessuna modifica a routing, RLS, logica clinica
 
----
+## File
 
-### 7. Sicurezza & performance
+**Modificati:**
+- `src/components/app-layout.tsx`
+- `src/routes/_authenticated/dashboard.tsx`
+- `src/components/calendario/evento-edit-dialog.tsx`
+- `src/components/paziente/diario-panel.tsx`
 
-- RLS su `evento_calendario` e `calendario_preferenze`: pattern identico alle altre tabelle (`is_active_operator`)
-- Query calendario range-bound (sempre con `data_inizio between from and to`) + indici su `data_inizio`, `paziente_id`
-- Widget dashboard: query separata limit 6, non bloccante
-- Nessun import nei file di `sedute-panel`, `piani-panel`, `consumo-step`, `magazzino`, `paziente-tab` → isolamento garantito
+**Creati:**
+- `src/components/paziente/paziente-search.tsx`
+- `src/components/dashboard/agenda-section.tsx`
+- `src/components/dashboard/azioni-rapide.tsx`
+- `src/components/dashboard/alerts-section.tsx`
+- `src/components/dashboard/kpi-griglia.tsx`
+- `src/components/dashboard/attivita-recente.tsx`
+- `src/hooks/use-kpi-mese.ts`
 
----
-
-### 8. Cosa NON faccio (per esplicito rispetto del principio)
-
-- Nessuna modifica a `seduta`, `piano_trattamento`, `prodotto_lotto`, `paziente_nota`, `magazzino_movimento`
-- Nessun trigger DB nuovo sulle tabelle core
-- Nessuna multi-sede (non esiste oggi nel progetto — verificato)
-- Nessun blocco UX: tutti gli alert calendario sono toast informativi
-- Nessun cambio ai flussi consensi/foto/baseline appena costruiti
-
----
-
-### File previsti
-
-**Nuovi:**
-- `supabase/migrations/<ts>_calendario.sql` (2 tabelle + RLS + indici)
-- `src/types/calendario.ts`
-- `src/lib/calendario.ts` (helpers normalizzazione eventi)
-- `src/server/calendario.functions.ts` (server functions: get/create/update/delete + follow-up)
-- `src/components/calendario/*` (5 componenti elencati sopra)
-- `src/hooks/use-calendario-eventi.ts`
-- `src/routes/_authenticated/calendario.tsx`
-
-**Modificati (minimi, additivi):**
-- `src/routes/_authenticated/dashboard.tsx` → aggiunta `<CalendarioWidget />` + link
-- `package.json` → aggiunta `@dnd-kit/core` e `@dnd-kit/sortable`
-- `src/components/paziente/sedute-panel.tsx` → SOLO una chiamata `try/catch` a `creaFollowupSePrevisto` dopo completamento (zero modifiche al flusso esistente, fallimento silenzioso)
-
-Pronto a procedere appena approvi.
+Nessuna migration DB.

@@ -7,7 +7,7 @@ import {
   Stethoscope,
   LayoutDashboard,
   Users,
-  ClipboardList,
+  CalendarDays,
   FileSignature,
   Syringe,
   Package,
@@ -21,16 +21,15 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.ReactNode;
-  comingSoon?: boolean;
 }
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+  { to: "/calendario", label: "Calendario", icon: <CalendarDays className="h-4 w-4" /> },
   { to: "/pazienti", label: "Pazienti", icon: <Users className="h-4 w-4" /> },
   { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" /> },
   { to: "/consensi", label: "Consensi", icon: <FileSignature className="h-4 w-4" /> },
   { to: "/magazzino", label: "Magazzino", icon: <Package className="h-4 w-4" /> },
-  { to: "/anamnesi", label: "Anamnesi", icon: <ClipboardList className="h-4 w-4" />, comingSoon: true },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -48,12 +47,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar desktop */}
       <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar md:flex md:flex-col">
         <SidebarContent />
       </aside>
 
-      {/* Sidebar mobile (drawer) */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -66,7 +63,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-card/60 px-4 md:px-6">
           <button
@@ -79,9 +75,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3 md:ml-auto">
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight">
-                {user?.email}
-              </p>
+              <p className="text-sm font-medium leading-tight">{user?.email}</p>
               <p className="text-xs text-muted-foreground leading-tight">{ruolo}</p>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -120,34 +114,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map((item) => {
             const active = location.pathname === item.to;
-            const disabled = item.comingSoon;
             return (
               <div
                 key={item.to}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors cursor-pointer",
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : disabled
-                      ? "text-sidebar-foreground/50"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer",
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
                 onClick={() => {
-                  if (!disabled) {
-                    void navigate({ to: item.to });
-                    onNavigate?.();
-                  }
+                  void navigate({ to: item.to });
+                  onNavigate?.();
                 }}
               >
-                <span className="flex items-center gap-2">
-                  {item.icon}
-                  {item.label}
-                </span>
-                {disabled && (
-                  <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sidebar-accent-foreground/70">
-                    Presto
-                  </span>
-                )}
+                {item.icon}
+                {item.label}
               </div>
             );
           })}
@@ -156,7 +138,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="border-t border-sidebar-border p-3">
           {hasRole("medico") && (
             <div
-              className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/60"
+              className="flex cursor-default items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/60"
               title="Disponibile prossimamente"
             >
               <Settings className="h-4 w-4" />
