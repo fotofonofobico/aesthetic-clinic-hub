@@ -620,6 +620,18 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           void load();
           onSaved();
         }}
+        onInviaTablet={(s) => setTabletSession(s)}
+      />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
+          void load();
+          onSaved();
+        }}
       />
 
       {/* === 1. GENERALE === */}
