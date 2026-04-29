@@ -442,11 +442,13 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
 
 function NuovoConsensoDialog({
   pazienteId,
+  pazienteNome = "",
   templates,
   onClose,
   onSaved,
 }: {
   pazienteId: string;
+  pazienteNome?: string;
   templates: ConsensoTemplate[];
   onClose: () => void;
   onSaved: () => void;
