@@ -200,22 +200,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => void avviaVisitaMac()}
-            disabled={buildingVisita}
-          >
-            <PenLine className="h-4 w-4" />
-            Sessione visita (Mac)
-          </Button>
-          <SendToTabletButton
-            session={null}
-            pazienteNome={pazienteNome}
-            label="📱 Invia a tablet"
-            disabled={buildingVisita}
-            buildSession={async () => buildVisitaSession(pazienteId)}
-            onCompleted={() => void load()}
-          />
           <Dialog open={openDlg} onOpenChange={setOpenDlg}>
             <DialogTrigger asChild>
               <Button>
@@ -225,6 +209,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
             </DialogTrigger>
             <NuovoConsensoDialog
               pazienteId={pazienteId}
+              pazienteNome={pazienteNome}
               templates={templates}
               onClose={() => setOpenDlg(false)}
               onSaved={() => {
