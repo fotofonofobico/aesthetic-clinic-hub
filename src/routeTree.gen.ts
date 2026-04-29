@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPdfViewerRouteImport } from './routes/_authenticated/pdf-viewer'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authenticated/calendario'
 import { Route as AuthenticatedTrattamentiIndexRouteImport } from './routes/_authenticated/trattamenti.index'
 import { Route as AuthenticatedPazientiIndexRouteImport } from './routes/_authenticated/pazienti.index'
 import { Route as AuthenticatedMagazzinoIndexRouteImport } from './routes/_authenticated/magazzino.index'
@@ -44,6 +45,11 @@ const AuthenticatedPdfViewerRoute = AuthenticatedPdfViewerRouteImport.update({
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCalendarioRoute = AuthenticatedCalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTrattamentiIndexRoute =
@@ -90,6 +96,7 @@ const AuthenticatedPazientiIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/calendario': typeof AuthenticatedCalendarioRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/_authenticated/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/calendario'
     | '/dashboard'
     | '/pdf-viewer'
     | '/pazienti/$id'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/calendario'
     | '/dashboard'
     | '/pdf-viewer'
     | '/pazienti/$id'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/calendario'
     | '/_authenticated/dashboard'
     | '/_authenticated/pdf-viewer'
     | '/_authenticated/pazienti/$id'
@@ -213,6 +225,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/calendario': {
+      id: '/_authenticated/calendario'
+      path: '/calendario'
+      fullPath: '/calendario'
+      preLoaderRoute: typeof AuthenticatedCalendarioRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/trattamenti/': {
@@ -282,6 +301,7 @@ const AuthenticatedPazientiIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedCalendarioRoute: typeof AuthenticatedCalendarioRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedPdfViewerRoute: typeof AuthenticatedPdfViewerRoute
   AuthenticatedPazientiIdRoute: typeof AuthenticatedPazientiIdRouteWithChildren
@@ -292,6 +312,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedCalendarioRoute: AuthenticatedCalendarioRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedPdfViewerRoute: AuthenticatedPdfViewerRoute,
   AuthenticatedPazientiIdRoute: AuthenticatedPazientiIdRouteWithChildren,
@@ -314,3 +335,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
