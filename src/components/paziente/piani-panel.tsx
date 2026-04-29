@@ -932,14 +932,14 @@ export function PianiPanel({
   // ---------- render ----------
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-display text-base font-semibold">Piani di trattamento</h3>
           <p className="text-xs text-muted-foreground">
             Pianifica trattamenti, prodotti, zone e prezzo. Le sedute si registrano in seduta.
           </p>
         </div>
-        <Button onClick={apriNuovo}>
+        <Button onClick={apriNuovo} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Nuovo piano
         </Button>
@@ -975,7 +975,7 @@ export function PianiPanel({
           }
         }}
       >
-        <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto p-4 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-3xl sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-display">
               {editingPianoId ? "Modifica piano" : "Nuovo piano"}
