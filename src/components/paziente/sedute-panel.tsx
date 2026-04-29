@@ -827,6 +827,20 @@ function EseguiSedutaDialog({
       toast.error(`Errore: ${error.message}`);
       return;
     }
+
+    // Scarico magazzino (best-effort, non blocca firma)
+    const righe = righeToRigheConsumo(consumoRighe);
+    if (righe.length > 0) {
+      try {
+        const res = await consumaSeduta(seduta.id, righe);
+        if (res.warnings && res.warnings.length > 0) {
+          toast.warning(`Magazzino: ${res.warnings.join("; ")}`);
+        }
+      } catch (e) {
+        toast.error(`Magazzino non aggiornato: ${(e as Error).message}`);
+      }
+    }
+
     toast.success("Seduta firmata e aggiunta al diario");
     onSaved();
   }
@@ -966,6 +980,8 @@ function EseguiSedutaDialog({
               ))}
             </div>
           </div>
+
+          <ConsumoMagazzinoStep righe={consumoRighe} onChange={setConsumoRighe} />
 
           <div>
             <Label>Parametri tecnici (opzionale)</Label>
