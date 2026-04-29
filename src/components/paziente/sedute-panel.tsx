@@ -959,6 +959,18 @@ function EseguiSedutaDialog({
     }
 
     toast.success("Seduta firmata e aggiunta al diario");
+
+    // Follow-up automatico opzionale (silenzioso, non blocca il flusso)
+    if (user?.id) {
+      void creaFollowupSePrevisto({
+        user_id: user.id,
+        paziente_id: seduta.paziente_id,
+        seduta_id: seduta.id,
+        data_seduta: new Date(dataIso),
+        trattamento_nome: trattamento?.nome ?? null,
+      });
+    }
+
     onSaved();
   }
 
