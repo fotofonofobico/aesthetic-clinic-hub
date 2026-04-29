@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FileSignature,
   Syringe,
+  Package,
   Settings,
   LogOut,
   Menu,
@@ -28,6 +29,7 @@ const NAV: NavItem[] = [
   { to: "/pazienti", label: "Pazienti", icon: <Users className="h-4 w-4" /> },
   { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" /> },
   { to: "/consensi", label: "Consensi", icon: <FileSignature className="h-4 w-4" /> },
+  { to: "/magazzino", label: "Magazzino", icon: <Package className="h-4 w-4" /> },
   { to: "/anamnesi", label: "Anamnesi", icon: <ClipboardList className="h-4 w-4" />, comingSoon: true },
 ];
 
