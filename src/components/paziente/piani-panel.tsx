@@ -1551,18 +1551,6 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                                   ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {cv?.ok === false && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        void avviaFirmaPerVoce(p.id, v.id, v.trattamento_id)
-                                      }
-                                    >
-                                      <PenLine className="h-3 w-3" />
-                                      Firma consenso
-                                    </Button>
-                                  )}
                                   <span className="text-xs font-medium">
                                     {formatEuro(
                                       prezzoRiga(
