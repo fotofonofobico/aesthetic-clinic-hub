@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPdfViewerRouteImport } from './routes/_authenticated/pdf-viewer'
+import { Route as AuthenticatedImpostazioniRouteImport } from './routes/_authenticated/impostazioni'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authenticated/calendario'
 import { Route as AuthenticatedTrattamentiIndexRouteImport } from './routes/_authenticated/trattamenti.index'
@@ -21,6 +22,11 @@ import { Route as AuthenticatedMagazzinoIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedConsensiIndexRouteImport } from './routes/_authenticated/consensi.index'
 import { Route as ShareConsensoTokenRouteImport } from './routes/share.consenso.$token'
 import { Route as AuthenticatedPazientiIdRouteImport } from './routes/_authenticated/pazienti.$id'
+import { Route as AuthenticatedImpostazioniUtentiRouteImport } from './routes/_authenticated/impostazioni.utenti'
+import { Route as AuthenticatedImpostazioniStudioRouteImport } from './routes/_authenticated/impostazioni.studio'
+import { Route as AuthenticatedImpostazioniProfiloRouteImport } from './routes/_authenticated/impostazioni.profilo'
+import { Route as AuthenticatedImpostazioniPreferenzeRouteImport } from './routes/_authenticated/impostazioni.preferenze'
+import { Route as AuthenticatedImpostazioniBackupRouteImport } from './routes/_authenticated/impostazioni.backup'
 import { Route as AuthenticatedPazientiIdEditRouteImport } from './routes/_authenticated/pazienti.$id.edit'
 
 const LoginRoute = LoginRouteImport.update({
@@ -42,6 +48,12 @@ const AuthenticatedPdfViewerRoute = AuthenticatedPdfViewerRouteImport.update({
   path: '/pdf-viewer',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedImpostazioniRoute =
+  AuthenticatedImpostazioniRouteImport.update({
+    id: '/impostazioni',
+    path: '/impostazioni',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -86,6 +98,36 @@ const AuthenticatedPazientiIdRoute = AuthenticatedPazientiIdRouteImport.update({
   path: '/pazienti/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedImpostazioniUtentiRoute =
+  AuthenticatedImpostazioniUtentiRouteImport.update({
+    id: '/utenti',
+    path: '/utenti',
+    getParentRoute: () => AuthenticatedImpostazioniRoute,
+  } as any)
+const AuthenticatedImpostazioniStudioRoute =
+  AuthenticatedImpostazioniStudioRouteImport.update({
+    id: '/studio',
+    path: '/studio',
+    getParentRoute: () => AuthenticatedImpostazioniRoute,
+  } as any)
+const AuthenticatedImpostazioniProfiloRoute =
+  AuthenticatedImpostazioniProfiloRouteImport.update({
+    id: '/profilo',
+    path: '/profilo',
+    getParentRoute: () => AuthenticatedImpostazioniRoute,
+  } as any)
+const AuthenticatedImpostazioniPreferenzeRoute =
+  AuthenticatedImpostazioniPreferenzeRouteImport.update({
+    id: '/preferenze',
+    path: '/preferenze',
+    getParentRoute: () => AuthenticatedImpostazioniRoute,
+  } as any)
+const AuthenticatedImpostazioniBackupRoute =
+  AuthenticatedImpostazioniBackupRouteImport.update({
+    id: '/backup',
+    path: '/backup',
+    getParentRoute: () => AuthenticatedImpostazioniRoute,
+  } as any)
 const AuthenticatedPazientiIdEditRoute =
   AuthenticatedPazientiIdEditRouteImport.update({
     id: '/edit',
@@ -98,7 +140,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
+  '/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
+  '/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
+  '/impostazioni/profilo': typeof AuthenticatedImpostazioniProfiloRoute
+  '/impostazioni/studio': typeof AuthenticatedImpostazioniStudioRoute
+  '/impostazioni/utenti': typeof AuthenticatedImpostazioniUtentiRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi/': typeof AuthenticatedConsensiIndexRoute
@@ -112,7 +160,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
+  '/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
+  '/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
+  '/impostazioni/profilo': typeof AuthenticatedImpostazioniProfiloRoute
+  '/impostazioni/studio': typeof AuthenticatedImpostazioniStudioRoute
+  '/impostazioni/utenti': typeof AuthenticatedImpostazioniUtentiRoute
   '/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/consensi': typeof AuthenticatedConsensiIndexRoute
@@ -128,7 +182,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/calendario': typeof AuthenticatedCalendarioRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
   '/_authenticated/pdf-viewer': typeof AuthenticatedPdfViewerRoute
+  '/_authenticated/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
+  '/_authenticated/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
+  '/_authenticated/impostazioni/profilo': typeof AuthenticatedImpostazioniProfiloRoute
+  '/_authenticated/impostazioni/studio': typeof AuthenticatedImpostazioniStudioRoute
+  '/_authenticated/impostazioni/utenti': typeof AuthenticatedImpostazioniUtentiRoute
   '/_authenticated/pazienti/$id': typeof AuthenticatedPazientiIdRouteWithChildren
   '/share/consenso/$token': typeof ShareConsensoTokenRoute
   '/_authenticated/consensi/': typeof AuthenticatedConsensiIndexRoute
@@ -144,7 +204,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/calendario'
     | '/dashboard'
+    | '/impostazioni'
     | '/pdf-viewer'
+    | '/impostazioni/backup'
+    | '/impostazioni/preferenze'
+    | '/impostazioni/profilo'
+    | '/impostazioni/studio'
+    | '/impostazioni/utenti'
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi/'
@@ -158,7 +224,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/calendario'
     | '/dashboard'
+    | '/impostazioni'
     | '/pdf-viewer'
+    | '/impostazioni/backup'
+    | '/impostazioni/preferenze'
+    | '/impostazioni/profilo'
+    | '/impostazioni/studio'
+    | '/impostazioni/utenti'
     | '/pazienti/$id'
     | '/share/consenso/$token'
     | '/consensi'
@@ -173,7 +245,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/calendario'
     | '/_authenticated/dashboard'
+    | '/_authenticated/impostazioni'
     | '/_authenticated/pdf-viewer'
+    | '/_authenticated/impostazioni/backup'
+    | '/_authenticated/impostazioni/preferenze'
+    | '/_authenticated/impostazioni/profilo'
+    | '/_authenticated/impostazioni/studio'
+    | '/_authenticated/impostazioni/utenti'
     | '/_authenticated/pazienti/$id'
     | '/share/consenso/$token'
     | '/_authenticated/consensi/'
@@ -218,6 +296,13 @@ declare module '@tanstack/react-router' {
       path: '/pdf-viewer'
       fullPath: '/pdf-viewer'
       preLoaderRoute: typeof AuthenticatedPdfViewerRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/impostazioni': {
+      id: '/_authenticated/impostazioni'
+      path: '/impostazioni'
+      fullPath: '/impostazioni'
+      preLoaderRoute: typeof AuthenticatedImpostazioniRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -276,6 +361,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPazientiIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/impostazioni/utenti': {
+      id: '/_authenticated/impostazioni/utenti'
+      path: '/utenti'
+      fullPath: '/impostazioni/utenti'
+      preLoaderRoute: typeof AuthenticatedImpostazioniUtentiRouteImport
+      parentRoute: typeof AuthenticatedImpostazioniRoute
+    }
+    '/_authenticated/impostazioni/studio': {
+      id: '/_authenticated/impostazioni/studio'
+      path: '/studio'
+      fullPath: '/impostazioni/studio'
+      preLoaderRoute: typeof AuthenticatedImpostazioniStudioRouteImport
+      parentRoute: typeof AuthenticatedImpostazioniRoute
+    }
+    '/_authenticated/impostazioni/profilo': {
+      id: '/_authenticated/impostazioni/profilo'
+      path: '/profilo'
+      fullPath: '/impostazioni/profilo'
+      preLoaderRoute: typeof AuthenticatedImpostazioniProfiloRouteImport
+      parentRoute: typeof AuthenticatedImpostazioniRoute
+    }
+    '/_authenticated/impostazioni/preferenze': {
+      id: '/_authenticated/impostazioni/preferenze'
+      path: '/preferenze'
+      fullPath: '/impostazioni/preferenze'
+      preLoaderRoute: typeof AuthenticatedImpostazioniPreferenzeRouteImport
+      parentRoute: typeof AuthenticatedImpostazioniRoute
+    }
+    '/_authenticated/impostazioni/backup': {
+      id: '/_authenticated/impostazioni/backup'
+      path: '/backup'
+      fullPath: '/impostazioni/backup'
+      preLoaderRoute: typeof AuthenticatedImpostazioniBackupRouteImport
+      parentRoute: typeof AuthenticatedImpostazioniRoute
+    }
     '/_authenticated/pazienti/$id/edit': {
       id: '/_authenticated/pazienti/$id/edit'
       path: '/edit'
@@ -285,6 +405,30 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedImpostazioniRouteChildren {
+  AuthenticatedImpostazioniBackupRoute: typeof AuthenticatedImpostazioniBackupRoute
+  AuthenticatedImpostazioniPreferenzeRoute: typeof AuthenticatedImpostazioniPreferenzeRoute
+  AuthenticatedImpostazioniProfiloRoute: typeof AuthenticatedImpostazioniProfiloRoute
+  AuthenticatedImpostazioniStudioRoute: typeof AuthenticatedImpostazioniStudioRoute
+  AuthenticatedImpostazioniUtentiRoute: typeof AuthenticatedImpostazioniUtentiRoute
+}
+
+const AuthenticatedImpostazioniRouteChildren: AuthenticatedImpostazioniRouteChildren =
+  {
+    AuthenticatedImpostazioniBackupRoute: AuthenticatedImpostazioniBackupRoute,
+    AuthenticatedImpostazioniPreferenzeRoute:
+      AuthenticatedImpostazioniPreferenzeRoute,
+    AuthenticatedImpostazioniProfiloRoute:
+      AuthenticatedImpostazioniProfiloRoute,
+    AuthenticatedImpostazioniStudioRoute: AuthenticatedImpostazioniStudioRoute,
+    AuthenticatedImpostazioniUtentiRoute: AuthenticatedImpostazioniUtentiRoute,
+  }
+
+const AuthenticatedImpostazioniRouteWithChildren =
+  AuthenticatedImpostazioniRoute._addFileChildren(
+    AuthenticatedImpostazioniRouteChildren,
+  )
 
 interface AuthenticatedPazientiIdRouteChildren {
   AuthenticatedPazientiIdEditRoute: typeof AuthenticatedPazientiIdEditRoute
@@ -303,6 +447,7 @@ const AuthenticatedPazientiIdRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedCalendarioRoute: typeof AuthenticatedCalendarioRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedImpostazioniRoute: typeof AuthenticatedImpostazioniRouteWithChildren
   AuthenticatedPdfViewerRoute: typeof AuthenticatedPdfViewerRoute
   AuthenticatedPazientiIdRoute: typeof AuthenticatedPazientiIdRouteWithChildren
   AuthenticatedConsensiIndexRoute: typeof AuthenticatedConsensiIndexRoute
@@ -314,6 +459,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCalendarioRoute: AuthenticatedCalendarioRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedImpostazioniRoute: AuthenticatedImpostazioniRouteWithChildren,
   AuthenticatedPdfViewerRoute: AuthenticatedPdfViewerRoute,
   AuthenticatedPazientiIdRoute: AuthenticatedPazientiIdRouteWithChildren,
   AuthenticatedConsensiIndexRoute: AuthenticatedConsensiIndexRoute,

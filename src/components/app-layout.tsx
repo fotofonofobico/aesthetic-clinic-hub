@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
+import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole, roles } = useAuth();
+  const { data: profilo } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -44,6 +46,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const ruolo = hasRole("medico") ? "Medico" : roles[0] ? "Collaboratore" : "—";
+  const nome = nomeVisualizzato(profilo, user?.email ?? "");
+  const prefisso = hasRole("medico") ? "Dr. " : "";
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -75,7 +79,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3 md:ml-auto">
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight">{user?.email}</p>
+              <p className="text-sm font-medium leading-tight">{prefisso}{nome}</p>
               <p className="text-xs text-muted-foreground leading-tight">{ruolo}</p>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -136,15 +140,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
-          {hasRole("medico") && (
-            <div
-              className="flex cursor-default items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/60"
-              title="Disponibile prossimamente"
-            >
-              <Settings className="h-4 w-4" />
-              Impostazioni
-            </div>
-          )}
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors cursor-pointer",
+              location.pathname.startsWith("/impostazioni")
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            )}
+            onClick={() => {
+              void navigate({ to: "/impostazioni/profilo" });
+              onNavigate?.();
+            }}
+          >
+            <Settings className="h-4 w-4" />
+            Impostazioni
+          </div>
         </div>
       </>
     );

@@ -1,123 +1,114 @@
-# Piano finale — refactor UI
+## Modifiche immediate (non ambigue)
 
-## Decisioni recepite
-- Sidebar: rimuovo Audit & Sicurezza e Impostazioni dalla lista (no placeholder "Presto")
-- KPI: opzione 3 → 2 KPI reali subito (nuovi pazienti mese, n. trattamenti mese), gli altri 2 dopo
-- Alert "Follow-up necessari": **non implementato** ora, in sospeso
-- Diario→Calendario: checkbox **default OFF** sempre, l'utente lo attiva esplicitamente
+1. **Saluto dashboard**: sostituire `{user?.email}` con `Nome Cognome` letto dalla tabella `profiles` (campo `nome` + `cognome`). Fallback a email se profilo vuoto. Aggiungere saluto contestuale: "Buongiorno/Buon pomeriggio/Buonasera, Dr. Nome Cognome".
+2. **Rimuovere "Azioni Rapide"** dalla dashboard (Nuovo paziente / trattamento / consenso). Cancellare componente `azioni-rapide.tsx` e import.
+3. **Header app-layout**: mostrare "Nome Cognome" al posto di email anche in alto a destra.
+4. **Consensi**: il default `durata_tipo` per template `trattamento_ciclo` è già "sedute" nel form — confermo che non serve toccare nulla. Verificherò solo il default `cicloDurata` (oggi "3" sedute, ok).
 
-## 1. Sidebar (`src/components/app-layout.tsx`)
+## Nuova sezione Impostazioni (`/impostazioni`)
 
-Voci finali:
-- Dashboard
-- **Calendario** (nuovo, icona `CalendarDays`)
-- Pazienti
-- Trattamenti
-- Consensi
-- Magazzino
+Sidebar: trasformare l'attuale voce disabilitata "Impostazioni" in link reale (visibile a tutti, contenuti differenziati per ruolo).
 
-Rimosse: Anamnesi (resta tab paziente), nessun placeholder.
-Footer sidebar: lascio com'è (Impostazioni placeholder solo per medico).
+Layout a tab/sotto-pagine (file route TanStack: `impostazioni.tsx` come layout con `<Outlet />` + sotto-route):
 
-## 2. Dashboard operativa (`src/routes/_authenticated/dashboard.tsx`)
+### Tab 1 — Il mio profilo (tutti)
+Editabile da chiunque, scrive su `profiles` solo il proprio record (RLS già ok).
+- Nome, Cognome, Telefono, Qualifica (libera: medico estetico, infermiere, segreteria…), Numero albo
+- Cambio password (`supabase.auth.updateUser({ password })`)
+- Logout
 
-Layout 2 colonne desktop, stack mobile:
+### Tab 2 — Studio (solo medico)
+Nuova tabella `studio_info` (singolo record). Campi:
+- Ragione sociale, P.IVA, Codice fiscale, Indirizzo, Città, CAP, Provincia
+- Telefono, Email, PEC, Sito web
+- Logo (upload bucket `studio-assets` privato, signed URL)
+- Direttore sanitario (testo)
 
-```text
-┌─────────────────────────┬───────────────────┐
-│ Agenda 7 giorni         │ Azioni rapide     │
-│ (colonna principale)    │ Alerts            │
-│                         │ KPI 2 card        │
-├─────────────────────────┴───────────────────┤
-│ Attività recente (pazienti | sedute)        │
-└─────────────────────────────────────────────┘
+Useremo questi dati nelle intestazioni PDF consensi/anamnesi/ricevute future.
+
+### Tab 3 — Utenti & Ruoli (solo medico)
+Schema attuale: due ruoli `medico` (admin) e `collaboratore` (standard) — manteniamo come da tua richiesta, predisponendo l'enum `app_role` per future estensioni (i valori attuali bastano).
+
+UI:
+- Lista profili con: Nome, Email, Qualifica, Ruolo (badge), Stato (attivo/disattivato)
+- Per ogni utente: cambia ruolo (medico/collaboratore), attiva/disattiva (`profiles.attivo`), reset password (invia email)
+- Nessuna creazione manuale: i nuovi utenti si registrano via signup standard, poi il medico li promuove
+- Audit: ogni cambio ruolo/attivazione scritto in `audit_log`
+
+Cosa NON facciamo ora (predisposto ma non implementato): permessi granulari per modulo. I due ruoli usano già le RLS esistenti.
+
+### Tab 4 — Backup & Export (solo medico)
+- Export CSV completo: pazienti, sedute, consensi firmati, movimenti magazzino — generati lato client da query Supabase, download diretto
+- Export PDF cartella singolo paziente: pulsante "Esporta cartella" con anagrafica + anamnesi corrente + sedute + consensi (già presente la logica PDF nel progetto, riusiamo)
+- Storico export (opzionale, lo lascio fuori per ora)
+
+### Tab 5 — Preferenze (tutti)
+- Vista calendario predefinita (giorno/settimana/mese) — già esiste `calendario_preferenze`
+- Follow-up automatico on/off + offset giorni — già esiste in `calendario_preferenze`
+- Tema chiaro/scuro (frontend only)
+
+## Database
+
+Nuova migration:
+
+```sql
+-- Tabella info studio (singleton)
+CREATE TABLE public.studio_info (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ragione_sociale text,
+  partita_iva text,
+  codice_fiscale text,
+  indirizzo text,
+  citta text,
+  cap text,
+  provincia text,
+  telefono text,
+  email text,
+  pec text,
+  sito_web text,
+  logo_url text,
+  direttore_sanitario text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by uuid
+);
+ALTER TABLE public.studio_info ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Studio visibile a operatori attivi" ON public.studio_info
+  FOR SELECT TO authenticated USING (is_active_operator(auth.uid()));
+CREATE POLICY "Solo medici modificano studio" ON public.studio_info
+  FOR ALL TO authenticated
+  USING (has_role(auth.uid(),'medico'))
+  WITH CHECK (has_role(auth.uid(),'medico'));
+
+-- Bucket logo
+INSERT INTO storage.buckets (id,name,public) VALUES ('studio-assets','studio-assets',false)
+ON CONFLICT DO NOTHING;
+-- policy: solo authenticated read, solo medici write
 ```
 
-Rimosso: blocco "Iterazione 1", tutte le `ModuleCard`, funzione helper.
+## File toccati / creati
 
-### Sezioni
+**Edit:**
+- `src/components/app-layout.tsx` — nome+cognome in header, link Impostazioni attivo
+- `src/routes/_authenticated/dashboard.tsx` — saluto "Buongiorno, Dr. Nome Cognome", rimuovo `<AzioniRapide />`
+- (no-op) `consensi.index.tsx` già default sedute
 
-**Agenda (`agenda-section.tsx`)**
-- `useCalendarioEventi(oggi → +7gg)`
-- Lista raggruppata per giorno, max 10 item visibili
-- Empty: "Nessun appuntamento nei prossimi 7 giorni"
-- CTA "Aggiungi appuntamento" → apre `EventoEditDialog`
-- Click evento → `/calendario` (o paziente se collegato)
-
-**Azioni rapide (`azioni-rapide.tsx`)**
-- 3 bottoni: Nuovo paziente → `/pazienti`, Nuovo trattamento → `/trattamenti`, Nuovo consenso → `/consensi`
-
-**Alerts (`alerts-section.tsx`)**
-Calcolati al volo:
-- **Consensi mancanti** (rosso): paziente con seduta pianificata nei prossimi 7gg senza consenso firmato collegato
-- **Anamnesi incomplete** (giallo): paziente senza riga in `anamnesi` o `updated_at > 12 mesi`
-- **Scorte basse** (rosso se 0, giallo se sotto soglia): da `prodotto_lotto`
-- ~~Follow-up necessari~~ → in sospeso
-
-Render: pallino colorato + testo + count, click → vista filtrata.
-Tutto ok → singola riga "Tutto in regola" con pallino verde.
-
-**KPI (`kpi-griglia.tsx` + `use-kpi-mese.ts`)**
-2 card reali:
-- **Nuovi pazienti del mese**: count `pazienti` con `created_at >= inizio_mese`
-- **Trattamenti del mese**: count `seduta` con `data_seduta >= inizio_mese AND completata = true`
-
-Card structure pronta per accettare 4 valori in futuro (fatturato, ticket medio quando ci sarà fatturazione).
-Skeleton durante loading. No mock.
-
-**Attività recente (`attivita-recente.tsx`)**
-- Ultimi 5 pazienti (`order by created_at desc limit 5`) → click `/pazienti/$id`
-- Ultime 5 sedute completate con nome paziente → click paziente
-- Empty state per ciascuna lista
-
-## 3. Ricerca paziente (`src/components/paziente/paziente-search.tsx`)
-
-Combobox riusabile basato su `Command` + `Popover` (pattern di `prodotto-combobox`).
-- Input con debounce 200ms
-- Query Supabase `pazienti` filtrata `cognome ilike` o `nome ilike`, limit 20
-- Voce "— nessuno —" sempre in cima
-- Trigger mostra "Cognome Nome" se selezionato
-
-Sostituisce il `<Select>` paziente in `EventoEditDialog`.
-
-## 4. Diario → Calendario (`src/components/paziente/diario-panel.tsx`)
-
-Aggiungo checkbox **"Aggiungi anche al calendario"** sotto il textarea — **default OFF sempre**.
-
-Quando attivo, alla creazione nota inserisce anche `evento_calendario`:
-- `titolo` = primi 60 char del testo
-- `descrizione` = testo completo
-- `tipo` = `promemoria`
-- `data_inizio` = `data_evento`
-- `paziente_id` = pazienteId
-- `sincronizza_diario` = true
-- `nota_diario_id` = id nota appena creata
-
-Errore evento NON blocca creazione nota (toast warning).
-Eliminazione nota NON elimina l'evento (calendario non vincolante).
-
-## 5. UX globali
-
-- Card e item liste cliccabili (cursor-pointer + hover bg)
-- Indicatori stato: `bg-success`, `bg-warning`, `bg-destructive`
-- Niente testi descrittivi superflui
-- Nessuna modifica a routing, RLS, logica clinica
-
-## File
-
-**Modificati:**
-- `src/components/app-layout.tsx`
-- `src/routes/_authenticated/dashboard.tsx`
-- `src/components/calendario/evento-edit-dialog.tsx`
-- `src/components/paziente/diario-panel.tsx`
-
-**Creati:**
-- `src/components/paziente/paziente-search.tsx`
-- `src/components/dashboard/agenda-section.tsx`
+**Delete:**
 - `src/components/dashboard/azioni-rapide.tsx`
-- `src/components/dashboard/alerts-section.tsx`
-- `src/components/dashboard/kpi-griglia.tsx`
-- `src/components/dashboard/attivita-recente.tsx`
-- `src/hooks/use-kpi-mese.ts`
 
-Nessuna migration DB.
+**Create:**
+- `src/routes/_authenticated/impostazioni.tsx` (layout con tab)
+- `src/routes/_authenticated/impostazioni.profilo.tsx`
+- `src/routes/_authenticated/impostazioni.studio.tsx`
+- `src/routes/_authenticated/impostazioni.utenti.tsx`
+- `src/routes/_authenticated/impostazioni.backup.tsx`
+- `src/routes/_authenticated/impostazioni.preferenze.tsx`
+- `src/hooks/use-profile.ts` — fetch profilo corrente (riusabile per saluto)
+- `src/hooks/use-studio-info.ts`
+
+## Cosa NON includo (da decidere dopo)
+- Notifiche email (richiede provider SMTP)
+- 2FA
+- Permessi granulari per modulo
+- Log accessi UI (i dati sono già scritti in `paziente_access_log`/`audit_log`, mostriamo dopo)
+
+Procedo con implementazione su tua approvazione.
