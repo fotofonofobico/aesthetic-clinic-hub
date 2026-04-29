@@ -88,7 +88,12 @@ export function ProdottoFormDialog({
       onCreated?.(p);
       onOpenChange(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Errore creazione prodotto");
+      const msg = e instanceof Error ? e.message : "Errore creazione prodotto";
+      if (/row-level security|Sessione scaduta/i.test(msg)) {
+        toast.error("Sessione scaduta. Ricarica la pagina e rifai il login.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBusy(false);
     }
