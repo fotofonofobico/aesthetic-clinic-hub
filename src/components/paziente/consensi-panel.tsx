@@ -201,15 +201,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
         </div>
       </div>
 
-      <SignatureSessionDialog
-        open={visitaOpen}
-        session={visitaSession}
-        onClose={() => setVisitaOpen(false)}
-        onCompleted={() => {
-          setVisitaOpen(false);
-          void load();
-        }}
-      />
+
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
