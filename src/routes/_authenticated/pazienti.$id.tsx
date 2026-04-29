@@ -190,7 +190,7 @@ function PazienteDetailPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-5 px-3 sm:space-y-6 sm:px-4 lg:px-0">
       <div>
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/pazienti" })}>
           <ArrowLeft className="h-4 w-4" />
@@ -200,7 +200,7 @@ function PazienteDetailPage() {
 
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
             {paziente.cognome} {paziente.nome}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -224,7 +224,7 @@ function PazienteDetailPage() {
       <FotoBaselineBanner paziente_id={id} onClickPiano={() => setTab("foto")} />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <TabsList className="max-w-full justify-start overflow-x-auto">
+        <TabsList className="max-w-full justify-start overflow-x-auto whitespace-nowrap">
           <TabsTrigger value="diario">Diario</TabsTrigger>
           <TabsTrigger value="anagrafica">Anagrafica</TabsTrigger>
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
