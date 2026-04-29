@@ -27,6 +27,8 @@ import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launcher";
+import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
+import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -249,6 +251,8 @@ function PazienteDetailPage() {
         consensiPianoMancanti={consensiPianoMancanti}
       />
 
+      <FotoBaselineBanner paziente_id={id} onClickPiano={() => setTab("foto")} />
+
       <SignatureSessionDialog
         open={sessioneOpen}
         session={sessione}
@@ -266,6 +270,7 @@ function PazienteDetailPage() {
           <TabsTrigger value="anamnesi">Anamnesi</TabsTrigger>
           <TabsTrigger value="piani">Piani</TabsTrigger>
           <TabsTrigger value="sedute">Sedute</TabsTrigger>
+          <TabsTrigger value="foto">Foto</TabsTrigger>
           <TabsTrigger value="consensi">Consensi</TabsTrigger>
           <TabsTrigger value="alert">Alert ({flags.length + alerts.length})</TabsTrigger>
         </TabsList>
@@ -292,6 +297,10 @@ function PazienteDetailPage() {
 
         <TabsContent value="sedute">
           <SedutePanel pazienteId={id} />
+        </TabsContent>
+
+        <TabsContent value="foto">
+          <FotoPazienteTab paziente_id={id} />
         </TabsContent>
 
         <TabsContent value="consensi">

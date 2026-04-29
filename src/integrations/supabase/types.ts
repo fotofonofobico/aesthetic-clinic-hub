@@ -486,6 +486,51 @@ export type Database = {
           },
         ]
       }
+      foto_clinica: {
+        Row: {
+          created_by: string | null
+          data_caricamento: string
+          data_scatto: string
+          id: string
+          livello: string | null
+          momento: Database["public"]["Enums"]["foto_momento"]
+          note: string | null
+          paziente_id: string
+          piano_id: string
+          seduta_id: string | null
+          storage_path: string
+          zona: string | null
+        }
+        Insert: {
+          created_by?: string | null
+          data_caricamento?: string
+          data_scatto?: string
+          id?: string
+          livello?: string | null
+          momento: Database["public"]["Enums"]["foto_momento"]
+          note?: string | null
+          paziente_id: string
+          piano_id: string
+          seduta_id?: string | null
+          storage_path: string
+          zona?: string | null
+        }
+        Update: {
+          created_by?: string | null
+          data_caricamento?: string
+          data_scatto?: string
+          id?: string
+          livello?: string | null
+          momento?: Database["public"]["Enums"]["foto_momento"]
+          note?: string | null
+          paziente_id?: string
+          piano_id?: string
+          seduta_id?: string | null
+          storage_path?: string
+          zona?: string | null
+        }
+        Relationships: []
+      }
       magazzino_movimento: {
         Row: {
           costo_unitario: number | null
@@ -805,6 +850,69 @@ export type Database = {
           sesso?: Database["public"]["Enums"]["sesso"] | null
           telefono?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      piano_foto_stato: {
+        Row: {
+          cambiato_da: string | null
+          cambiato_il: string
+          incoerenza_data: boolean
+          motivazione: string | null
+          piano_id: string
+          stato: Database["public"]["Enums"]["piano_foto_stato_enum"]
+        }
+        Insert: {
+          cambiato_da?: string | null
+          cambiato_il?: string
+          incoerenza_data?: boolean
+          motivazione?: string | null
+          piano_id: string
+          stato?: Database["public"]["Enums"]["piano_foto_stato_enum"]
+        }
+        Update: {
+          cambiato_da?: string | null
+          cambiato_il?: string
+          incoerenza_data?: boolean
+          motivazione?: string | null
+          piano_id?: string
+          stato?: Database["public"]["Enums"]["piano_foto_stato_enum"]
+        }
+        Relationships: []
+      }
+      piano_foto_stato_log: {
+        Row: {
+          cambiato_da: string | null
+          cambiato_il: string
+          id: string
+          motivazione: string | null
+          piano_id: string
+          stato_nuovo: Database["public"]["Enums"]["piano_foto_stato_enum"]
+          stato_precedente:
+            | Database["public"]["Enums"]["piano_foto_stato_enum"]
+            | null
+        }
+        Insert: {
+          cambiato_da?: string | null
+          cambiato_il?: string
+          id?: string
+          motivazione?: string | null
+          piano_id: string
+          stato_nuovo: Database["public"]["Enums"]["piano_foto_stato_enum"]
+          stato_precedente?:
+            | Database["public"]["Enums"]["piano_foto_stato_enum"]
+            | null
+        }
+        Update: {
+          cambiato_da?: string | null
+          cambiato_il?: string
+          id?: string
+          motivazione?: string | null
+          piano_id?: string
+          stato_nuovo?: Database["public"]["Enums"]["piano_foto_stato_enum"]
+          stato_precedente?:
+            | Database["public"]["Enums"]["piano_foto_stato_enum"]
+            | null
         }
         Relationships: []
       }
@@ -1412,6 +1520,11 @@ export type Database = {
           versione: string
         }[]
       }
+      piano_foto_marca_non_eseguibile: {
+        Args: { _motivazione: string; _piano_id: string }
+        Returns: Json
+      }
+      piano_foto_riapri: { Args: { _piano_id: string }; Returns: Json }
     }
     Enums: {
       alert_severity: "info" | "attenzione" | "critico"
@@ -1425,7 +1538,9 @@ export type Database = {
         | "uso_immagini"
         | "anamnesi"
       consenso_modalita_firma: "tablet" | "pdf_caricato"
+      foto_momento: "prima" | "dopo"
       nota_tipo: "clinica" | "telefonata" | "promemoria" | "altro"
+      piano_foto_stato_enum: "completo" | "baseline_mancante" | "non_eseguibile"
       piano_stato:
         | "attivo"
         | "completato"
@@ -1573,7 +1688,13 @@ export const Constants = {
         "anamnesi",
       ],
       consenso_modalita_firma: ["tablet", "pdf_caricato"],
+      foto_momento: ["prima", "dopo"],
       nota_tipo: ["clinica", "telefonata", "promemoria", "altro"],
+      piano_foto_stato_enum: [
+        "completo",
+        "baseline_mancante",
+        "non_eseguibile",
+      ],
       piano_stato: [
         "attivo",
         "completato",
