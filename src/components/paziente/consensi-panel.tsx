@@ -55,7 +55,7 @@ import { buildVisitaSession, type SignatureSession } from "@/lib/signature-sessi
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
-export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
+export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
   const { user, hasRole } = useAuth();
   const isMedico = hasRole("medico");
   const [firmati, setFirmati] = useState<ConsensoFirmato[]>([]);
@@ -64,6 +64,9 @@ export function ConsensiPanel({ pazienteId }: { pazienteId: string }) {
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
+  const [visitaSession, setVisitaSession] = useState<SignatureSession | null>(null);
+  const [visitaOpen, setVisitaOpen] = useState(false);
+  const [buildingVisita, setBuildingVisita] = useState(false);
   
 
   useEffect(() => {
