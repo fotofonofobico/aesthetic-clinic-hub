@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Plus, Trash2, Package } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ProdottoCombobox } from "./prodotto-combobox";
+import { ProdottoSelectInline } from "./prodotto-select-inline";
 import { ProdottoFormDialog } from "./prodotto-form-dialog";
-import { listLotti } from "@/lib/magazzino";
+import { listLotti, listProdotti } from "@/lib/magazzino";
 import type { Lotto, ProdottoConDettagli, RigaConsumo } from "@/types/magazzino";
 
 export interface ConsumoRiga extends RigaConsumo {
@@ -33,8 +34,27 @@ function newKey() {
 }
 
 export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
+  const [prodotti, setProdotti] = React.useState<ProdottoConDettagli[]>([]);
+  const [loadingProdotti, setLoadingProdotti] = React.useState(false);
   const [creaProdottoOpen, setCreaProdottoOpen] = React.useState(false);
   const [creaIdx, setCreaIdx] = React.useState<number | null>(null);
+
+  const refreshProdotti = React.useCallback(async () => {
+    setLoadingProdotti(true);
+    try {
+      const d = await listProdotti({ includiStandby: false });
+      setProdotti(d);
+    } catch (e) {
+      // non fatale: la lista resta vuota, l'utente può comunque creare prodotti
+      console.warn("listProdotti failed", e);
+    } finally {
+      setLoadingProdotti(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refreshProdotti();
+  }, [refreshProdotti]);
 
   function addRiga() {
     onChange([
@@ -51,12 +71,18 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
     onChange(righe.filter((_, i) => i !== idx));
   }
 
-  async function onProdottoSelect(idx: number, id: string | null, p: ProdottoConDettagli | null) {
+  async function onProdottoSelect(
+    idx: number,
+    id: string | null,
+    p: ProdottoConDettagli | null,
+  ) {
     let lotti: Lotto[] = [];
     if (id && p?.modalita_tracking === "tracciato") {
       try {
         lotti = await listLotti({ prodotto_id: id });
-      } catch {
+      } catch (e) {
+        console.warn("listLotti failed", e);
+        toast.error("Impossibile caricare i lotti del prodotto");
         lotti = [];
       }
     }
@@ -97,7 +123,7 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
 
       {righe.map((r, idx) => {
         const tracciato = r._prodotto?.modalita_tracking === "tracciato";
-        const lotti = r._lotti ?? [];
+        const lotti = Array.isArray(r._lotti) ? r._lotti : [];
         return (
           <div
             key={r._key}
@@ -106,7 +132,9 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Label className="text-[11px]">Prodotto</Label>
-                <ProdottoCombobox
+                <ProdottoSelectInline
+                  prodotti={prodotti}
+                  loading={loadingProdotti}
                   value={r.prodotto_id || null}
                   onChange={(id, p) => void onProdottoSelect(idx, id, p)}
                   onCreaNuovo={() => {
@@ -239,22 +267,24 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
         );
       })}
 
-      {creaProdottoOpen && (
-        <ProdottoFormDialog
-          open={creaProdottoOpen}
-          onOpenChange={(o) => {
-            setCreaProdottoOpen(o);
-            if (!o) setCreaIdx(null);
-          }}
-          onCreated={(p) => {
+      <ProdottoFormDialog
+        open={creaProdottoOpen}
+        onOpenChange={(o) => {
+          setCreaProdottoOpen(o);
+          if (!o) setCreaIdx(null);
+        }}
+        rapido
+        onCreated={(p) => {
+          // ricarica la lista così il nuovo prodotto compare ovunque
+          void refreshProdotti().then(() => {
             if (creaIdx != null) {
               void onProdottoSelect(creaIdx, p.id, p as ProdottoConDettagli);
             }
-            setCreaProdottoOpen(false);
-            setCreaIdx(null);
-          }}
-        />
-      )}
+          });
+          setCreaProdottoOpen(false);
+          setCreaIdx(null);
+        }}
+      />
     </div>
   );
 }
@@ -266,8 +296,7 @@ export function righeToRigheConsumo(righe: ConsumoRiga[]): RigaConsumo[] {
       prodotto_id: r.prodotto_id,
       lotto_id: r._useNuovoLotto ? null : r.lotto_id ?? null,
       quantita: r.quantita,
-      nuovo_lotto: r._useNuovoLotto && r.nuovo_lotto?.numero_lotto
-        ? r.nuovo_lotto
-        : null,
+      nuovo_lotto:
+        r._useNuovoLotto && r.nuovo_lotto?.numero_lotto ? r.nuovo_lotto : null,
     }));
 }
