@@ -63,10 +63,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
   const [loading, setLoading] = useState(true);
   const [openDlg, setOpenDlg] = useState(false);
   const [viewing, setViewing] = useState<ConsensoFirmato | null>(null);
-  const [visitaSession, setVisitaSession] = useState<SignatureSession | null>(null);
-  const [visitaOpen, setVisitaOpen] = useState(false);
-  const [buildingVisita, setBuildingVisita] = useState(false);
-  
 
   useEffect(() => {
     void load();
@@ -171,21 +167,6 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
       void load();
     } catch (e) {
       toast.error(`Errore rigenerazione PDF: ${(e as Error).message}`);
-    }
-  }
-
-  async function avviaVisitaMac() {
-    setBuildingVisita(true);
-    try {
-      const s = await buildVisitaSession(pazienteId);
-      if (!s || s.documenti.length === 0) {
-        toast.success("Tutti i consensi richiesti sono già validi");
-        return;
-      }
-      setVisitaSession(s);
-      setVisitaOpen(true);
-    } finally {
-      setBuildingVisita(false);
     }
   }
 
