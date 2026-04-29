@@ -23,7 +23,8 @@ import {
   type SignatureSession,
 } from "@/lib/signature-session";
 import { CheckCircle2, ChevronLeft, FileSignature, Loader2 } from "lucide-react";
-import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { Button } from "@/components/ui/button";
+import { Tablet } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,14 @@ interface Props {
   pazienteNome?: string;
   onClose: () => void;
   onCompleted: () => void;
+  /**
+   * Se fornito, mostra accanto ad ogni trackpad un bottone "Invia a tablet".
+   * Quando cliccato, il dialog si chiude e viene invocato con la sessione
+   * corrente, così che il chiamante possa montare il runner tablet *fuori*
+   * da questo dialog (altrimenti i listener Realtime morirebbero alla
+   * chiusura del dialog → bug "firma inviata ma il Mac non riceve nulla").
+   */
+  onInviaTablet?: (session: SignatureSession) => void;
 }
 
 type Stato = "compilazione" | "salvataggio" | "fatto";
@@ -38,7 +47,7 @@ type Phase = "consensi" | "anamnesi" | "trattamento";
 
 type Scelta = "acconsento" | "non_acconsento";
 
-export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted }: Props) {
+export function SignatureSessionDialog({ open, session, pazienteNome: _pazienteNome = "", onClose, onCompleted, onInviaTablet }: Props) {
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
   const [stato, setStato] = useState<Stato>("compilazione");
