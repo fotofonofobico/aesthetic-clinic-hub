@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Syringe, Loader2 } from "lucide-react";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 interface TrattamentoLite {
   id: string;
