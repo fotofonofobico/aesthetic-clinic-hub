@@ -10,6 +10,21 @@ import type {
   RigaConsumo,
 } from "@/types/magazzino";
 
+/**
+ * Garantisce che il client supabase abbia una sessione utente attiva
+ * e ritorna l'user.id. Se la sessione manca, tenta un refresh esplicito.
+ * Necessario perché alcune RLS richiedono auth.uid() valorizzato.
+ */
+async function requireUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) return session.user.id;
+  const { data: r, error } = await supabase.auth.refreshSession();
+  if (error || !r.session?.user) {
+    throw new Error("Sessione scaduta — ricarica la pagina e rifai il login");
+  }
+  return r.session.user.id;
+}
+
 // ============================================================
 // MARCHE
 // ============================================================
