@@ -80,6 +80,8 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
   }
 
   async function conferma() {
+    if (!row) return;
+    const sessId = row.id;
     const pad = padRef.current;
     if (!pad || pad.isEmpty()) {
       toast.error("Apponi la firma prima di confermare");
@@ -87,19 +89,18 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
     }
     const firma = pad.toDataURL();
 
-    // Se il paziente ha rifiutato TUTTI i documenti → marca refused
     const tuttiRifiutati = docs.every((d) => scelte[d.localId] === "non_acconsento");
     setSaving(true);
     try {
       if (tuttiRifiutati) {
-        await rifiutaFirmaSessione(row.id, "Paziente ha rifiutato tutti i documenti");
+        await rifiutaFirmaSessione(sessId, "Paziente ha rifiutato tutti i documenti");
       } else {
         const risposte: RispostaDocumento[] = docs.map((d) => ({
           localId: d.localId,
           scelta: scelte[d.localId],
           firmaPaziente: scelte[d.localId] === "acconsento" ? firma : null,
         }));
-        const res = await salvaRispostePaziente(row.id, risposte);
+        const res = await salvaRispostePaziente(sessId, risposte);
         if (res.error) throw new Error(res.error);
       }
       toast.success("Firma inviata al medico");
