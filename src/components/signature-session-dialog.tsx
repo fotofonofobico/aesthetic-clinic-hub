@@ -23,7 +23,6 @@ import {
   type SignatureSession,
 } from "@/lib/signature-session";
 import { CheckCircle2, ChevronLeft, FileSignature, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Tablet } from "lucide-react";
 
 interface Props {
