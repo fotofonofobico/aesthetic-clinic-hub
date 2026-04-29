@@ -41,10 +41,10 @@ export function useCalendarioEventi({ from, to, filtri }: Params) {
     const fromIso = from.toISOString();
     const toIso = to.toISOString();
 
-    const queries: Promise<any>[] = [];
+    const run = async (): Promise<{ data: any[] | null }> => ({ data: [] });
 
-    // 1. Sedute pianificate (read-only)
-    if (filtri.mostraSedute) {
+    const sedutePromise: Promise<{ data: any[] | null }> = (async () => {
+      if (!filtri.mostraSedute) return { data: [] };
       let q = supabase
         .from("seduta")
         .select("id, paziente_id, piano_id, numero_seduta, data_seduta, durata_minuti, completata, trattamento_id")
@@ -52,39 +52,37 @@ export function useCalendarioEventi({ from, to, filtri }: Params) {
         .lte("data_seduta", toIso)
         .not("data_seduta", "is", null);
       if (filtri.paziente_id) q = q.eq("paziente_id", filtri.paziente_id);
-      queries.push(q);
-    } else {
-      queries.push(Promise.resolve({ data: [] }));
-    }
+      const r = await q;
+      return { data: (r.data as any[]) ?? [] };
+    })();
 
-    // 2. Eventi calendario
-    if (filtri.mostraEventi) {
+    const eventiPromise: Promise<{ data: any[] | null }> = (async () => {
+      if (!filtri.mostraEventi) return { data: [] };
       let q = supabase
         .from("evento_calendario")
         .select("*")
         .gte("data_inizio", fromIso)
         .lte("data_inizio", toIso);
       if (filtri.paziente_id) q = q.eq("paziente_id", filtri.paziente_id);
-      queries.push(q);
-    } else {
-      queries.push(Promise.resolve({ data: [] }));
-    }
+      const r = await q;
+      return { data: (r.data as any[]) ?? [] };
+    })();
 
-    // 3. Scadenze lotti (read-only)
-    if (filtri.mostraScadenze && !filtri.paziente_id) {
+    const scadenzePromise: Promise<{ data: any[] | null }> = (async () => {
+      if (!filtri.mostraScadenze || filtri.paziente_id) return { data: [] };
       const fromDate = from.toISOString().slice(0, 10);
       const toDate = to.toISOString().slice(0, 10);
-      queries.push(
-        supabase
-          .from("prodotto_lotto")
-          .select("id, prodotto_id, numero_lotto, data_scadenza, quantita_disponibile, prodotto:prodotto_id(nome)")
-          .gte("data_scadenza", fromDate)
-          .lte("data_scadenza", toDate)
-          .gt("quantita_disponibile", 0),
-      );
-    } else {
-      queries.push(Promise.resolve({ data: [] }));
-    }
+      const r = await supabase
+        .from("prodotto_lotto")
+        .select("id, prodotto_id, numero_lotto, data_scadenza, quantita_disponibile, prodotto:prodotto_id(nome)")
+        .gte("data_scadenza", fromDate)
+        .lte("data_scadenza", toDate)
+        .gt("quantita_disponibile", 0);
+      return { data: (r.data as any[]) ?? [] };
+    })();
+
+    void run;
+    const queries: Promise<{ data: any[] | null }>[] = [sedutePromise, eventiPromise, scadenzePromise];
 
     Promise.all(queries)
       .then(async ([sedRes, evRes, scadRes]) => {
