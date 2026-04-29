@@ -86,6 +86,14 @@ function MagazzinoPage() {
   const [modalitaRett, setModalitaRett] = React.useState<"rettifica" | "scarico">("rettifica");
   const [drawerProdotto, setDrawerProdotto] = React.useState<ProdottoConDettagli | null>(null);
 
+  // Warm-up sessione: alcune RLS richiedono auth.uid() valorizzato.
+  // Forziamo il caricamento (e refresh se manca) della sessione al mount.
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) supabase.auth.refreshSession();
+    });
+  }, []);
+
   const ricarica = React.useCallback(async () => {
     setLoading(true);
     try {
