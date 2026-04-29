@@ -609,8 +609,10 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       />
 
       <SignatureSessionDialog
+      <SignatureSessionDialog
         open={visitaOpen}
         session={visitaSession}
+        pazienteNome={pazienteNome}
         onClose={() => setVisitaOpen(false)}
         onCompleted={() => {
           setVisitaOpen(false);
