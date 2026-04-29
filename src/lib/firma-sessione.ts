@@ -200,18 +200,19 @@ export function useSessioniInArrivo(createdBy: string | null) {
 
   useEffect(() => {
     if (!createdBy) return;
+    const userId = createdBy;
     let active = true;
 
     async function reload() {
       const { data } = await supabase
         .from("firma_sessione")
         .select("*")
-        .eq("created_by", createdBy)
+        .eq("created_by", userId)
         .in("stato", ["pending", "waiting"])
         .is("consumed_at", null)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
-      if (active) setRows((data ?? []) as FirmaSessioneRow[]);
+      if (active) setRows((data ?? []) as unknown as FirmaSessioneRow[]);
     }
     void reload();
 
