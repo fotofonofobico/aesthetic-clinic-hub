@@ -250,7 +250,6 @@ export function PianiPanel({
 
     setTrattamenti((tRes.data ?? []) as Trattamento[]);
     setLoading(false);
-    onChanged?.();
   }
 
   // ---------- gestione righe form ----------
@@ -712,6 +711,7 @@ export function PianiPanel({
       toast.success("Piano creato");
       setOpen(false);
       void load();
+      onChanged?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -879,6 +879,7 @@ export function PianiPanel({
       setOpen(false);
       setEditingPianoId(null);
       void load();
+      onChanged?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -903,6 +904,7 @@ export function PianiPanel({
       return;
     }
     void load();
+    onChanged?.();
   }
 
   function toggle(id: string) {
