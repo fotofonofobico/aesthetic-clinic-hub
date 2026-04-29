@@ -264,7 +264,11 @@ function PazienteDetailPage() {
         </TabsContent>
 
         <TabsContent value="sedute">
-          <SedutePanel pazienteId={id} pazienteNome={`${paziente.nome} ${paziente.cognome}`} />
+          <SedutePanel
+            pazienteId={id}
+            pazienteNome={`${paziente.nome} ${paziente.cognome}`}
+            onChanged={() => void load({ silent: true })}
+          />
         </TabsContent>
 
         <TabsContent value="foto">
