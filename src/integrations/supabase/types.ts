@@ -510,6 +510,63 @@ export type Database = {
         }
         Relationships: []
       }
+      firma_sessione: {
+        Row: {
+          acconsensi: Json | null
+          consumed_at: string | null
+          consumed_into_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          firma_paziente_base64: string | null
+          id: string
+          payload: Json
+          paziente_id: string
+          rifiuto_motivo: string | null
+          signed_at: string | null
+          stato: Database["public"]["Enums"]["firma_sessione_stato"]
+          target_id: string
+          tipo: Database["public"]["Enums"]["firma_sessione_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          acconsensi?: Json | null
+          consumed_at?: string | null
+          consumed_into_id?: string | null
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          firma_paziente_base64?: string | null
+          id?: string
+          payload?: Json
+          paziente_id: string
+          rifiuto_motivo?: string | null
+          signed_at?: string | null
+          stato?: Database["public"]["Enums"]["firma_sessione_stato"]
+          target_id: string
+          tipo: Database["public"]["Enums"]["firma_sessione_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          acconsensi?: Json | null
+          consumed_at?: string | null
+          consumed_into_id?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          firma_paziente_base64?: string | null
+          id?: string
+          payload?: Json
+          paziente_id?: string
+          rifiuto_motivo?: string | null
+          signed_at?: string | null
+          stato?: Database["public"]["Enums"]["firma_sessione_stato"]
+          target_id?: string
+          tipo?: Database["public"]["Enums"]["firma_sessione_tipo"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       followup: {
         Row: {
           complicanza_descrizione: string | null
@@ -1626,6 +1683,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      firma_sessione_marca_scadute: { Args: never; Returns: number }
       has_consenso_valido: {
         Args: { _paziente_id: string; _template_id: string }
         Returns: boolean
@@ -1680,6 +1738,14 @@ export type Database = {
         | "uso_immagini"
         | "anamnesi"
       consenso_modalita_firma: "tablet" | "pdf_caricato"
+      firma_sessione_stato:
+        | "waiting"
+        | "pending"
+        | "signed"
+        | "refused"
+        | "expired"
+        | "cancelled"
+      firma_sessione_tipo: "consenso" | "anamnesi"
       foto_momento: "prima" | "dopo"
       nota_tipo: "clinica" | "telefonata" | "promemoria" | "altro"
       piano_foto_stato_enum: "completo" | "baseline_mancante" | "non_eseguibile"
@@ -1831,6 +1897,15 @@ export const Constants = {
         "anamnesi",
       ],
       consenso_modalita_firma: ["tablet", "pdf_caricato"],
+      firma_sessione_stato: [
+        "waiting",
+        "pending",
+        "signed",
+        "refused",
+        "expired",
+        "cancelled",
+      ],
+      firma_sessione_tipo: ["consenso", "anamnesi"],
       foto_momento: ["prima", "dopo"],
       nota_tipo: ["clinica", "telefonata", "promemoria", "altro"],
       piano_foto_stato_enum: [
