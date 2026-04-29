@@ -40,6 +40,7 @@ import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 type ReactNode = React.ReactNode;
 
