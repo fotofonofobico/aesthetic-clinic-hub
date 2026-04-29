@@ -153,6 +153,7 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
   const [firmaSession, setFirmaSession] = useState<SignatureSession | null>(null);
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [pendingExecAfterFirma, setPendingExecAfterFirma] = useState<Seduta | null>(null);
+  const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
 
   // Foto baseline non bloccante
   const [baselineDialog, setBaselineDialog] = useState<{
@@ -534,7 +535,20 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
             "Consenso firmato. Puoi registrare la seduta quando vuoi.",
           );
         }}
+        onInviaTablet={(s) => setTabletSession(s)}
       />
+
+      <TabletSessionRunner
+        session={tabletSession}
+        pazienteNome={pazienteNome}
+        onClose={() => setTabletSession(null)}
+        onCompleted={() => {
+          setTabletSession(null);
+          void load();
+          toast.success("Consenso firmato sul tablet.");
+        }}
+      />
+
 
       {/* Foto baseline mancanti — non bloccante prima di "Esegui" */}
       {baselineDialog && baselineDialog.seduta.piano_id && (
