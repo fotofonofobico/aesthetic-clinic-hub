@@ -80,7 +80,12 @@ export function RettificaDialog({ open, onOpenChange, lotto, modalita, onSaved }
       onSaved?.();
       onOpenChange(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Errore");
+      const msg = e instanceof Error ? e.message : "Errore";
+      if (/row-level security|Sessione scaduta/i.test(msg)) {
+        toast.error("Sessione scaduta. Ricarica la pagina e rifai il login.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBusy(false);
     }
