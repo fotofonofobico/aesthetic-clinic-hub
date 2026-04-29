@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" /> },
   { to: "/consensi", label: "Consensi", icon: <FileSignature className="h-4 w-4" /> },
   { to: "/magazzino", label: "Magazzino", icon: <Package className="h-4 w-4" /> },
+  { to: "/firma", label: "Modalità firma", icon: <Tablet className="h-4 w-4" /> },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
