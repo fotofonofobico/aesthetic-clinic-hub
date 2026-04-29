@@ -65,6 +65,7 @@ import {
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoBaselineDialog } from "@/components/foto/foto-baseline-dialog";
 import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
 import { FotoGrid } from "@/components/foto/foto-grid";
