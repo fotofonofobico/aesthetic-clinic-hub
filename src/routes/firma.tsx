@@ -19,6 +19,7 @@ function ModalitaFirmaPage() {
   const { data: studio } = useStudioInfo();
 
   const [activeRow, setActiveRow] = useState<FirmaSessioneRow | null>(null);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set());
   const sessioni = useSessioniInArrivo(user?.id ?? null);
 
   useEffect(() => {
@@ -30,9 +31,9 @@ function ModalitaFirmaPage() {
   // Auto-apertura della prima sessione pending in arrivo
   useEffect(() => {
     if (activeRow) return;
-    const next = sessioni.find((s) => s.stato === "pending");
+    const next = sessioni.find((s) => s.stato === "pending" && !completedIds.has(s.id));
     if (next) setActiveRow(next);
-  }, [sessioni, activeRow]);
+  }, [sessioni, activeRow, completedIds]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -100,7 +101,14 @@ function ModalitaFirmaPage() {
       <TabletPazienteSignDialog
         open={!!activeRow}
         row={activeRow}
-        onCompleted={() => setActiveRow(null)}
+        onCompleted={() => {
+          setCompletedIds((cur) => {
+            const next = new Set(cur);
+            if (activeRow) next.add(activeRow.id);
+            return next;
+          });
+          setActiveRow(null);
+        }}
       />
     </div>
   );

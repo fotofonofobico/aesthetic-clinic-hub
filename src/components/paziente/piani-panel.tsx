@@ -163,7 +163,15 @@ function allineaProdottiPerSeduta(
 // ---------- consenso per voce piano (lazy) ----------
 type ConsensoVoce = { ok: boolean; motivi: string[]; loading: boolean };
 
-export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
+export function PianiPanel({
+  pazienteId,
+  pazienteNome = "",
+  onChanged,
+}: {
+  pazienteId: string;
+  pazienteNome?: string;
+  onChanged?: () => void;
+}) {
   const { user } = useAuth();
   const [piani, setPiani] = useState<PianoTrattamento[]>([]);
   const [sedutePerPiano, setSedutePerPiano] = useState<Record<string, Seduta[]>>({});
@@ -703,6 +711,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
       toast.success("Piano creato");
       setOpen(false);
       void load();
+      onChanged?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -870,6 +879,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
       setOpen(false);
       setEditingPianoId(null);
       void load();
+      onChanged?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -894,6 +904,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
       return;
     }
     void load();
+    onChanged?.();
   }
 
   function toggle(id: string) {
@@ -923,14 +934,14 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
   // ---------- render ----------
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-display text-base font-semibold">Piani di trattamento</h3>
           <p className="text-xs text-muted-foreground">
             Pianifica trattamenti, prodotti, zone e prezzo. Le sedute si registrano in seduta.
           </p>
         </div>
-        <Button onClick={apriNuovo}>
+        <Button onClick={apriNuovo} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Nuovo piano
         </Button>
@@ -966,7 +977,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
           }
         }}
       >
-        <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto p-4 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-3xl sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-display">
               {editingPianoId ? "Modifica piano" : "Nuovo piano"}
@@ -1435,7 +1446,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
             return (
               <Card key={p.id}>
                 <CardContent className="space-y-3 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <button
                       type="button"
                       className="flex min-w-0 flex-1 items-start gap-2 text-left"
@@ -1474,13 +1485,14 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
                         </p>
                       </div>
                     </button>
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                       {!isLegacy && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => apriModifica(p)}
                           disabled={p.stato === "annullato"}
+                          className="w-full sm:w-auto"
                         >
                           <Pencil className="h-3 w-3" />
                           Modifica
@@ -1491,7 +1503,7 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
                         onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
                       >
                         <SelectTrigger
-                          className="h-8 w-36"
+                          className="h-8 w-full sm:w-36"
                           title={
                             p.stato === "completato"
                               ? "Stato impostato automaticamente al termine di tutte le sedute"
@@ -1685,6 +1697,8 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
         }}
         onCompleted={() => {
           setFirmaOpen(false);
+          void load();
+          onChanged?.();
           if (firmaVoceKey) {
             const [pid, vid, tid] = firmaVoceKey.split("::");
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);
@@ -1699,6 +1713,8 @@ export function PianiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: stri
         onClose={() => setTabletSession(null)}
         onCompleted={() => {
           setTabletSession(null);
+          void load();
+          onChanged?.();
           if (firmaVoceKey) {
             const [pid, vid, tid] = firmaVoceKey.split("::");
             if (pid && vid && tid) void valutaConsensoVoce(pid, vid, tid);

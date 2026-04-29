@@ -54,7 +54,15 @@ import type { SignatureSession, SessionDoc, SessionDocKind } from "@/lib/signatu
 
 type StatoMap = Record<string, ConsensoStato>; // consenso.id -> stato
 
-export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
+export function ConsensiPanel({
+  pazienteId,
+  pazienteNome = "",
+  onChanged,
+}: {
+  pazienteId: string;
+  pazienteNome?: string;
+  onChanged?: () => void;
+}) {
   const { user, hasRole } = useAuth();
   const isMedico = hasRole("medico");
   const [firmati, setFirmati] = useState<ConsensoFirmato[]>([]);
@@ -110,6 +118,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
     }
     toast.success("Consenso revocato");
     void load();
+    onChanged?.();
   }
 
   /**
@@ -195,6 +204,7 @@ export function ConsensiPanel({ pazienteId, pazienteNome = "" }: { pazienteId: s
               onSaved={() => {
                 setOpenDlg(false);
                 void load();
+                onChanged?.();
               }}
             />
           </Dialog>

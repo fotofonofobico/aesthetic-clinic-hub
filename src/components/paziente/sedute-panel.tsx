@@ -135,7 +135,15 @@ interface Riga extends Seduta {
 
 // ───────────────────────────── Componente principale ─────────────────────────────
 
-export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: string; pazienteNome?: string }) {
+export function SedutePanel({
+  pazienteId,
+  pazienteNome = "",
+  onChanged,
+}: {
+  pazienteId: string;
+  pazienteNome?: string;
+  onChanged?: () => void;
+}) {
   const { user, hasRole } = useAuth();
   const [sedute, setSedute] = useState<Seduta[]>([]);
   const [piani, setPiani] = useState<PianoTrattamento[]>([]);
@@ -531,6 +539,7 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
           setFirmaOpen(false);
           setPendingExecAfterFirma(null);
           void load();
+          onChanged?.();
           toast.success(
             "Consenso firmato. Puoi registrare la seduta quando vuoi.",
           );
@@ -545,6 +554,7 @@ export function SedutePanel({ pazienteId, pazienteNome = "" }: { pazienteId: str
         onCompleted={() => {
           setTabletSession(null);
           void load();
+          onChanged?.();
           toast.success("Consenso firmato sul tablet.");
         }}
       />
