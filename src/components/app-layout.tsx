@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   X,
+  Tablet,
 } from "lucide-react";
 
 interface NavItem {
