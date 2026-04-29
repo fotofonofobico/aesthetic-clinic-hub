@@ -25,6 +25,10 @@ function DashboardPage() {
       </header>
 
       <section>
+        <CalendarioWidget />
+      </section>
+
+      <section>
         <h2 className="font-display text-lg font-semibold">Iterazione 1 — in costruzione</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Le fondamenta sono pronte. Nei prossimi step costruiamo i moduli clinici.
