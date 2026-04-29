@@ -57,6 +57,7 @@ import {
 } from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
 
 const STATO_LABELS: Record<PianoStato, string> = {
   attivo: "Attivo",
@@ -1460,6 +1461,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           >
                             {STATO_LABELS[p.stato]}
                           </span>
+                          <FotoStatoBadgeLive piano_id={p.id} />
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {new Date(p.created_at).toLocaleDateString("it-IT")} ·{" "}
