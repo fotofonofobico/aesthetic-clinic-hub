@@ -43,7 +43,6 @@ export function EventoEditDialog({
   const [pazienteId, setPazienteId] = useState<string | null>(null);
   const [sincronizzaDiario, setSincronizzaDiario] = useState(false);
   const [completato, setCompletato] = useState(false);
-  const [pazienti, setPazienti] = useState<PazienteMin[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -71,16 +70,6 @@ export function EventoEditDialog({
       setCompletato(false);
     }
   }, [open, evento, defaultStart, defaultPazienteId]);
-
-  useEffect(() => {
-    if (!open) return;
-    supabase
-      .from("pazienti")
-      .select("id, nome, cognome")
-      .order("cognome")
-      .limit(500)
-      .then(({ data }) => setPazienti((data ?? []) as PazienteMin[]));
-  }, [open]);
 
   const handleSave = async () => {
     if (!titolo.trim()) {
