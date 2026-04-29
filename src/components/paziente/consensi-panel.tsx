@@ -922,3 +922,47 @@ function NuovoConsensoDialog({
     </>
   );
 }
+
+/**
+ * Costruisce una SignatureSession mono-documento per un singolo consenso
+ * specifico (usato dal bottone "Invia a tablet" inline accanto al SignaturePad
+ * del NuovoConsensoDialog).
+ */
+function buildSingleConsensoSession(
+  pazienteId: string,
+  tpl: ConsensoTemplate,
+): SignatureSession {
+  let kind: SessionDocKind;
+  if (tpl.categoria === "gdpr") {
+    kind = { kind: "gdpr", templateId: tpl.id };
+  } else if (tpl.categoria === "uso_immagini") {
+    kind = { kind: "uso_immagini", templateId: tpl.id };
+  } else {
+    kind = {
+      kind: "trattamento",
+      templateId: tpl.id,
+      trattamentoId: tpl.trattamento_id ?? "",
+      categoria:
+        tpl.categoria === "trattamento_ciclo"
+          ? "trattamento_ciclo"
+          : "trattamento_singolo",
+    };
+  }
+  const doc: SessionDoc = {
+    localId: crypto.randomUUID(),
+    kind,
+    titolo: tpl.titolo,
+    testo: tpl.testo,
+    versione: tpl.versione,
+    validitaMesi: tpl.validita_mesi,
+    durataTipo: tpl.durata_tipo === "sedute" ? "sedute" : "mesi",
+    duratSedute: tpl.durata_tipo === "sedute" ? tpl.durata_sedute : null,
+    richiedeFirmaMedico: tpl.richiede_firma_medico,
+    completato: false,
+  };
+  return {
+    tipo: tpl.categoria === "gdpr" || tpl.categoria === "uso_immagini" ? "visita" : "trattamento",
+    pazienteId,
+    documenti: [doc],
+  };
+}
