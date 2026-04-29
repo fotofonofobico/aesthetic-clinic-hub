@@ -23,10 +23,12 @@ import {
   type SignatureSession,
 } from "@/lib/signature-session";
 import { CheckCircle2, ChevronLeft, FileSignature, Loader2 } from "lucide-react";
+import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 
 interface Props {
   open: boolean;
   session: SignatureSession | null;
+  pazienteNome?: string;
   onClose: () => void;
   onCompleted: () => void;
 }
@@ -36,7 +38,7 @@ type Phase = "consensi" | "anamnesi" | "trattamento";
 
 type Scelta = "acconsento" | "non_acconsento";
 
-export function SignatureSessionDialog({ open, session, onClose, onCompleted }: Props) {
+export function SignatureSessionDialog({ open, session, pazienteNome = "", onClose, onCompleted }: Props) {
   const { user } = useAuth();
   const [docs, setDocs] = useState<SessionDoc[]>([]);
   const [stato, setStato] = useState<Stato>("compilazione");
