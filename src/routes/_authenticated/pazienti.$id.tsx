@@ -26,7 +26,6 @@ import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
-import { FirmaTrattamentoLauncher } from "@/components/firma-trattamento-launcher";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 
@@ -232,7 +231,6 @@ function PazienteDetailPage() {
             <FileSignature className="h-4 w-4" />
             Firma visita & anamnesi
           </Button>
-          <FirmaTrattamentoLauncher pazienteId={id} onCompleted={() => void load({ silent: true })} />
           <Button
             variant="outline"
             onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}

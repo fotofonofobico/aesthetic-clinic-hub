@@ -21,18 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Plus,
   Syringe,
   ChevronDown,
   ChevronRight,
   Trash2,
-  PenLine,
   Loader2,
   Package,
   MapPin,
-  AlertTriangle,
   Pencil,
   X,
 } from "lucide-react";
@@ -57,6 +54,7 @@ import {
 } from "@/lib/piano-prezzo";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
 
 const STATO_LABELS: Record<PianoStato, string> = {
   attivo: "Attivo",
@@ -1460,6 +1458,7 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                           >
                             {STATO_LABELS[p.stato]}
                           </span>
+                          <FotoStatoBadgeLive piano_id={p.id} />
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {new Date(p.created_at).toLocaleDateString("it-IT")} ·{" "}
@@ -1513,19 +1512,8 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                     </div>
                   </div>
 
-                  {/* Alert consenso aggregato */}
-                  {!isLegacy && isOpen && vociMancanti.length > 0 && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>
-                        Consenso mancante per {vociMancanti.length} trattamento/i
-                      </AlertTitle>
-                      <AlertDescription>
-                        Firma il consenso prima di iniziare le sedute. Lo trovi
-                        accanto a ogni trattamento qui sotto.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* Alert consenso aggregato rimosso: ridondante con i pallini per voce qui sotto */}
+
 
                   {isOpen && (
                     <div className="space-y-3 border-t border-border pt-3">
@@ -1562,18 +1550,6 @@ export function PianiPanel({ pazienteId }: { pazienteId: string }) {
                                   ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {cv?.ok === false && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        void avviaFirmaPerVoce(p.id, v.id, v.trattamento_id)
-                                      }
-                                    >
-                                      <PenLine className="h-3 w-3" />
-                                      Firma consenso
-                                    </Button>
-                                  )}
                                   <span className="text-xs font-medium">
                                     {formatEuro(
                                       prezzoRiga(

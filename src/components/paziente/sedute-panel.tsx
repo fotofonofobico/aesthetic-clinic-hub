@@ -64,6 +64,11 @@ import {
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
+import { FotoBaselineDialog } from "@/components/foto/foto-baseline-dialog";
+import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
+import { FotoGrid } from "@/components/foto/foto-grid";
+import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
+import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
@@ -146,6 +151,19 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
   const [firmaSession, setFirmaSession] = useState<SignatureSession | null>(null);
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [pendingExecAfterFirma, setPendingExecAfterFirma] = useState<Seduta | null>(null);
+
+  // Foto baseline non bloccante
+  const [baselineDialog, setBaselineDialog] = useState<{
+    seduta: Seduta;
+    incoerenza: boolean;
+  } | null>(null);
+  // Upload rapido foto (post-seduta DOPO o caricamento baseline da dialog)
+  const [uploadFoto, setUploadFoto] = useState<{
+    paziente_id: string;
+    piano_id: string;
+    seduta_id: string | null;
+    momento: FotoMomento;
+  } | null>(null);
 
   useEffect(() => {
     void load();
@@ -259,11 +277,27 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
         ? eseguite
         : [...programmate, ...eseguite];
 
-  function handleEsegui(s: Seduta) {
+  async function handleEsegui(s: Seduta) {
     const c = consensoMap.get(s.id);
     if (c && !c.ok && s.trattamento_id) {
       toast.error("Consenso mancante: firma prima di eseguire la seduta");
       return;
+    }
+    // Check baseline foto non bloccante
+    if (s.piano_id) {
+      const snoozeKey = `foto-baseline-snooze:${s.piano_id}`;
+      const snoozeUntil = Number(localStorage.getItem(snoozeKey) || 0);
+      if (snoozeUntil < Date.now()) {
+        try {
+          const stato = await getStatoPiano(s.piano_id);
+          if (stato && stato.stato === "baseline_mancante") {
+            setBaselineDialog({ seduta: s, incoerenza: stato.incoerenza_data });
+            return;
+          }
+        } catch {
+          // fail silent: non blocchiamo l'esecuzione per un errore foto
+        }
+      }
     }
     setEseguiSeduta(s);
   }
@@ -405,8 +439,39 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
           voce={eseguiSeduta.voce_id ? voceMap.get(eseguiSeduta.voce_id) : undefined}
           onClose={() => setEseguiSeduta(null)}
           onSaved={() => {
+            const completata = eseguiSeduta;
             setEseguiSeduta(null);
             void load();
+            // Toast non bloccante: proponi foto DOPO se la seduta è dentro un piano
+            if (completata?.piano_id) {
+              const snoozeKey = `foto-dopo-snooze:${completata.piano_id}`;
+              const snoozeUntil = Number(localStorage.getItem(snoozeKey) || 0);
+              if (snoozeUntil < Date.now()) {
+                toast("Aggiungi foto DOPO la seduta?", {
+                  description: "Documentazione fotografica del risultato.",
+                  duration: 10000,
+                  action: {
+                    label: "Carica",
+                    onClick: () =>
+                      setUploadFoto({
+                        paziente_id: pazienteId,
+                        piano_id: completata.piano_id!,
+                        seduta_id: completata.id,
+                        momento: "dopo",
+                      }),
+                  },
+                  cancel: {
+                    label: "Più tardi",
+                    onClick: () => {
+                      localStorage.setItem(
+                        snoozeKey,
+                        String(Date.now() + 24 * 60 * 60 * 1000),
+                      );
+                    },
+                  },
+                });
+              }
+            }
           }}
         />
       )}
@@ -467,6 +532,57 @@ export function SedutePanel({ pazienteId }: { pazienteId: string }) {
           );
         }}
       />
+
+      {/* Foto baseline mancanti — non bloccante prima di "Esegui" */}
+      {baselineDialog && baselineDialog.seduta.piano_id && (
+        <FotoBaselineDialog
+          open
+          onOpenChange={(v) => !v && setBaselineDialog(null)}
+          piano_id={baselineDialog.seduta.piano_id}
+          paziente_id={pazienteId}
+          incoerenza={baselineDialog.incoerenza}
+          onProcedi={() => {
+            const key = `foto-baseline-snooze:${baselineDialog.seduta.piano_id}`;
+            localStorage.setItem(
+              key,
+              String(Date.now() + 24 * 60 * 60 * 1000),
+            );
+            const s = baselineDialog.seduta;
+            setBaselineDialog(null);
+            setEseguiSeduta(s);
+          }}
+          onCarica={() => {
+            const s = baselineDialog.seduta;
+            setBaselineDialog(null);
+            setUploadFoto({
+              paziente_id: pazienteId,
+              piano_id: s.piano_id!,
+              seduta_id: null,
+              momento: "prima",
+            });
+          }}
+          onNonEseguibile={() => {
+            setBaselineDialog(null);
+            void load();
+          }}
+        />
+      )}
+
+      {/* Upload rapido foto (baseline o post-seduta) */}
+      {uploadFoto && (
+        <FotoUploadDialog
+          open
+          onOpenChange={(v) => !v && setUploadFoto(null)}
+          paziente_id={uploadFoto.paziente_id}
+          piano_id={uploadFoto.piano_id}
+          seduta_id={uploadFoto.seduta_id}
+          defaultMomento={uploadFoto.momento}
+          onUploaded={() => {
+            setUploadFoto(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1002,6 +1118,12 @@ function EseguiSedutaDialog({
               placeholder="Tolleranza, reazioni, indicazioni post"
             />
           </div>
+
+          <FotoSedutaInline
+            paziente_id={seduta.paziente_id}
+            piano_id={seduta.piano_id}
+            seduta_id={seduta.id}
+          />
         </div>
 
         <DialogFooter>
@@ -1479,5 +1601,82 @@ function AuditSedutaDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ───────────────────────────── Foto seduta inline (dialog Esegui) ─────────────────────────────
+
+function FotoSedutaInline({
+  paziente_id,
+  piano_id,
+  seduta_id,
+}: {
+  paziente_id: string;
+  piano_id: string | null;
+  seduta_id: string;
+}) {
+  const [foto, setFoto] = useState<FotoClinica[]>([]);
+  const [uploadOpen, setUploadOpen] = useState<FotoMomento | null>(null);
+
+  const reload = useMemo(
+    () => async () => {
+      if (!piano_id) return;
+      try {
+        const all = await listFotoByPiano(piano_id);
+        setFoto(all.filter((f) => f.seduta_id === seduta_id));
+      } catch {
+        setFoto([]);
+      }
+    },
+    [piano_id, seduta_id],
+  );
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  if (!piano_id) return null;
+
+  return (
+    <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">Foto seduta (opzionale)</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setUploadOpen("prima")}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            PRIMA
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setUploadOpen("dopo")}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            DOPO
+          </Button>
+        </div>
+      </div>
+      <FotoGrid foto={foto} emptyHint="Nessuna foto per questa seduta." />
+      {uploadOpen && (
+        <FotoUploadDialog
+          open
+          onOpenChange={(v) => !v && setUploadOpen(null)}
+          paziente_id={paziente_id}
+          piano_id={piano_id}
+          seduta_id={seduta_id}
+          defaultMomento={uploadOpen}
+          onUploaded={() => {
+            setUploadOpen(null);
+            void reload();
+          }}
+        />
+      )}
+    </div>
   );
 }
