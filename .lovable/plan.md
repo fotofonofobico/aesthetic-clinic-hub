@@ -1,68 +1,66 @@
-# Fix "Errore creazione prodotto" (RLS prodotto_marca)
+## Problema
 
-## Diagnosi
+Cliccando **"+ Riga"** in *Consumo magazzino* dentro il dialog *Esegui seduta* la scheda paziente va in errore con:
 
-Dai network log:
-- `POST /prodotto_marca` → **401** `new row violates row-level security policy`
-- Header `authorization` = anon key (HS256), **non** il JWT utente (ES256)
-- Body inviato: `{"nome":"Allergan","created_by":null}`
+> `null is not an object (evaluating 'resolveDispatcher().useMemo')`
 
-La policy `INSERT` richiede `is_active_operator(auth.uid())`. Poiché il bearer è la sola anon key, `auth.uid()` è `NULL` → policy fallisce.
+È un errore React interno: un hook (`useMemo`) viene invocato fuori da un render valido. La causa più probabile, leggendo il codice attuale, è il sotto-componente `ProdottoCombobox` che monta `<Popover>` + `<Command>` (cmdk) **dentro un `<Dialog>` Radix nidificato** (il dialog "Esegui seduta") e fa partire subito un `useEffect` con `listProdotti()`. La combinazione (Popover/Command + portal in dialog + render multipli all'aggiunta di righe) fa esplodere cmdk in modo non recuperabile.
 
-Il profilo è `attivo=true` (verificato in DB), quindi la policy in sé è corretta. Il problema è che la chiamata parte **senza sessione utente allegata**: in alcune chiamate REST recenti (`prodotto_marca`, `prodotto`, `magazzino_movimento`) il client supabase non sta inviando il JWT, mentre `user_roles` lo invia. Questo capita tipicamente quando il modulo viene importato/eseguito prima che la sessione sia ripristinata da `localStorage`, oppure quando il token è scaduto silenziosamente.
+In più:
+- Il `useEffect` di `ProdottoCombobox` ha `[open]` come deps ⇒ rifà la query a ogni apertura, e parte subito al mount. Più righe = più fetch in parallelo, e ogni nuovo prodotto creato non aggiorna le altre combobox.
+- Il `<Select>` lotto usa il valore sentinella `"__auto__"` / `"__new__"` ma è dentro un Dialog — funziona, ma l'errore ne impedisce l'apertura.
+- `ProdottoFormDialog` è renderizzato **dentro** `ConsumoMagazzinoStep` ⇒ Dialog dentro Dialog dentro Popover. Anche questo contribuisce alla fragilità.
 
-## Strategia in 2 livelli
+## Soluzione
 
-### 1) Garanzia di sessione prima di ogni write magazzino
-In `src/lib/magazzino.ts`, sostituire le `await supabase.auth.getUser()` con un helper:
+Sostituisco la combobox con un **componente più semplice e robusto** dedicato all'uso *inline in seduta*, eliminando Popover+Command annidati nel Dialog. Il selettore prodotto diventa:
 
-```ts
-async function requireUserId(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) {
-    // tenta refresh esplicito
-    const { data: r } = await supabase.auth.refreshSession();
-    if (!r.session?.user) throw new Error("Sessione scaduta — rifai il login");
-    return r.session.user.id;
-  }
-  return session.user.id;
-}
-```
+- **`<Select>` Radix** (stesso pattern già usato altrove nel dialog seduta, quindi sicuro).
+- Una **`<Input>` di ricerca** sopra al Select per filtrare la lista (no cmdk).
+- Pulsante **"+ Nuovo prodotto"** che apre `ProdottoFormDialog` **a livello del dialog seduta** (non dentro al Popover), così non ci sono nesting strani.
 
-Usato in: `creaMarca`, `creaFornitore`, `creaProdotto`, `creaLotto`, `aggiungiCarico`, `registraScaricoManuale`, `rettificaInventario`. Il refresh forza supabase-js a rigenerare gli header per le richieste successive.
+Carico la lista prodotti **una sola volta** a livello di `ConsumoMagazzinoStep` (non per ogni riga) e la passo per props alle righe → meno fetch, refresh corretto dopo creazione di un nuovo prodotto.
 
-### 2) UX: messaggi chiari + invalidazione cache
-- In `ProdottoFormDialog` (e `LottoFormDialog`, `RettificaDialog`): se l'errore contiene "row-level security" o "Sessione scaduta", mostrare toast "Sessione scaduta, ricarica la pagina" con un bottone Reload.
-- Aggiungere un effetto in `magazzino.index.tsx` che al mount chiami `supabase.auth.getSession()` per "scaldare" il token prima delle prime query.
+### Cosa cambia in concreto
 
-## Bonus: reattivazione sessione automatica all'apertura del modulo
-In `src/routes/_authenticated/magazzino.index.tsx`, all'inizio del componente:
+1. **`src/components/magazzino/consumo-step.tsx`**
+   - `useEffect` unico che carica `listProdotti({ includiStandby: false })` e mantiene `prodotti` in stato locale.
+   - Funzione `refreshProdotti()` chiamata dopo creazione inline.
+   - Ogni riga riceve `prodotti` per props e usa un nuovo `<ProdottoSelectInline>` (vedi sotto) al posto di `ProdottoCombobox`.
+   - `ProdottoFormDialog` montato **una sola volta** nel componente, fuori dal mapping delle righe.
+   - Per il select lotto: aggiungo guardia: se `r._lotti` non è array lo tratto come `[]`; valori sentinella restano `__auto__` / `__new__` (mai stringa vuota).
+   - Migliore gestione errori in `onProdottoSelect` (try/catch con toast).
 
-```ts
-React.useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => {
-    if (!data.session) supabase.auth.refreshSession();
-  });
-}, []);
-```
+2. **Nuovo `src/components/magazzino/prodotto-select-inline.tsx`**
+   - Riceve `prodotti`, `value`, `onChange(id, prodotto)`, `onCreaNuovo`.
+   - Render: piccolo `Input` di ricerca + `Select` con opzioni filtrate + opzione finale "➕ Nuovo prodotto…" (sentinella `__new__`).
+   - Usa solo Radix `Select` (no cmdk, no Popover) → niente conflitti dentro Dialog.
+   - Mostra badge modalità (Tracciato/Solo uso) accanto al nome.
 
-Così se l'utente arriva alla pagina con un token "lazy", lo riallinea prima di triggerare il form.
+3. **`src/components/magazzino/prodotto-combobox.tsx`** — **lasciato com'è** per la pagina `/magazzino` (lì funziona, non è dentro un Dialog).
 
-## File da modificare
+### File toccati
 
-1. `src/lib/magazzino.ts` — aggiungere `requireUserId()`, sostituire le `getUser()` nelle funzioni di mutazione (creaMarca, creaFornitore, creaProdotto, creaLotto, aggiungiCarico, registraScaricoManuale, rettificaInventario).
-2. `src/components/magazzino/prodotto-form-dialog.tsx` — gestire errori RLS con messaggio specifico.
-3. `src/components/magazzino/lotto-form-dialog.tsx` — idem.
-4. `src/components/magazzino/rettifica-dialog.tsx` — idem.
-5. `src/routes/_authenticated/magazzino.index.tsx` — warm-up sessione al mount.
+- `src/components/magazzino/consumo-step.tsx` (refactor)
+- `src/components/magazzino/prodotto-select-inline.tsx` (nuovo)
 
-## Cosa NON cambio
-- Le RLS policy: sono corrette così.
-- Lo schema DB.
-- Il client supabase generato.
+### Cosa NON cambio
+
+- Logica di `consumaSeduta`, RPC, RLS, tipi, schema DB.
+- Comportamento FEFO, lotto inline, "solo uso".
+- Pagina `/magazzino` e gli altri dialog magazzino.
 
 ## Risultato atteso
-- Cliccando "Crea prodotto" / "Nuova marca", il client invia il JWT utente → `auth.uid()` valorizzato → policy passa → riga creata.
-- Se la sessione è davvero scaduta, l'utente vede un messaggio chiaro invece dell'errore generico.
 
-Confermi che procedo con queste 5 modifiche?
+- "+ Riga" non crasha più.
+- Selezione prodotto funzionante anche con tastiera.
+- Creazione "Nuovo prodotto" inline funzionante; il prodotto compare subito nella select.
+- Selezione lotto FEFO/manuale/nuovo lotto invariata e funzionante.
+
+## Test manuale dopo il fix
+
+1. Apri scheda paziente → seduta → **Esegui**.
+2. Premi **+ Riga** in *Consumo magazzino* — deve aggiungere la riga senza errore.
+3. Seleziona un prodotto esistente *tracciato* → compare dropdown lotto con FEFO/lotti.
+4. **+ Nuovo prodotto** → crea → torna alla riga col prodotto già selezionato.
+5. Su un tracciato senza lotti scegli **+ Nuovo lotto inline** → compila → completa la seduta → verifica scarico.
