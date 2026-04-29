@@ -224,18 +224,7 @@ export function EventoEditDialog({
             </div>
             <div className="space-y-1">
               <Label>Paziente (opzionale)</Label>
-              <Select
-                value={pazienteId ?? "__none__"}
-                onValueChange={(v) => setPazienteId(v === "__none__" ? null : v)}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— nessuno —</SelectItem>
-                  {pazienti.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.cognome} {p.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <PazienteSearch value={pazienteId} onChange={setPazienteId} />
             </div>
           </div>
 
