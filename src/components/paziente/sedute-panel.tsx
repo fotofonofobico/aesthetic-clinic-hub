@@ -1118,6 +1118,12 @@ function EseguiSedutaDialog({
               placeholder="Tolleranza, reazioni, indicazioni post"
             />
           </div>
+
+          <FotoSedutaInline
+            paziente_id={seduta.paziente_id}
+            piano_id={seduta.piano_id}
+            seduta_id={seduta.id}
+          />
         </div>
 
         <DialogFooter>
