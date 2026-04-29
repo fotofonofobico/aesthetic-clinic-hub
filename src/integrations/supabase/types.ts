@@ -486,6 +486,83 @@ export type Database = {
           },
         ]
       }
+      magazzino_movimento: {
+        Row: {
+          costo_unitario: number | null
+          data_movimento: string
+          id: string
+          lotto_id: string | null
+          modalita_snapshot: string | null
+          motivazione: string | null
+          note: string | null
+          operatore_id: string | null
+          paziente_id: string | null
+          prodotto_id: string
+          quantita: number
+          seduta_id: string | null
+          tipo: string
+        }
+        Insert: {
+          costo_unitario?: number | null
+          data_movimento?: string
+          id?: string
+          lotto_id?: string | null
+          modalita_snapshot?: string | null
+          motivazione?: string | null
+          note?: string | null
+          operatore_id?: string | null
+          paziente_id?: string | null
+          prodotto_id: string
+          quantita: number
+          seduta_id?: string | null
+          tipo: string
+        }
+        Update: {
+          costo_unitario?: number | null
+          data_movimento?: string
+          id?: string
+          lotto_id?: string | null
+          modalita_snapshot?: string | null
+          motivazione?: string | null
+          note?: string | null
+          operatore_id?: string | null
+          paziente_id?: string | null
+          prodotto_id?: string
+          quantita?: number
+          seduta_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "magazzino_movimento_lotto_id_fkey"
+            columns: ["lotto_id"]
+            isOneToOne: false
+            referencedRelation: "prodotto_lotto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "magazzino_movimento_paziente_id_fkey"
+            columns: ["paziente_id"]
+            isOneToOne: false
+            referencedRelation: "pazienti"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "magazzino_movimento_prodotto_id_fkey"
+            columns: ["prodotto_id"]
+            isOneToOne: false
+            referencedRelation: "prodotto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "magazzino_movimento_seduta_id_fkey"
+            columns: ["seduta_id"]
+            isOneToOne: false
+            referencedRelation: "seduta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       paziente_access_log: {
         Row: {
           azione: string
@@ -845,6 +922,173 @@ export type Database = {
         }
         Relationships: []
       }
+      prodotto: {
+        Row: {
+          attivo: boolean
+          costo_unitario_default: number | null
+          created_at: string
+          created_by: string | null
+          fornitore_id: string | null
+          id: string
+          marca_id: string | null
+          modalita_tracking: string
+          nome: string
+          note: string | null
+          soglia_minima: number
+          tipologia: string | null
+          unita_misura: string
+          updated_at: string
+        }
+        Insert: {
+          attivo?: boolean
+          costo_unitario_default?: number | null
+          created_at?: string
+          created_by?: string | null
+          fornitore_id?: string | null
+          id?: string
+          marca_id?: string | null
+          modalita_tracking?: string
+          nome: string
+          note?: string | null
+          soglia_minima?: number
+          tipologia?: string | null
+          unita_misura?: string
+          updated_at?: string
+        }
+        Update: {
+          attivo?: boolean
+          costo_unitario_default?: number | null
+          created_at?: string
+          created_by?: string | null
+          fornitore_id?: string | null
+          id?: string
+          marca_id?: string | null
+          modalita_tracking?: string
+          nome?: string
+          note?: string | null
+          soglia_minima?: number
+          tipologia?: string | null
+          unita_misura?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prodotto_fornitore_id_fkey"
+            columns: ["fornitore_id"]
+            isOneToOne: false
+            referencedRelation: "prodotto_fornitore"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prodotto_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "prodotto_marca"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prodotto_fornitore: {
+        Row: {
+          attivo: boolean
+          contatti: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          attivo?: boolean
+          contatti?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          attivo?: boolean
+          contatti?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      prodotto_lotto: {
+        Row: {
+          costo_unitario: number | null
+          created_at: string
+          created_by: string | null
+          data_scadenza: string | null
+          id: string
+          note: string | null
+          numero_lotto: string
+          prodotto_id: string
+          quantita_disponibile: number
+          quantita_iniziale: number
+        }
+        Insert: {
+          costo_unitario?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_scadenza?: string | null
+          id?: string
+          note?: string | null
+          numero_lotto: string
+          prodotto_id: string
+          quantita_disponibile?: number
+          quantita_iniziale?: number
+        }
+        Update: {
+          costo_unitario?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_scadenza?: string | null
+          id?: string
+          note?: string | null
+          numero_lotto?: string
+          prodotto_id?: string
+          quantita_disponibile?: number
+          quantita_iniziale?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prodotto_lotto_prodotto_id_fkey"
+            columns: ["prodotto_id"]
+            isOneToOne: false
+            referencedRelation: "prodotto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prodotto_marca: {
+        Row: {
+          attiva: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          attiva?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          attiva?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           attivo: boolean
@@ -895,6 +1139,7 @@ export type Database = {
           firmata_da: string | null
           firmata_il: string | null
           id: string
+          magazzino_scaricato: boolean
           nota_diario_id: string | null
           note_cliniche: string | null
           numero_seduta: number
@@ -917,6 +1162,7 @@ export type Database = {
           firmata_da?: string | null
           firmata_il?: string | null
           id?: string
+          magazzino_scaricato?: boolean
           nota_diario_id?: string | null
           note_cliniche?: string | null
           numero_seduta?: number
@@ -939,6 +1185,7 @@ export type Database = {
           firmata_da?: string | null
           firmata_il?: string | null
           id?: string
+          magazzino_scaricato?: boolean
           nota_diario_id?: string | null
           note_cliniche?: string | null
           numero_seduta?: number
@@ -1143,6 +1390,14 @@ export type Database = {
       }
       is_active_operator: { Args: { _user_id: string }; Returns: boolean }
       is_valid_cf: { Args: { _cf: string }; Returns: boolean }
+      magazzino_consuma_seduta: {
+        Args: { _righe: Json; _seduta_id: string }
+        Returns: Json
+      }
+      magazzino_ripristina_seduta: {
+        Args: { _seduta_id: string }
+        Returns: Json
+      }
       paziente_consensi_stato: {
         Args: { _paziente_id: string }
         Returns: {
