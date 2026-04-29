@@ -12,7 +12,7 @@ import { calcolaValidoFinoA, type SessionDoc, type SignatureSession } from "@/li
 export interface SaveContext {
   userId: string | null;
   operatoreNome: string | null;
-  modalitaFirma: "tablet" | "desktop";
+  modalitaFirma: "tablet" | "pdf_caricato";
 }
 
 export async function caricaPazientePerFirma(pazienteId: string) {
