@@ -74,6 +74,7 @@ export interface Trattamento {
   durata_minuti: number | null;
   prezzo_indicativo: number | null;
   attivo: boolean;
+  archiviato_il: string | null;
   created_at: string;
   updated_at: string;
   tipo: TrattamentoTipo | null;

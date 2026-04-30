@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Syringe, Pencil, Power } from "lucide-react";
+import { Plus, Syringe, Pencil, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import {
   type Trattamento,
@@ -48,6 +48,7 @@ interface TemplateOption {
 function TrattamentiPage() {
   const { hasRole } = useAuth();
   const isMedico = hasRole("medico");
+  const [mostraArchiviati, setMostraArchiviati] = useState(false);
   const [items, setItems] = useState<Trattamento[]>([]);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,30 +77,31 @@ function TrattamentiPage() {
     setLoading(false);
   }
 
-  async function toggleAttivo(t: Trattamento) {
+  async function toggleArchiviato(t: Trattamento) {
+    const archiviato = t.archiviato_il != null;
     const { error } = await supabase
       .from("trattamenti")
-      .update({ attivo: !t.attivo })
+      .update({ archiviato_il: archiviato ? null : new Date().toISOString() })
       .eq("id", t.id);
     if (error) {
       toast.error(error.message);
       return;
     }
+    toast.success(archiviato ? "Trattamento ripristinato" : "Trattamento archiviato");
     void load();
   }
 
-  const templateById = React.useMemo(
-    () => new Map(templates.map((t) => [t.id, t])),
-    [templates],
+  const templateById = React.useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
+  const visibleItems = React.useMemo(
+    () => items.filter((t) => (t.archiviato_il != null) === mostraArchiviati),
+    [items, mostraArchiviati],
   );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Trattamenti
-          </h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Trattamenti</h1>
           <p className="text-sm text-muted-foreground">
             Catalogo dei trattamenti offerti dallo studio.
           </p>
@@ -131,14 +133,24 @@ function TrattamentiPage() {
         )}
       </header>
 
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant={mostraArchiviati ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMostraArchiviati((v) => !v)}
+        >
+          {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
+        </Button>
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <Syringe className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nessun trattamento in catalogo.
+              {mostraArchiviati ? "Nessun trattamento archiviato." : "Nessun trattamento attivo."}
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
@@ -150,16 +162,17 @@ function TrattamentiPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {items.map((t) => {
+          {visibleItems.map((t) => {
             const consenso = t.consenso_template_id
               ? templateById.get(t.consenso_template_id)
               : null;
+            const archiviato = t.archiviato_il != null;
             const categoriaLabel =
               t.categoria && (TRATTAMENTO_CATEGORIE as readonly string[]).includes(t.categoria)
                 ? TRATTAMENTO_CATEGORIA_LABELS[t.categoria as TrattamentoCategoria]
                 : t.categoria;
             return (
-              <Card key={t.id} className={t.attivo ? "" : "opacity-60"}>
+              <Card key={t.id} className={archiviato || !t.attivo ? "opacity-60" : ""}>
                 <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -182,6 +195,11 @@ function TrattamentiPage() {
                       {!t.attivo && (
                         <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
                           Disattivato
+                        </span>
+                      )}
+                      {archiviato && (
+                        <span className="rounded-full border border-muted-foreground/30 bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Archiviato
                         </span>
                       )}
                     </div>
@@ -215,10 +233,14 @@ function TrattamentiPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => void toggleAttivo(t)}
-                        title={t.attivo ? "Disattiva" : "Attiva"}
+                        onClick={() => void toggleArchiviato(t)}
+                        title={archiviato ? "Ripristina" : "Archivia"}
                       >
-                        <Power className="h-4 w-4" />
+                        {archiviato ? (
+                          <ArchiveRestore className="h-4 w-4" />
+                        ) : (
+                          <Archive className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   )}
@@ -373,18 +395,15 @@ function TrattamentoDialog({
               placeholder="Es. 3"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento
-              di questo numero di sedute.
+              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento di questo
+              numero di sedute.
             </p>
           </div>
         )}
 
         <div>
           <Label>Categoria *</Label>
-          <Select
-            value={categoria}
-            onValueChange={(v) => setCategoria(v as TrattamentoCategoria)}
-          >
+          <Select value={categoria} onValueChange={(v) => setCategoria(v as TrattamentoCategoria)}>
             <SelectTrigger>
               <SelectValue placeholder="Seleziona…" />
             </SelectTrigger>
