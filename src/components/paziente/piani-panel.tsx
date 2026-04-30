@@ -888,23 +888,89 @@ export function PianiPanel({
   }
 
   // ---------- stato piano (manuale, esclude completato) ----------
-  async function aggiornaStato(p: PianoTrattamento, stato: PianoStato) {
+  // Cambi che richiedono motivazione (annullamento/sospensione/riattivazione di un annullato)
+  const [statoChangeReq, setStatoChangeReq] = useState<{
+    piano: PianoTrattamento;
+    nuovoStato: PianoStato;
+  } | null>(null);
+  const [statoMotivo, setStatoMotivo] = useState("");
+  const [statoSaving, setStatoSaving] = useState(false);
+
+  function richiediCambioStato(p: PianoTrattamento, stato: PianoStato) {
     if (stato === "completato") {
-      toast.info(
-        "Lo stato 'completato' è automatico al termine di tutte le sedute",
-      );
+      toast.info("Lo stato 'completato' è automatico al termine di tutte le sedute");
       return;
     }
-    const { error } = await supabase
-      .from("piano_trattamento")
-      .update({ stato } as never)
-      .eq("id", p.id);
-    if (error) {
-      toast.error(error.message);
+    if (stato === p.stato) return;
+    // Cambi che richiedono motivazione: annulla, sospendi, riattiva (da annullato/sospeso ad attivo)
+    const richiedeMotivo =
+      stato === "annullato" ||
+      stato === "sospeso" ||
+      (stato === "attivo" && (p.stato === "annullato" || p.stato === "sospeso"));
+    if (richiedeMotivo) {
+      setStatoMotivo("");
+      setStatoChangeReq({ piano: p, nuovoStato: stato });
       return;
     }
-    void load();
-    onChanged?.();
+    void eseguiCambioStato(p, stato, null);
+  }
+
+  async function eseguiCambioStato(
+    p: PianoTrattamento,
+    stato: PianoStato,
+    motivo: string | null,
+  ) {
+    setStatoSaving(true);
+    try {
+      const { error } = await supabase
+        .from("piano_trattamento")
+        .update({ stato } as never)
+        .eq("id", p.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      // Inserisci nota nel diario
+      const azioneLabel =
+        stato === "annullato"
+          ? "annullato"
+          : stato === "sospeso"
+            ? "sospeso"
+            : stato === "attivo"
+              ? p.stato === "annullato"
+                ? "riattivato (era annullato)"
+                : "riattivato (era sospeso)"
+              : "modificato";
+      const testo = motivo
+        ? `Piano «${p.titolo}» ${azioneLabel}.\nMotivo: ${motivo}`
+        : `Piano «${p.titolo}» ${azioneLabel}.`;
+      await supabase.from("paziente_nota").insert({
+        paziente_id: pazienteId,
+        tipo: "clinica",
+        testo,
+        data_evento: new Date().toISOString(),
+        created_by: user?.id,
+        auto_generata: true,
+      } as never);
+
+      if (stato === "annullato") {
+        toast.success("Piano annullato. Le sedute non eseguite sono state rimosse.");
+      } else {
+        toast.success("Stato piano aggiornato");
+      }
+      setStatoChangeReq(null);
+      setStatoMotivo("");
+      void load();
+      onChanged?.();
+    } finally {
+      setStatoSaving(false);
+    }
+  }
+
+  // Wrapper retro-compatibile per non rompere altre chiamate
+  async function aggiornaStato(p: PianoTrattamento, stato: PianoStato) {
+    richiediCambioStato(p, stato);
   }
 
   function toggle(id: string) {
