@@ -10,10 +10,12 @@ interface PdfCanvasViewerProps {
   blob: Blob | null;
   className?: string;
   onError?: (message: string) => void;
+  onReadyChange?: (ready: boolean) => void;
 }
 
-export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerProps) {
+export function PdfCanvasViewer({ blob, className, onError, onReadyChange }: PdfCanvasViewerProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
+  const printHostRef = React.useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -30,15 +32,31 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
   }, []);
 
   React.useEffect(() => {
+    const printHost = document.createElement("div");
+    printHost.setAttribute("data-pdf-print-pages", "true");
+    document.body.appendChild(printHost);
+    printHostRef.current = printHost;
+
+    return () => {
+      printHost.remove();
+      if (printHostRef.current === printHost) printHostRef.current = null;
+    };
+  }, []);
+
+  React.useEffect(() => {
     const host = hostRef.current;
-    if (!host || !blob || width <= 0) return;
+    const printHost = printHostRef.current;
+    if (!host || !blob || width <= 0 || !printHost) return;
     const currentHost = host;
+    const currentPrintHost = printHost;
     const pdfBlob = blob;
 
     let cancelled = false;
     currentHost.innerHTML = "";
+    currentPrintHost.innerHTML = "";
     setLoading(true);
     setError(null);
+    onReadyChange?.(false);
 
     async function render() {
       try {
@@ -66,13 +84,27 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
 
           await page.render({ canvas, canvasContext: context, viewport, intent: "display" }).promise;
           if (!cancelled) currentHost.appendChild(canvas);
+
+          const printViewport = page.getViewport({ scale: 2 });
+          const printCanvas = document.createElement("canvas");
+          const printContext = printCanvas.getContext("2d");
+          if (!printContext) throw new Error("Canvas PDF non disponibile");
+          printCanvas.width = Math.floor(printViewport.width);
+          printCanvas.height = Math.floor(printViewport.height);
+          printCanvas.style.width = `${(baseViewport.width * 25.4) / 72}mm`;
+          printCanvas.style.height = `${(baseViewport.height * 25.4) / 72}mm`;
+
+          await page.render({ canvas: printCanvas, canvasContext: printContext, viewport: printViewport, intent: "print" }).promise;
+          if (!cancelled) currentPrintHost.appendChild(printCanvas);
         }
         await pdf.destroy();
+        if (!cancelled) onReadyChange?.(true);
       } catch (e) {
         if (cancelled) return;
         const message = (e as Error).message || "Anteprima PDF non riuscita";
         console.error("[pdf preview]", e);
         setError("Anteprima PDF non riuscita su questo browser. Usa il pulsante Stampa per aprirlo nativamente.");
+        onReadyChange?.(false);
         onError?.(message);
       } finally {
         if (!cancelled) setLoading(false);
@@ -84,11 +116,13 @@ export function PdfCanvasViewer({ blob, className, onError }: PdfCanvasViewerPro
     return () => {
       cancelled = true;
       currentHost.innerHTML = "";
+      currentPrintHost.innerHTML = "";
+      onReadyChange?.(false);
     };
-  }, [blob, onError, width]);
+  }, [blob, onError, onReadyChange, width]);
 
   return (
-    <div data-pdf-print-pages className={cn("relative h-full overflow-auto bg-muted", className)}>
+    <div className={cn("relative h-full overflow-auto bg-muted", className)}>
       <div ref={hostRef} className="min-h-full px-4 py-2" />
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 bg-muted/80 text-sm text-muted-foreground">
