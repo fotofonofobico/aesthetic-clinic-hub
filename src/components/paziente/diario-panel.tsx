@@ -515,6 +515,22 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
                       {e.detail}
                     </p>
                   ) : null}
+                  {e.allegati && e.allegati.length > 0 ? (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {e.allegati.map((a) => (
+                        <li key={a.path}>
+                          <button
+                            type="button"
+                            onClick={() => void apriAllegato(a.path)}
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:bg-accent"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            <span className="max-w-[200px] truncate">{a.nome}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </li>
             );
