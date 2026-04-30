@@ -20,6 +20,7 @@ export function FotoPazienteTab({ paziente_id }: Props) {
       .from("piano_trattamento")
       .select("*")
       .eq("paziente_id", paziente_id)
+      .not("stato", "in", "(bozza,annullato)")
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         if (mounted) {
