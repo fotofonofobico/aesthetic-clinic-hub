@@ -453,9 +453,13 @@ function TemplateDialog({
             <Label>Versione</Label>
             <Input
               value={versione}
-              onChange={(e) => setVersione(e.target.value)}
-              placeholder="1.0"
+              readOnly
+              disabled
+              title="Aggiornata automaticamente ad ogni modifica del consenso"
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Aggiornata automaticamente ad ogni modifica.
+            </p>
           </div>
         </div>
 
