@@ -147,7 +147,7 @@ function PazienteDetailPage() {
           .from("piano_trattamento")
           .select("id, stato")
           .eq("paziente_id", id)
-          .neq("stato", "annullato");
+          .not("stato", "in", "(annullato,bozza)");
         const ids = (piani ?? []).map((p) => (p as { id: string }).id);
         if (ids.length === 0) {
           setConsensiPianoMancanti([]);

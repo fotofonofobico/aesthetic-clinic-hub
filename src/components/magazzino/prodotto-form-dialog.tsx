@@ -212,7 +212,7 @@ export function ProdottoFormDialog({
                         value={tipologia}
                         onValueChange={setTipologia}
                       />
-                      <CommandList>
+                      <CommandList className="max-h-64 overflow-y-auto">
                         <CommandEmpty>
                           {tipologia.trim() ? (
                             <button
