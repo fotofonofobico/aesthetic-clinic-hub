@@ -57,6 +57,8 @@ export function ProdottoFormDialog({
   const [soglia, setSoglia] = React.useState("0");
   const [note, setNote] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [tipologie, setTipologie] = React.useState<string[]>([]);
+  const [tipoOpen, setTipoOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
@@ -70,6 +72,7 @@ export function ProdottoFormDialog({
       setSoglia("0");
       setNote("");
       listMarche().then(setMarche).catch(() => setMarche([]));
+      listTipologie().then(setTipologie).catch(() => setTipologie([]));
     }
   }, [open, defaultModalita]);
 
