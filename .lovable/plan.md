@@ -1,44 +1,58 @@
 ## Obiettivo
 
-1. Rimuovere ovunque il pulsante **"Scarica PDF"** lasciando solo **"Stampa"**.
-2. Mostrare l'export "Esporta cartella PDF" del paziente nella **stessa videata** di anteprima usata oggi per anamnesi/consensi (header con titolo + tasto Stampa, viewer canvas sotto), invece del download diretto.
+Rendere la creazione di un piano un atto leggero ("una proposta"). Solo quando il paziente accetta, con **un singolo click**, il piano diventa attivo e genera sedute + alert consenso.
 
-## Modifiche
+## Flusso utente (zero attriti in più)
 
-### 1. `src/components/pdf-blob-dialog.tsx` (anteprima usata da anamnesi e consensi)
-- Rimuovere il bottone **Scarica PDF** e la funzione `downloadPdf`.
-- Rimuovere import non più usati: `Download`, `triggerBlobDownload`.
-- Tenere solo il bottone **Stampa** che apre il blob in una nuova tab tramite `openBlobInNewTab` (da lì il browser permette la stampa nativa).
-- La prop `filename` resta (serve come titolo eventuale) ma non viene più usata per il download.
+1. **Crei piano** dal pannello Piani come ora → nasce come **Proposta**. Nessuna seduta creata, nessun alert consenso, nessuno scarico magazzino. Badge giallo "Proposta" sulla card.
+2. Sulla card della proposta compare **un solo bottone evidenziato: "Attiva piano"** (verde, accanto a Modifica).
+3. Click su **Attiva piano** → il piano diventa **Attivo**, vengono generate tutte le sedute e partono gli alert consenso (esattamente come oggi al momento della creazione). Una toast conferma "Piano attivato, N sedute generate".
+4. Se il paziente rifiuta → "Annulla piano" come oggi.
 
-### 2. `src/routes/_authenticated/pdf-viewer.tsx` (visualizzatore PDF da Storage)
-- Rimuovere bottone **Scarica PDF** e funzione `downloadPdf`.
-- Rimuovere import `Download` e l'helper `safeFilename` se inutilizzato.
-- Tenere solo **Indietro** + **Stampa**. La stampa userà `openBlobInNewTab(blob)` (più affidabile di `window.print()` su iframe esterni).
-- Aggiornare il messaggio di errore dentro `pdf-canvas-viewer.tsx` da "usa Scarica PDF" a "usa Stampa".
+Quindi: **stesso numero di click di oggi se il paziente accetta subito** (creazione + attivazione = 2 azioni, come oggi creazione + eventuale firma consenso). Se il paziente non conferma, semplicemente non clicchi "Attiva" e non hai alert spuri.
 
-### 3. `src/components/pdf-canvas-viewer.tsx`
-- Aggiornare il testo di fallback rimuovendo il riferimento a "Scarica PDF" → "usa il pulsante Stampa".
+## Stato badge
 
-### 4. `src/routes/_authenticated/pazienti.$id.tsx` — Esporta cartella PDF come anteprima
-- Sostituire il flusso di download diretto con apertura del **`PdfBlobDialog`** (lo stesso usato da anamnesi/consensi):
-  - Aggiungere stato `cartellaBlob: Blob | null` e `cartellaOpen: boolean`.
-  - In `esportaCartella()`: generare il PDF con `generaPdfCartellaPaziente`, salvare `blob` nello stato, aprire il dialog. Niente più chiamata a `triggerBlobDownload`.
-  - Rimuovere import `triggerBlobDownload` (non più usato qui).
-  - Rendere `<PdfBlobDialog>` in fondo al componente, con titolo "Cartella paziente — {cognome nome}" e `filename` = filename ritornato dal generatore (per coerenza, anche se non scaricabile).
-- Il bottone in header diventa: "Apri cartella PDF" (più coerente con anteprima + stampa). Icona `FileText` invece di `Download`.
+```text
+Proposta   → giallo (bozza)
+Attivo     → verde
+Completato → grigio
+Sospeso    → arancio
+Annullato  → rosso
+```
 
-### 5. Pulizia `src/lib/download.ts`
-- `triggerBlobDownload` non viene più chiamata da nessuna parte. La rimuoviamo per mantenere il codice pulito. Resta solo `openBlobInNewTab`.
-- Verificare con `rg "triggerBlobDownload"` post-edit che non ci siano import orfani.
+## Cambiamenti tecnici
 
-## Comportamento finale per l'utente
-- Su qualsiasi PDF (anamnesi firmata, consenso firmato, cartella paziente, PDF da storage) si apre **un'unica videata di anteprima** identica a quella in screenshot, con header **Indietro / titolo / Stampa**.
-- Nessun "Scarica PDF" da nessuna parte. La stampa usa la nuova tab nativa del browser (lì è anche disponibile "Salva come PDF" del sistema operativo, quindi l'utente non perde la possibilità di archiviare).
+**Database** (`piano_stato` enum ha già `bozza`, va solo usato):
+- Nessuna migrazione DB necessaria. Lo stato `bozza` esiste già.
 
-## File toccati
-- `src/components/pdf-blob-dialog.tsx`
-- `src/routes/_authenticated/pdf-viewer.tsx`
-- `src/components/pdf-canvas-viewer.tsx`
-- `src/routes/_authenticated/pazienti.$id.tsx`
-- `src/lib/download.ts`
+**`src/components/paziente/piani-panel.tsx`**:
+- `creaPiano()`: 
+  - Inserisci il piano con `stato: 'bozza'`
+  - **Rimuovi** la creazione delle sedute alla fine (le `sedutePayload.push` e l'insert su `seduta`)
+  - Toast: "Proposta creata. Clicca 'Attiva piano' quando il paziente conferma."
+- Nuova funzione `attivaPiano(p)`:
+  - Update `piano_trattamento` → `stato: 'attivo'`
+  - Genera le sedute (sposta qui la logica oggi in `creaPiano`, leggendo voci + prodotti dal piano salvato)
+  - Inserisce nota diario "Piano attivato"
+  - Trigger riavvio della valutazione consensi sulle voci
+- Nella lista piani:
+  - Aggiungi mapping label: `bozza → "Proposta"`
+  - Per piani in `bozza`: badge giallo + bottone primario **"Attiva piano"** (icona CheckCircle), nascondi il bottone "Stato" o nascondine l'opzione "attivo" dal menu (sostituito dal click diretto)
+  - Per piani non-bozza: comportamento attuale invariato
+- `vociMancanti` / alert consenso: già di fatto inerti per piani in bozza (nessuna seduta = nessun alert). Aggiungo un guard esplicito per non mostrare il banner "Consenso mancante" sulle proposte.
+- `Modifica` resta disponibile per le proposte.
+
+**`src/components/paziente/sedute-panel.tsx`** (verifico in implementazione):
+- Filtra eventuali alert/badge basati su sedute in modo che le proposte (zero sedute) non mostrino warning fuorvianti.
+
+**Piani esistenti**:
+- Nessuna migrazione dati. Tutti i piani attuali restano `attivo`. Il nuovo flusso vale solo per i piani futuri.
+
+## Cosa NON cambia
+
+- Tabelle, RLS, trigger
+- PDF cartella paziente
+- Stati `attivo`, `completato`, `sospeso`, `annullato` e relativa logica
+- Magazzino, foto cliniche, calendario
+- Alert consenso (logica identica, scatta solo quando ci sono sedute → cioè da Attivo in poi)

@@ -32,6 +32,7 @@ import {
   MapPin,
   Pencil,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -58,6 +59,7 @@ import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
 
 const STATO_LABELS: Record<PianoStato, string> = {
+  bozza: "Proposta",
   attivo: "Attivo",
   completato: "Completato",
   sospeso: "Sospeso",
@@ -665,6 +667,7 @@ export function PianiPanel({
           prezzo_finale: finale,
           sconto_tipo: scontoTipo,
           sconto_valore: scontoValore,
+          stato: "bozza",
           note: null,
           created_by: user?.id,
         } as never)
@@ -673,42 +676,16 @@ export function PianiPanel({
       if (pianoErr || !pianoData) throw pianoErr ?? new Error("Errore creazione piano");
       const pianoId = (pianoData as { id: string }).id;
 
-      const sedutePayload: Array<Record<string, unknown>> = [];
+      // Crea solo le voci del piano. Le sedute verranno generate all'attivazione.
       for (let i = 0; i < righe.length; i++) {
         const r = righe[i];
-        const { data: vNew, error: vErr } = await supabase
+        const { error: vErr } = await supabase
           .from("piano_trattamento_voce")
-          .insert({ piano_id: pianoId, ...buildVocePayload(r, i) } as never)
-          .select("id")
-          .single();
-        if (vErr || !vNew) throw vErr ?? new Error("Errore creazione voce");
-        const voceId = (vNew as { id: string }).id;
-        for (let n = 1; n <= r.numero_sedute; n++) {
-          sedutePayload.push({
-            piano_id: pianoId,
-            paziente_id: pazienteId,
-            trattamento_id: r.trattamento_id,
-            voce_id: voceId,
-            numero_seduta: n,
-            data_seduta: null, // data da definire
-            operatore_id: user?.id,
-            completata: false,
-            prodotti_previsti: JSON.parse(JSON.stringify(prodottiPerSedutaN(r, n))),
-          });
-        }
-      }
-      if (sedutePayload.length > 0) {
-        const { error: sErr } = await supabase
-          .from("seduta")
-          .insert(sedutePayload as never);
-        if (sErr) {
-          toast.error(`Piano creato ma errore generazione sedute: ${sErr.message}`, {
-            duration: 8000,
-          });
-        }
+          .insert({ piano_id: pianoId, ...buildVocePayload(r, i) } as never);
+        if (vErr) throw vErr;
       }
 
-      toast.success("Piano creato");
+      toast.success("Proposta creata. Clicca 'Attiva piano' quando il paziente conferma.");
       setOpen(false);
       void load();
       onChanged?.();
@@ -716,6 +693,90 @@ export function PianiPanel({
       toast.error(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ---------- attivazione piano (bozza -> attivo + genera sedute) ----------
+  const [attivandoPianoId, setAttivandoPianoId] = useState<string | null>(null);
+  async function attivaPiano(p: PianoTrattamento) {
+    setAttivandoPianoId(p.id);
+    try {
+      // Carica voci del piano
+      const { data: vociData, error: vErr } = await supabase
+        .from("piano_trattamento_voce")
+        .select("id, trattamento_id, numero_sedute, prodotti_previsti, prodotti_per_seduta")
+        .eq("piano_id", p.id)
+        .order("ordine", { ascending: true });
+      if (vErr) throw vErr;
+      const voci = (vociData ?? []) as Array<{
+        id: string;
+        trattamento_id: string;
+        numero_sedute: number;
+        prodotti_previsti: unknown;
+        prodotti_per_seduta: unknown;
+      }>;
+
+      const sedutePayload: Array<Record<string, unknown>> = [];
+      for (const v of voci) {
+        const prodottiBase = parseProdotti(v.prodotti_previsti);
+        const perSeduta = Array.isArray(v.prodotti_per_seduta)
+          ? (v.prodotti_per_seduta as unknown[])
+          : null;
+        for (let n = 1; n <= v.numero_sedute; n++) {
+          const prodSeduta =
+            perSeduta && perSeduta[n - 1]
+              ? parseProdotti(perSeduta[n - 1])
+              : prodottiBase;
+          sedutePayload.push({
+            piano_id: p.id,
+            paziente_id: pazienteId,
+            trattamento_id: v.trattamento_id,
+            voce_id: v.id,
+            numero_seduta: n,
+            data_seduta: null,
+            operatore_id: user?.id,
+            completata: false,
+            prodotti_previsti: JSON.parse(JSON.stringify(prodSeduta)),
+          });
+        }
+      }
+
+      // Aggiorna stato piano -> attivo
+      const { error: updErr } = await supabase
+        .from("piano_trattamento")
+        .update({ stato: "attivo" } as never)
+        .eq("id", p.id);
+      if (updErr) throw updErr;
+
+      // Inserisci sedute
+      if (sedutePayload.length > 0) {
+        const { error: sErr } = await supabase
+          .from("seduta")
+          .insert(sedutePayload as never);
+        if (sErr) {
+          toast.error(`Piano attivato ma errore generazione sedute: ${sErr.message}`, {
+            duration: 8000,
+          });
+        }
+      }
+
+      // Nota diario
+      await supabase.from("paziente_nota").insert({
+        paziente_id: pazienteId,
+        tipo: "clinica",
+        testo: `Piano «${p.titolo}» attivato. ${sedutePayload.length} sedute generate.`,
+        data_evento: new Date().toISOString(),
+        created_by: user?.id,
+        auto_generata: true,
+      } as never);
+
+      toast.success(`Piano attivato. ${sedutePayload.length} sedute generate.`);
+      void load();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore attivazione piano");
+    } finally {
+      setAttivandoPianoId(null);
     }
   }
 
@@ -1524,11 +1585,13 @@ export function PianiPanel({
                           <h4 className="font-display text-base font-semibold">{p.titolo}</h4>
                           <span
                             className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                              p.stato === "attivo"
-                                ? "border-success/40 bg-success/15 text-success-foreground"
-                                : p.stato === "completato"
-                                  ? "border-border bg-muted text-muted-foreground"
-                                  : "border-warning/40 bg-warning/15"
+                              p.stato === "bozza"
+                                ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                : p.stato === "attivo"
+                                  ? "border-success/40 bg-success/15 text-success-foreground"
+                                  : p.stato === "completato"
+                                    ? "border-border bg-muted text-muted-foreground"
+                                    : "border-warning/40 bg-warning/15"
                             }`}
                           >
                             {STATO_LABELS[p.stato]}
@@ -1548,6 +1611,21 @@ export function PianiPanel({
                       </div>
                     </button>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                      {p.stato === "bozza" && (
+                        <Button
+                          size="sm"
+                          onClick={() => void attivaPiano(p)}
+                          disabled={attivandoPianoId === p.id}
+                          className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
+                        >
+                          {attivandoPianoId === p.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                          Attiva piano
+                        </Button>
+                      )}
                       {!isLegacy && (
                         <Button
                           variant="outline"
@@ -1560,34 +1638,47 @@ export function PianiPanel({
                           Modifica
                         </Button>
                       )}
-                      <Select
-                        value={p.stato}
-                        onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
-                        disabled={p.stato === "completato" || p.stato === "annullato"}
-                      >
-                        <SelectTrigger
-                          className="h-8 w-full sm:w-36"
-                          title={
-                            p.stato === "completato"
-                              ? "Piano completato — stato non più modificabile"
-                              : p.stato === "annullato"
-                                ? "Piano annullato"
-                                : undefined
-                          }
+                      {p.stato !== "bozza" && (
+                        <Select
+                          value={p.stato}
+                          onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
+                          disabled={p.stato === "completato" || p.stato === "annullato"}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="attivo">Attivo</SelectItem>
-                          <SelectItem value="sospeso">Sospeso</SelectItem>
-                          <SelectItem value="annullato">Annullato</SelectItem>
-                          {p.stato === "completato" && (
-                            <SelectItem value="completato" disabled>
-                              Completato (auto)
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                          <SelectTrigger
+                            className="h-8 w-full sm:w-36"
+                            title={
+                              p.stato === "completato"
+                                ? "Piano completato — stato non più modificabile"
+                                : p.stato === "annullato"
+                                  ? "Piano annullato"
+                                  : undefined
+                            }
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="attivo">Attivo</SelectItem>
+                            <SelectItem value="sospeso">Sospeso</SelectItem>
+                            <SelectItem value="annullato">Annullato</SelectItem>
+                            {p.stato === "completato" && (
+                              <SelectItem value="completato" disabled>
+                                Completato (auto)
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {p.stato === "bozza" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => richiediCambioStato(p, "annullato")}
+                          className="w-full sm:w-auto"
+                        >
+                          <X className="h-3 w-3" />
+                          Annulla
+                        </Button>
+                      )}
                     </div>
                   </div>
 
