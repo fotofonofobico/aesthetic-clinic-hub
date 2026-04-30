@@ -12,9 +12,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { creaProdotto, listMarche, creaMarca } from "@/lib/magazzino";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { creaProdotto, listMarche, creaMarca, listTipologie } from "@/lib/magazzino";
 import type { Marca, ModalitaTracking, Prodotto } from "@/types/magazzino";
 import { MODALITA_DESCRIZIONI, MODALITA_LABELS } from "@/types/magazzino";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
