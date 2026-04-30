@@ -244,6 +244,36 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
       });
     });
 
+    // Audit anagrafica: cambi di telefono/email/CF/indirizzo
+    (auRes.data ?? []).forEach((r) => {
+      const meta = (r.metadata ?? {}) as Record<string, { prima?: unknown; dopo?: unknown }>;
+      const campi = Object.keys(meta);
+      if (campi.length === 0) return;
+      const detail = campi
+        .map((k) => {
+          const m = meta[k] ?? {};
+          return `${k}: "${m.prima ?? "—"}" → "${m.dopo ?? "—"}"`;
+        })
+        .join("\n");
+      ev.push({
+        id: `au-${r.id}`,
+        ts: r.created_at,
+        kind: "audit",
+        title: "Anagrafica modificata",
+        detail,
+      });
+    });
+
+    // Versioni anamnesi (snapshot precedenti dopo aggiornamento)
+    (avRes.data ?? []).forEach((r) => {
+      ev.push({
+        id: `av-${r.id}`,
+        ts: r.created_at,
+        kind: "anamnesi",
+        title: "Versione anamnesi archiviata",
+      });
+    });
+
     ev.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     setEvents(ev);
     setNotes(noteList);
