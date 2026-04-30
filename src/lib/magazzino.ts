@@ -160,23 +160,23 @@ export interface CreaProdottoInput {
 
 export async function creaProdotto(input: CreaProdottoInput): Promise<Prodotto> {
   const uid = await requireUserId();
-  const { data, error } = await supabase
-    .from("prodotto")
-    .insert({
-      nome: input.nome.trim(),
-      tipologia: input.tipologia ?? null,
-      marca_id: input.marca_id ?? null,
-      fornitore_id: input.fornitore_id ?? null,
-      unita_misura: input.unita_misura || "pz",
-      costo_unitario_default: input.costo_unitario_default ?? null,
-      soglia_minima: input.soglia_minima ?? 0,
-      modalita_tracking: input.modalita_tracking ?? "solo_uso",
-      note: input.note ?? null,
-      created_by: uid,
-    })
-    .select()
-    .single();
-  if (error) throw error;
+  const payload = {
+    nome: input.nome.trim(),
+    tipologia: input.tipologia ?? null,
+    marca_id: input.marca_id ?? null,
+    fornitore_id: input.fornitore_id ?? null,
+    unita_misura: (input.unita_misura || "pz").trim(),
+    costo_unitario_default: input.costo_unitario_default ?? null,
+    soglia_minima: input.soglia_minima ?? 0,
+    modalita_tracking: input.modalita_tracking ?? "solo_uso",
+    note: input.note ?? null,
+    created_by: uid,
+  };
+  const { data, error } = await supabase.from("prodotto").insert(payload).select().single();
+  if (error) {
+    console.error("[creaProdotto] error", { code: error.code, message: error.message, details: error.details, payload });
+    throw new Error(error.message || "Errore creazione prodotto");
+  }
   return data as Prodotto;
 }
 
