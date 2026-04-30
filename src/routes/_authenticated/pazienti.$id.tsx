@@ -27,6 +27,7 @@ import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
+import { triggerBlobDownload } from "@/lib/download";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
