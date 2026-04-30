@@ -218,7 +218,8 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     );
 
     const noteList = (ntRes.data ?? []) as PazienteNota[];
-    noteList.forEach((n) =>
+    noteList.forEach((n) => {
+      const all = Array.isArray(n.allegati) ? (n.allegati as NotaAllegato[]) : [];
       ev.push({
         id: `nt-${n.id}`,
         ts: n.data_evento,
@@ -226,8 +227,9 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
         title: TIPO_LABEL[n.tipo],
         detail: n.testo,
         notaTipo: n.tipo,
-      }),
-    );
+        allegati: all,
+      });
+    });
 
     ev.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     setEvents(ev);
