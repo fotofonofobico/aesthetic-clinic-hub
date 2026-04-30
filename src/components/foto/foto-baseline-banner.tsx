@@ -18,7 +18,7 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
         .from("piano_trattamento")
         .select("id")
         .eq("paziente_id", paziente_id)
-        .not("stato", "in", "(bozza,annullato)");
+        .neq("stato", "bozza");
       const ids = (piani ?? []).map((p) => (p as { id: string }).id);
       if (ids.length === 0) {
         if (mounted) setCount(0);
