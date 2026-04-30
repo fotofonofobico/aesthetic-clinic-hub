@@ -23,7 +23,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, FileSignature, Pencil, Power } from "lucide-react";
+import { Plus, FileSignature, Pencil, Power, Archive, ArchiveRestore } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useArchivioFilter } from "@/hooks/useArchivioFilter";
 import { toast } from "sonner";
 import {
   CATEGORIA_LABELS,
