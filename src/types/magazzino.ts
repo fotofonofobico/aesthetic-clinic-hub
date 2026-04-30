@@ -15,7 +15,7 @@ export const MODALITA_LABELS: Record<ModalitaTracking, string> = {
 
 export const MODALITA_DESCRIZIONI: Record<ModalitaTracking, string> = {
   tracciato: "Conta scorte e scarica automaticamente",
-  solo_uso: "Registra lotto/uso senza decremento (prodotti condivisi)",
+  solo_uso: "Registra lotto e uso senza scaricare le scorte",
   standby: "Disattivato — escluso da seduta e piano",
 };
 

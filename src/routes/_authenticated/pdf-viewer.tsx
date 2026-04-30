@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
-import { openBlobInNewTab } from "@/lib/download";
+import { printBlob } from "@/lib/download";
 
 const pdfSearchSchema = z.object({
   bucket: z.enum(["anamnesi-pdf", "consensi-pdf"]),
@@ -57,7 +57,7 @@ function PdfViewerPage() {
       toast.error("PDF non ancora pronto");
       return;
     }
-    openBlobInNewTab(blob, "application/pdf");
+    printBlob(blob, "application/pdf");
   }
 
   return (

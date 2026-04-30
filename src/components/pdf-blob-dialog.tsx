@@ -2,7 +2,7 @@ import * as React from "react";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
-import { openBlobInNewTab } from "@/lib/download";
+import { printBlob } from "@/lib/download";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title }: PdfBlobDialog
 
   function printPdf() {
     if (!blob) return;
-    openBlobInNewTab(blob, "application/pdf");
+    printBlob(blob, "application/pdf");
   }
 
   return (
