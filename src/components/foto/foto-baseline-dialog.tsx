@@ -116,20 +116,22 @@ export function FotoBaselineDialog({
               <strong>Baseline mancante</strong> finché non carichi le foto), oppure
               caricarle ora.
             </p>
-            <DialogFooter className="flex-col gap-2 sm:flex-row">
-              <Button variant="outline" onClick={onProcedi}>
-                <Play className="h-4 w-4" />
-                Procedi comunque
-              </Button>
-              <Button onClick={onCarica}>
-                <Camera className="h-4 w-4" />
-                Carica baseline ora
-              </Button>
+            <DialogFooter className="flex w-full flex-col gap-2 sm:flex-col">
+              <div className="flex w-full flex-col gap-2 sm:flex-row">
+                <Button variant="outline" onClick={onProcedi} className="w-full sm:flex-1">
+                  <Play className="h-4 w-4" />
+                  Procedi comunque
+                </Button>
+                <Button onClick={onCarica} className="w-full sm:flex-1">
+                  <Camera className="h-4 w-4" />
+                  Carica baseline ora
+                </Button>
+              </div>
               {isMedico && (
                 <Button
                   variant="ghost"
                   onClick={() => setShowMotivo(true)}
-                  className="sm:ml-auto"
+                  className="w-full"
                 >
                   <Ban className="h-4 w-4" />
                   Marca non eseguibile
