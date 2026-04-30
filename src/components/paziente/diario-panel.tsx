@@ -47,6 +47,7 @@ interface TimelineEvent {
     | "followup"
     | "complicanza"
     | "consenso"
+    | "audit"
     | "nota";
   title: string;
   detail?: string;
