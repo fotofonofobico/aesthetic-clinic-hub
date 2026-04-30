@@ -174,10 +174,12 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
               </Button>
             </div>
 
-            {tracciato && (
+            {(tracciato || soloUso) && (
               <div className="grid gap-2 md:grid-cols-2">
                 <div>
-                  <Label className="text-[11px]">Lotto (FEFO se vuoto)</Label>
+                  <Label className="text-[11px]">
+                    {tracciato ? "Lotto (FEFO se vuoto)" : "Lotto / scadenza (opzionale)"}
+                  </Label>
                   <Select
                     value={r._useNuovoLotto ? "__new__" : r.lotto_id ?? "__auto__"}
                     onValueChange={(v) => {
@@ -206,12 +208,15 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__auto__">Auto FEFO</SelectItem>
+                      <SelectItem value="__auto__">
+                        {tracciato ? "Auto FEFO" : "Senza lotto"}
+                      </SelectItem>
                       {lotti
-                        .filter((l) => l.quantita_disponibile > 0)
+                        .filter((l) => tracciato ? l.quantita_disponibile > 0 : true)
                         .map((l) => (
                           <SelectItem key={l.id} value={l.id}>
-                            {l.numero_lotto} · {l.quantita_disponibile} disp.
+                            {l.numero_lotto}
+                            {tracciato ? ` · ${l.quantita_disponibile} disp.` : ""}
                             {l.data_scadenza ? ` · scad ${l.data_scadenza}` : ""}
                           </SelectItem>
                         ))}
