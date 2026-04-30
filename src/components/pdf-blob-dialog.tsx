@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Download, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
-import { triggerBlobDownload, openBlobInNewTab } from "@/lib/download";
+import { openBlobInNewTab } from "@/lib/download";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,11 @@ interface PdfBlobDialogProps {
   onOpenChange: (open: boolean) => void;
   blob: Blob | null;
   title: string;
-  filename: string;
+  /** Mantenuto per compatibilità — non usato (download rimosso). */
+  filename?: string;
 }
 
-export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: PdfBlobDialogProps) {
+export function PdfBlobDialog({ open, onOpenChange, blob, title }: PdfBlobDialogProps) {
   const [url, setUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -35,11 +36,6 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
     return () => URL.revokeObjectURL(nextUrl);
   }, [blob, open]);
 
-  function downloadPdf() {
-    if (!blob) return;
-    triggerBlobDownload(blob, filename, "application/pdf");
-  }
-
   function printPdf() {
     if (!blob) return;
     openBlobInNewTab(blob, "application/pdf");
@@ -52,15 +48,11 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
           <div className="flex flex-wrap items-center gap-2 pr-8">
             <div className="min-w-0 flex-1">
               <DialogTitle className="truncate text-base">{title}</DialogTitle>
-              <DialogDescription>Anteprima PDF interna, senza popup o schede fittizie.</DialogDescription>
+              <DialogDescription>Anteprima PDF interna. Usa Stampa per stampare o salvare.</DialogDescription>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob}>
               <Printer className="h-4 w-4" />
               Stampa
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!blob}>
-              <Download className="h-4 w-4" />
-              Scarica PDF
             </Button>
           </div>
         </DialogHeader>
