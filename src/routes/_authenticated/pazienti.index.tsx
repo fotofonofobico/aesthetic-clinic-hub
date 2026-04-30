@@ -170,7 +170,9 @@ function PazientiListPage() {
                 <tr
                   key={p.id}
                   className="cursor-pointer border-t border-border transition-colors hover:bg-accent/40"
-                  onClick={() => !mostraArchiviati && navigate({ to: "/pazienti/$id", params: { id: p.id } })}
+                  onClick={() =>
+                    !mostraArchiviati && navigate({ to: "/pazienti/$id", params: { id: p.id } })
+                  }
                 >
                   <td className="px-4 py-3">
                     <div className="font-medium">
@@ -191,7 +193,11 @@ function PazientiListPage() {
                   {mostraArchiviati && (
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {isMedico && (
-                        <Button variant="ghost" size="sm" onClick={() => void ripristinaPaziente(p.id)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void ripristinaPaziente(p.id)}
+                        >
                           <ArchiveRestore className="h-4 w-4" />
                           Ripristina
                         </Button>

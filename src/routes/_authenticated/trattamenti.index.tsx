@@ -93,18 +93,13 @@ function TrattamentiPage() {
     void load();
   }
 
-  const templateById = React.useMemo(
-    () => new Map(templates.map((t) => [t.id, t])),
-    [templates],
-  );
+  const templateById = React.useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Trattamenti
-          </h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Trattamenti</h1>
           <p className="text-sm text-muted-foreground">
             Catalogo dei trattamenti offerti dallo studio.
           </p>
@@ -399,18 +394,15 @@ function TrattamentoDialog({
               placeholder="Es. 3"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento
-              di questo numero di sedute.
+              Il ciclo (e il consenso collegato) si considera concluso al raggiungimento di questo
+              numero di sedute.
             </p>
           </div>
         )}
 
         <div>
           <Label>Categoria *</Label>
-          <Select
-            value={categoria}
-            onValueChange={(v) => setCategoria(v as TrattamentoCategoria)}
-          >
+          <Select value={categoria} onValueChange={(v) => setCategoria(v as TrattamentoCategoria)}>
             <SelectTrigger>
               <SelectValue placeholder="Seleziona…" />
             </SelectTrigger>
