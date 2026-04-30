@@ -168,7 +168,67 @@ export function ProdottoFormDialog({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Tipologia</Label>
-                <Input value={tipologia} onChange={(e) => setTipologia(e.target.value)} placeholder="es. biostimolante" />
+                <Popover open={tipoOpen} onOpenChange={setTipoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className={cn("truncate", !tipologia && "text-muted-foreground")}>
+                        {tipologia || "Seleziona o digita…"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command shouldFilter={true}>
+                      <CommandInput
+                        placeholder="Cerca o aggiungi…"
+                        value={tipologia}
+                        onValueChange={setTipologia}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {tipologia.trim() ? (
+                            <button
+                              type="button"
+                              className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent"
+                              onClick={() => setTipoOpen(false)}
+                            >
+                              + Usa "{tipologia.trim()}"
+                            </button>
+                          ) : (
+                            <span className="block px-2 py-1.5 text-sm text-muted-foreground">
+                              Nessuna tipologia
+                            </span>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {tipologie.map((t) => (
+                            <CommandItem
+                              key={t}
+                              value={t}
+                              onSelect={() => {
+                                setTipologia(t);
+                                setTipoOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  tipologia === t ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              {t}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>Costo unitario (€)</Label>
