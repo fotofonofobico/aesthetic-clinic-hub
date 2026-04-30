@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, ArrowLeft, Download, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileText, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
@@ -27,7 +27,7 @@ import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
-import { triggerBlobDownload } from "@/lib/download";
+import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -77,14 +77,18 @@ function PazienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>("diario");
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [cartellaBlob, setCartellaBlob] = useState<Blob | null>(null);
+  const [cartellaFilename, setCartellaFilename] = useState<string>("cartella-paziente.pdf");
+  const [cartellaOpen, setCartellaOpen] = useState(false);
 
   async function esportaCartella() {
     if (!paziente) return;
     setExportingPdf(true);
     try {
       const { blob, filename } = await generaPdfCartellaPaziente(paziente.id);
-      triggerBlobDownload(blob, filename, "application/pdf");
-      toast.success("Cartella PDF generata");
+      setCartellaBlob(blob);
+      setCartellaFilename(filename);
+      setCartellaOpen(true);
     } catch (e) {
       console.error("[esportaCartella]", e);
       const msg = e instanceof Error ? e.message : "Errore generazione PDF";
@@ -237,7 +241,7 @@ function PazienteDetailPage() {
             onClick={() => void esportaCartella()}
             disabled={exportingPdf}
           >
-            <Download className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             {exportingPdf ? "Generazione…" : "Esporta cartella PDF"}
           </Button>
         </div>
