@@ -1787,6 +1787,79 @@ export function PianiPanel({
           }
         }}
       />
+
+      <Dialog
+        open={!!statoChangeReq}
+        onOpenChange={(v) => {
+          if (!v && !statoSaving) {
+            setStatoChangeReq(null);
+            setStatoMotivo("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {statoChangeReq?.nuovoStato === "annullato"
+                ? "Annulla piano"
+                : statoChangeReq?.nuovoStato === "sospeso"
+                  ? "Sospendi piano"
+                  : "Riattiva piano"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {statoChangeReq?.nuovoStato === "annullato" && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                Le sedute non ancora eseguite verranno cancellate. Le sedute già completate
+                rimangono nello storico clinico.
+              </p>
+            )}
+            <div>
+              <Label>Motivazione *</Label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                rows={4}
+                value={statoMotivo}
+                onChange={(e) => setStatoMotivo(e.target.value)}
+                placeholder="Spiega brevemente il motivo (verrà registrato nel diario del paziente)"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Almeno 5 caratteri.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStatoChangeReq(null);
+                setStatoMotivo("");
+              }}
+              disabled={statoSaving}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={() => {
+                if (statoMotivo.trim().length < 5) {
+                  toast.error("Inserisci una motivazione di almeno 5 caratteri");
+                  return;
+                }
+                if (statoChangeReq) {
+                  void eseguiCambioStato(
+                    statoChangeReq.piano,
+                    statoChangeReq.nuovoStato,
+                    statoMotivo.trim(),
+                  );
+                }
+              }}
+              disabled={statoSaving}
+            >
+              {statoSaving ? "Salvataggio…" : "Conferma"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
