@@ -24,8 +24,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, Syringe, Pencil, Archive, ArchiveRestore } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { useArchivioFilter } from "@/hooks/useArchivioFilter";
 import { toast } from "sonner";
 import {
   type Trattamento,
@@ -50,7 +48,7 @@ interface TemplateOption {
 function TrattamentiPage() {
   const { hasRole } = useAuth();
   const isMedico = hasRole("medico");
-  const archivio = useArchivioFilter(false);
+  const [mostraArchiviati, setMostraArchiviati] = useState(false);
   const [items, setItems] = useState<Trattamento[]>([]);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +92,10 @@ function TrattamentiPage() {
   }
 
   const templateById = React.useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
+  const visibleItems = React.useMemo(
+    () => items.filter((t) => (t.archiviato_il != null) === mostraArchiviati),
+    [items, mostraArchiviati],
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -132,24 +134,23 @@ function TrattamentiPage() {
       </header>
 
       <div className="flex items-center justify-end gap-2">
-        <Switch
-          id="mostra-archiviati-trattamenti"
-          checked={archivio.mostraArchiviati}
-          onCheckedChange={archivio.toggle}
-        />
-        <Label htmlFor="mostra-archiviati-trattamenti" className="text-xs text-muted-foreground">
-          Mostra archiviati
-        </Label>
+        <Button
+          variant={mostraArchiviati ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMostraArchiviati((v) => !v)}
+        >
+          {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
+        </Button>
       </div>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
-      ) : items.filter(archivio.filterRow).length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <Syringe className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              {archivio.mostraArchiviati ? "Nessun trattamento." : "Nessun trattamento attivo."}
+              {mostraArchiviati ? "Nessun trattamento archiviato." : "Nessun trattamento attivo."}
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
@@ -161,7 +162,7 @@ function TrattamentiPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {items.filter(archivio.filterRow).map((t) => {
+          {visibleItems.map((t) => {
             const consenso = t.consenso_template_id
               ? templateById.get(t.consenso_template_id)
               : null;
