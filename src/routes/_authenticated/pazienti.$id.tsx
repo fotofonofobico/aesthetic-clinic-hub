@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, ArrowLeft, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
@@ -26,6 +26,7 @@ import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
+import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -74,6 +75,29 @@ function PazienteDetailPage() {
   const [consensiPianoMancanti, setConsensiPianoMancanti] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>("diario");
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  async function esportaCartella() {
+    if (!paziente) return;
+    setExportingPdf(true);
+    try {
+      const { blob, filename } = await generaPdfCartellaPaziente(paziente.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Cartella PDF generata");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Errore generazione PDF";
+      toast.error(msg);
+    } finally {
+      setExportingPdf(false);
+    }
+  }
 
   useEffect(() => {
     if (isChildRoute) {
@@ -210,6 +234,17 @@ function PazienteDetailPage() {
             {paziente.sesso ? ` · ${paziente.sesso}` : ""}
             {paziente.codice_fiscale ? ` · ${paziente.codice_fiscale}` : ""}
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void esportaCartella()}
+            disabled={exportingPdf}
+          >
+            <Download className="h-4 w-4" />
+            {exportingPdf ? "Generazione…" : "Esporta cartella PDF"}
+          </Button>
         </div>
       </header>
 
