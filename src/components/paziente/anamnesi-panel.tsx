@@ -1184,7 +1184,18 @@ function TernaryRow({
 }) {
   return (
     <div className="space-y-2 rounded-md border border-border p-3">
-      <Label className="text-sm">{label}</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-sm">{label}</Label>
+        {value !== "" && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+          >
+            azzera
+          </button>
+        )}
+      </div>
       <div className="flex gap-1">
         {[
           { v: "no" as const, l: "No" },
@@ -1196,7 +1207,7 @@ function TernaryRow({
             type="button"
             size="sm"
             variant={value === o.v ? "default" : "outline"}
-            onClick={() => onChange(value === o.v ? "" : o.v)}
+            onClick={() => onChange(o.v)}
             className="flex-1"
           >
             {o.l}
