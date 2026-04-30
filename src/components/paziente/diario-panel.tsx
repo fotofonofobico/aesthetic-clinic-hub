@@ -606,6 +606,8 @@ function iconFor(e: TimelineEvent) {
       return <ShieldAlert className={cls} />;
     case "consenso":
       return <FileSignature className={cls} />;
+    case "audit":
+      return <Pencil className={cls} />;
     case "nota":
       if (e.notaTipo === "telefonata") return <Phone className={cls} />;
       if (e.notaTipo === "promemoria") return <MessageCircle className={cls} />;
