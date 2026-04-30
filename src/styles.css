@@ -155,6 +155,10 @@
   }
 }
 
+[data-pdf-print-pages] {
+  display: none;
+}
+
 @media print {
   @page {
     margin: 0;
