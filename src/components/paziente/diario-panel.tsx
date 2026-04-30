@@ -239,48 +239,88 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
 
   async function aggiungiNota() {
     if (!testo.trim()) return;
-    const dataIso = new Date(dataEvento).toISOString();
-    const testoTrim = testo.trim();
-    const { data: nota, error } = await supabase
-      .from("paziente_nota")
-      .insert({
-        paziente_id: pazienteId,
-        tipo,
-        testo: testoTrim,
-        data_evento: dataIso,
-        created_by: user?.id,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
+    setUploading(true);
+    try {
+      const dataIso = new Date(dataEvento).toISOString();
+      const testoTrim = testo.trim();
+      const { data: nota, error } = await supabase
+        .from("paziente_nota")
+        .insert({
+          paziente_id: pazienteId,
+          tipo,
+          testo: testoTrim,
+          data_evento: dataIso,
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        toast.error(`Errore: ${error.message}`);
+        return;
+      }
+
+      // Upload allegati (se presenti)
+      if (nota && allegatiFile.length > 0) {
+        const uploaded: NotaAllegato[] = [];
+        for (const f of allegatiFile) {
+          const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+          const path = `${pazienteId}/${nota.id}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from("nota-allegati")
+            .upload(path, f, { upsert: false, contentType: f.type || undefined });
+          if (upErr) {
+            toast.warning(`Allegato "${f.name}" non caricato: ${upErr.message}`);
+          } else {
+            uploaded.push({ path, nome: f.name, mime: f.type || null, size: f.size });
+          }
+        }
+        if (uploaded.length > 0) {
+          await supabase
+            .from("paziente_nota")
+            .update({ allegati: uploaded as unknown as never })
+            .eq("id", nota.id);
+        }
+      }
+
+      // Opzionale: crea anche evento calendario collegato
+      if (aggiungiAlCalendario && nota) {
+        const titolo = testoTrim.length > 60 ? testoTrim.slice(0, 60) + "…" : testoTrim;
+        const { error: evErr } = await supabase.from("evento_calendario").insert({
+          titolo,
+          descrizione: testoTrim,
+          tipo: "promemoria",
+          data_inizio: dataIso,
+          paziente_id: pazienteId,
+          sincronizza_diario: true,
+          nota_diario_id: nota.id,
+          created_by: user?.id,
+        });
+        if (evErr) {
+          toast.warning("Nota salvata, ma evento calendario non creato");
+        }
+      }
+
+      setTesto("");
+      setTipo("clinica");
+      setDataEvento(new Date().toISOString().slice(0, 16));
+      setAggiungiAlCalendario(false);
+      setAllegatiFile([]);
+      toast.success("Nota aggiunta al diario");
+      void load();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function apriAllegato(path: string) {
+    const { data, error } = await supabase.storage
+      .from("nota-allegati")
+      .createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) {
+      toast.error("Impossibile aprire l'allegato");
       return;
     }
-
-    // Opzionale: crea anche evento calendario collegato
-    if (aggiungiAlCalendario && nota) {
-      const titolo = testoTrim.length > 60 ? testoTrim.slice(0, 60) + "…" : testoTrim;
-      const { error: evErr } = await supabase.from("evento_calendario").insert({
-        titolo,
-        descrizione: testoTrim,
-        tipo: "promemoria",
-        data_inizio: dataIso,
-        paziente_id: pazienteId,
-        sincronizza_diario: true,
-        nota_diario_id: nota.id,
-        created_by: user?.id,
-      });
-      if (evErr) {
-        toast.warning("Nota salvata, ma evento calendario non creato");
-      }
-    }
-
-    setTesto("");
-    setTipo("clinica");
-    setDataEvento(new Date().toISOString().slice(0, 16));
-    setAggiungiAlCalendario(false);
-    toast.success("Nota aggiunta al diario");
-    void load();
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function eliminaNota(id: string) {
