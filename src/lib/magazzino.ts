@@ -196,6 +196,21 @@ export async function disattivaProdotto(id: string): Promise<void> {
   await aggiornaProdotto(id, { attivo: false });
 }
 
+/** Lista tipologie distinte già usate nei prodotti (per combobox) */
+export async function listTipologie(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("prodotto")
+    .select("tipologia")
+    .not("tipologia", "is", null);
+  if (error) throw error;
+  const set = new Set<string>();
+  for (const r of data ?? []) {
+    const t = (r.tipologia as string | null)?.trim();
+    if (t) set.add(t);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 // ============================================================
 // LOTTI
 // ============================================================

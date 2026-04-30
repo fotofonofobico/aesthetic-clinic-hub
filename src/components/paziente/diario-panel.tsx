@@ -32,14 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { NotaTipo, PazienteNota } from "@/types/clinico";
-
-interface NotaAllegato {
-  path: string;
-  nome: string;
-  mime?: string | null;
-  size?: number | null;
-}
+import type { NotaAllegato, NotaTipo, PazienteNota } from "@/types/clinico";
 
 interface TimelineEvent {
   id: string;
@@ -225,7 +218,8 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     );
 
     const noteList = (ntRes.data ?? []) as PazienteNota[];
-    noteList.forEach((n) =>
+    noteList.forEach((n) => {
+      const all = Array.isArray(n.allegati) ? (n.allegati as NotaAllegato[]) : [];
       ev.push({
         id: `nt-${n.id}`,
         ts: n.data_evento,
@@ -233,8 +227,9 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
         title: TIPO_LABEL[n.tipo],
         detail: n.testo,
         notaTipo: n.tipo,
-      }),
-    );
+        allegati: all,
+      });
+    });
 
     ev.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     setEvents(ev);
@@ -244,48 +239,88 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
 
   async function aggiungiNota() {
     if (!testo.trim()) return;
-    const dataIso = new Date(dataEvento).toISOString();
-    const testoTrim = testo.trim();
-    const { data: nota, error } = await supabase
-      .from("paziente_nota")
-      .insert({
-        paziente_id: pazienteId,
-        tipo,
-        testo: testoTrim,
-        data_evento: dataIso,
-        created_by: user?.id,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
+    setUploading(true);
+    try {
+      const dataIso = new Date(dataEvento).toISOString();
+      const testoTrim = testo.trim();
+      const { data: nota, error } = await supabase
+        .from("paziente_nota")
+        .insert({
+          paziente_id: pazienteId,
+          tipo,
+          testo: testoTrim,
+          data_evento: dataIso,
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        toast.error(`Errore: ${error.message}`);
+        return;
+      }
+
+      // Upload allegati (se presenti)
+      if (nota && allegatiFile.length > 0) {
+        const uploaded: NotaAllegato[] = [];
+        for (const f of allegatiFile) {
+          const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+          const path = `${pazienteId}/${nota.id}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from("nota-allegati")
+            .upload(path, f, { upsert: false, contentType: f.type || undefined });
+          if (upErr) {
+            toast.warning(`Allegato "${f.name}" non caricato: ${upErr.message}`);
+          } else {
+            uploaded.push({ path, nome: f.name, mime: f.type || null, size: f.size });
+          }
+        }
+        if (uploaded.length > 0) {
+          await supabase
+            .from("paziente_nota")
+            .update({ allegati: uploaded as unknown as never })
+            .eq("id", nota.id);
+        }
+      }
+
+      // Opzionale: crea anche evento calendario collegato
+      if (aggiungiAlCalendario && nota) {
+        const titolo = testoTrim.length > 60 ? testoTrim.slice(0, 60) + "…" : testoTrim;
+        const { error: evErr } = await supabase.from("evento_calendario").insert({
+          titolo,
+          descrizione: testoTrim,
+          tipo: "promemoria",
+          data_inizio: dataIso,
+          paziente_id: pazienteId,
+          sincronizza_diario: true,
+          nota_diario_id: nota.id,
+          created_by: user?.id,
+        });
+        if (evErr) {
+          toast.warning("Nota salvata, ma evento calendario non creato");
+        }
+      }
+
+      setTesto("");
+      setTipo("clinica");
+      setDataEvento(new Date().toISOString().slice(0, 16));
+      setAggiungiAlCalendario(false);
+      setAllegatiFile([]);
+      toast.success("Nota aggiunta al diario");
+      void load();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function apriAllegato(path: string) {
+    const { data, error } = await supabase.storage
+      .from("nota-allegati")
+      .createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) {
+      toast.error("Impossibile aprire l'allegato");
       return;
     }
-
-    // Opzionale: crea anche evento calendario collegato
-    if (aggiungiAlCalendario && nota) {
-      const titolo = testoTrim.length > 60 ? testoTrim.slice(0, 60) + "…" : testoTrim;
-      const { error: evErr } = await supabase.from("evento_calendario").insert({
-        titolo,
-        descrizione: testoTrim,
-        tipo: "promemoria",
-        data_inizio: dataIso,
-        paziente_id: pazienteId,
-        sincronizza_diario: true,
-        nota_diario_id: nota.id,
-        created_by: user?.id,
-      });
-      if (evErr) {
-        toast.warning("Nota salvata, ma evento calendario non creato");
-      }
-    }
-
-    setTesto("");
-    setTipo("clinica");
-    setDataEvento(new Date().toISOString().slice(0, 16));
-    setAggiungiAlCalendario(false);
-    toast.success("Nota aggiunta al diario");
-    void load();
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function eliminaNota(id: string) {
@@ -353,6 +388,55 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               />
             </div>
           </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label
+                htmlFor="diario-allegati"
+                className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                <Paperclip className="h-4 w-4" />
+                Allega file
+              </Label>
+              <input
+                id="diario-allegati"
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setAllegatiFile((prev) => [...prev, ...files]);
+                  e.target.value = "";
+                }}
+              />
+              {allegatiFile.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {allegatiFile.length} file selezionati
+                </span>
+              )}
+            </div>
+            {allegatiFile.length > 0 && (
+              <ul className="space-y-1">
+                {allegatiFile.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between gap-2 rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+                  >
+                    <span className="truncate">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAllegatiFile((prev) => prev.filter((_, idx) => idx !== i))
+                      }
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Rimuovi"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <Checkbox
@@ -361,9 +445,9 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               />
               <span className="text-muted-foreground">Aggiungi anche al calendario</span>
             </label>
-            <Button onClick={aggiungiNota} disabled={!testo.trim()}>
+            <Button onClick={aggiungiNota} disabled={!testo.trim() || uploading}>
               <Plus className="h-4 w-4" />
-              Aggiungi
+              {uploading ? "Salvataggio…" : "Aggiungi"}
             </Button>
           </div>
         </CardContent>
@@ -430,6 +514,22 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
                     <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
                       {e.detail}
                     </p>
+                  ) : null}
+                  {e.allegati && e.allegati.length > 0 ? (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {e.allegati.map((a) => (
+                        <li key={a.path}>
+                          <button
+                            type="button"
+                            onClick={() => void apriAllegato(a.path)}
+                            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:bg-accent"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            <span className="max-w-[200px] truncate">{a.nome}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                 </div>
               </li>
