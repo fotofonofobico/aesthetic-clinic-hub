@@ -39,11 +39,15 @@ export function EventoEditDialog({
   const [tipo, setTipo] = useState<CalendarioEventoTipo>("promemoria");
   const [dataInizio, setDataInizio] = useState("");
   const [dataFine, setDataFine] = useState("");
+  const [modoFine, setModoFine] = useState<"durata" | "fine">("durata");
+  const [durataMinuti, setDurataMinuti] = useState<number>(60);
   const [tuttoIlGiorno, setTuttoIlGiorno] = useState(false);
   const [pazienteId, setPazienteId] = useState<string | null>(null);
   const [sincronizzaDiario, setSincronizzaDiario] = useState(false);
   const [completato, setCompletato] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const DURATE_PRESET = [15, 30, 45, 60, 90, 120];
 
   useEffect(() => {
     if (!open) return;
@@ -51,8 +55,25 @@ export function EventoEditDialog({
       setTitolo(evento.titolo);
       setDescrizione(evento.descrizione ?? "");
       setTipo(evento.tipo);
-      setDataInizio(toLocalInput(new Date(evento.data_inizio)));
-      setDataFine(evento.data_fine ? toLocalInput(new Date(evento.data_fine)) : "");
+      const startD = new Date(evento.data_inizio);
+      setDataInizio(toLocalInput(startD));
+      if (evento.data_fine) {
+        const endD = new Date(evento.data_fine);
+        const diffMin = Math.round((endD.getTime() - startD.getTime()) / 60000);
+        if (diffMin > 0 && diffMin <= 480 && diffMin % 5 === 0) {
+          setModoFine("durata");
+          setDurataMinuti(diffMin);
+          setDataFine("");
+        } else {
+          setModoFine("fine");
+          setDataFine(toLocalInput(endD));
+          setDurataMinuti(60);
+        }
+      } else {
+        setModoFine("durata");
+        setDurataMinuti(60);
+        setDataFine("");
+      }
       setTuttoIlGiorno(evento.tutto_il_giorno);
       setPazienteId(evento.paziente_id);
       setSincronizzaDiario(evento.sincronizza_diario);
@@ -64,6 +85,8 @@ export function EventoEditDialog({
       setTipo("promemoria");
       setDataInizio(toLocalInput(start));
       setDataFine("");
+      setModoFine("durata");
+      setDurataMinuti(60);
       setTuttoIlGiorno(false);
       setPazienteId(defaultPazienteId ?? null);
       setSincronizzaDiario(false);
