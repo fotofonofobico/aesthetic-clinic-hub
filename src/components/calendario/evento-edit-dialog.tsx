@@ -107,14 +107,30 @@ export function EventoEditDialog({
       toast.error("Per sincronizzare nel diario seleziona un paziente");
       return;
     }
+    const startDate = fromLocalInput(dataInizio);
+    let fineIso: string | null = null;
+    if (!tuttoIlGiorno) {
+      if (modoFine === "durata") {
+        if (durataMinuti && durataMinuti > 0) {
+          fineIso = new Date(startDate.getTime() + durataMinuti * 60_000).toISOString();
+        }
+      } else if (dataFine) {
+        const endDate = fromLocalInput(dataFine);
+        if (endDate.getTime() < startDate.getTime()) {
+          toast.error("La data di fine deve essere successiva all'inizio");
+          return;
+        }
+        fineIso = endDate.toISOString();
+      }
+    }
     setSaving(true);
     try {
       const payload: any = {
         titolo: titolo.trim(),
         descrizione: descrizione.trim() || null,
         tipo,
-        data_inizio: fromLocalInput(dataInizio).toISOString(),
-        data_fine: dataFine ? fromLocalInput(dataFine).toISOString() : null,
+        data_inizio: startDate.toISOString(),
+        data_fine: fineIso,
         tutto_il_giorno: tuttoIlGiorno,
         paziente_id: pazienteId,
         sincronizza_diario: sincronizzaDiario,
