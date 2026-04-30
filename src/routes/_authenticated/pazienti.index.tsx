@@ -1,10 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, AlertTriangle, ShieldAlert, Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import type { Paziente, AlertSeverity } from "@/types/clinico";
 import { cn } from "@/lib/utils";
@@ -18,21 +21,24 @@ interface PazienteRow extends Paziente {
 }
 
 function PazientiListPage() {
+  const { hasRole } = useAuth();
+  const isMedico = hasRole("medico");
   const [pazienti, setPazienti] = useState<PazienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [mostraArchiviati, setMostraArchiviati] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [mostraArchiviati]);
 
   async function load() {
     setLoading(true);
     const { data: pData, error } = await supabase
       .from("pazienti")
       .select("*")
-      .is("deleted_at", null)
+      .filter("deleted_at", mostraArchiviati ? "not.is" : "is", null)
       .order("cognome", { ascending: true });
 
     if (error) {
@@ -66,6 +72,23 @@ function PazientiListPage() {
     setLoading(false);
   }
 
+  async function ripristinaPaziente(id: string) {
+    if (!isMedico) {
+      toast.error("Solo i medici possono ripristinare pazienti");
+      return;
+    }
+    const { error } = await supabase
+      .from("pazienti")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", id);
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      return;
+    }
+    toast.success("Paziente ripristinato");
+    void load();
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return pazienti;
@@ -95,14 +118,26 @@ function PazientiListPage() {
         </Button>
       </header>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cerca per cognome, nome, CF, telefono…"
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative min-w-[260px] max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cerca per cognome, nome, CF, telefono…"
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="mostra-archiviati-pazienti"
+            checked={mostraArchiviati}
+            onCheckedChange={setMostraArchiviati}
+          />
+          <Label htmlFor="mostra-archiviati-pazienti" className="text-xs text-muted-foreground">
+            Mostra archiviati
+          </Label>
+        </div>
       </div>
 
       {loading ? (
@@ -112,7 +147,9 @@ function PazientiListPage() {
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">
               {pazienti.length === 0
-                ? "Nessun paziente in archivio. Crea il primo con il pulsante in alto."
+                ? mostraArchiviati
+                  ? "Nessun paziente archiviato."
+                  : "Nessun paziente in archivio. Crea il primo con il pulsante in alto."
                 : "Nessun risultato per la ricerca."}
             </p>
           </CardContent>
@@ -125,6 +162,7 @@ function PazientiListPage() {
                 <th className="px-4 py-3 font-medium">Paziente</th>
                 <th className="hidden px-4 py-3 font-medium md:table-cell">Contatti</th>
                 <th className="hidden px-4 py-3 font-medium lg:table-cell">CF</th>
+                {mostraArchiviati && <th className="px-4 py-3 text-right font-medium">Azioni</th>}
               </tr>
             </thead>
             <tbody>
@@ -132,7 +170,7 @@ function PazientiListPage() {
                 <tr
                   key={p.id}
                   className="cursor-pointer border-t border-border transition-colors hover:bg-accent/40"
-                  onClick={() => navigate({ to: "/pazienti/$id", params: { id: p.id } })}
+                  onClick={() => !mostraArchiviati && navigate({ to: "/pazienti/$id", params: { id: p.id } })}
                 >
                   <td className="px-4 py-3">
                     <div className="font-medium">
@@ -150,6 +188,16 @@ function PazientiListPage() {
                   <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground lg:table-cell">
                     {p.codice_fiscale ?? "—"}
                   </td>
+                  {mostraArchiviati && (
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      {isMedico && (
+                        <Button variant="ghost" size="sm" onClick={() => void ripristinaPaziente(p.id)}>
+                          <ArchiveRestore className="h-4 w-4" />
+                          Ripristina
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
