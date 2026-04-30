@@ -129,14 +129,25 @@ function ConsensiPage() {
         )}
       </header>
 
+      <div className="flex items-center justify-end gap-2">
+        <Switch
+          id="mostra-archiviati-consensi"
+          checked={archivio.mostraArchiviati}
+          onCheckedChange={archivio.toggle}
+        />
+        <Label htmlFor="mostra-archiviati-consensi" className="text-xs text-muted-foreground">
+          Mostra archiviati
+        </Label>
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento…</p>
-      ) : templates.length === 0 ? (
+      ) : templates.filter(archivio.filterRow).length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <FileSignature className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nessun consenso ancora creato.
+              {archivio.mostraArchiviati ? "Nessun consenso." : "Nessun consenso attivo."}
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
@@ -148,10 +159,11 @@ function ConsensiPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {templates.map((t) => {
+          {templates.filter(archivio.filterRow).map((t) => {
             const trat = trattamenti.find((x) => x.id === t.trattamento_id);
+            const archiviato = (t as any).archiviato_il != null;
             return (
-              <Card key={t.id} className={t.attivo ? "" : "opacity-60"}>
+              <Card key={t.id} className={archiviato || !t.attivo ? "opacity-60" : ""}>
                 <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -178,7 +190,12 @@ function ConsensiPage() {
                           Validità {t.validita_mesi} mesi
                         </span>
                       ) : null}
-                      {!t.attivo && (
+                      {archiviato && (
+                        <span className="rounded-full border border-muted-foreground/30 bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Archiviato
+                        </span>
+                      )}
+                      {!archiviato && !t.attivo && (
                         <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[11px] uppercase tracking-wide">
                           Disattivato
                         </span>
@@ -202,16 +219,21 @@ function ConsensiPage() {
                           setEditing(t);
                           setOpen(true);
                         }}
+                        title="Modifica"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => void toggleAttivo(t)}
-                        title={t.attivo ? "Disattiva" : "Attiva"}
+                        onClick={() => void toggleArchiviato(t)}
+                        title={archiviato ? "Ripristina" : "Archivia"}
                       >
-                        <Power className="h-4 w-4" />
+                        {archiviato ? (
+                          <ArchiveRestore className="h-4 w-4" />
+                        ) : (
+                          <Archive className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   )}
