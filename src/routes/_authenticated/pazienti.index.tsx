@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -31,9 +31,9 @@ function PazientiListPage() {
 
   useEffect(() => {
     void load();
-  }, [mostraArchiviati]);
+  }, [load]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data: pData, error } = await supabase
       .from("pazienti")
@@ -70,7 +70,7 @@ function PazientiListPage() {
 
     setPazienti(enriched);
     setLoading(false);
-  }
+  }, [mostraArchiviati]);
 
   async function ripristinaPaziente(id: string) {
     if (!isMedico) {
