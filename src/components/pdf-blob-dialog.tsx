@@ -89,11 +89,11 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
               <DialogTitle className="truncate text-base">{title}</DialogTitle>
               <DialogDescription>Anteprima PDF interna, senza popup o schede fittizie.</DialogDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!url}>
+            <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob}>
               <Printer className="h-4 w-4" />
               Stampa
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!url}>
+            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!blob}>
               <Download className="h-4 w-4" />
               Scarica PDF
             </Button>
