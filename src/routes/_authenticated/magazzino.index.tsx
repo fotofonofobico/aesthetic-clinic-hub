@@ -180,6 +180,13 @@ function MagazzinoPage() {
             >
               {includiStandby ? "Nascondi standby" : "Mostra standby"}
             </Button>
+            <Button
+              variant={mostraArchiviati ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMostraArchiviati((v) => !v)}
+            >
+              {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
+            </Button>
           </div>
 
           <div className="rounded-md border">
@@ -393,6 +400,27 @@ function MagazzinoPage() {
                       <SelectItem value="standby">Standby</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        if (drawerProdotto.archiviato_il) {
+                          await ripristinaProdotto(drawerProdotto.id);
+                          toast.success("Prodotto ripristinato");
+                        } else {
+                          await archiviaProdotto(drawerProdotto.id);
+                          toast.success("Prodotto archiviato");
+                        }
+                        setDrawerProdotto(null);
+                        void ricarica();
+                      } catch (e: unknown) {
+                        toast.error(e instanceof Error ? e.message : "Errore");
+                      }
+                    }}
+                  >
+                    {drawerProdotto.archiviato_il ? "Ripristina" : "Archivia"}
+                  </Button>
                 </div>
 
                 <div>
