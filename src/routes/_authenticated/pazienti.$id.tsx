@@ -235,6 +235,17 @@ function PazienteDetailPage() {
             {paziente.codice_fiscale ? ` · ${paziente.codice_fiscale}` : ""}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void esportaCartella()}
+            disabled={exportingPdf}
+          >
+            <Download className="h-4 w-4" />
+            {exportingPdf ? "Generazione…" : "Esporta cartella PDF"}
+          </Button>
+        </div>
       </header>
 
       {/* Banner flag/alert critici sempre in evidenza */}
