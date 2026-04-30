@@ -242,7 +242,7 @@ export async function generaPdfCartellaPaziente(pazienteId: string): Promise<Car
     b.sectionTitle("Piani di trattamento");
     for (const p of piani) {
       b.paragraph(`■ ${p.titolo}  —  Stato: ${p.stato}`, { bold: true, size: 10 });
-      if (p.descrizione) b.paragraph(p.descrizione);
+      if (p.note) b.paragraph(p.note);
       const seduteP = sedute.filter((s) => s.piano_id === p.id);
       if (seduteP.length) {
         for (const s of seduteP) {
