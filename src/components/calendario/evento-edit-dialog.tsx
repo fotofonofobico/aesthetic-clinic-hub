@@ -39,11 +39,15 @@ export function EventoEditDialog({
   const [tipo, setTipo] = useState<CalendarioEventoTipo>("promemoria");
   const [dataInizio, setDataInizio] = useState("");
   const [dataFine, setDataFine] = useState("");
+  const [modoFine, setModoFine] = useState<"durata" | "fine">("durata");
+  const [durataMinuti, setDurataMinuti] = useState<number>(60);
   const [tuttoIlGiorno, setTuttoIlGiorno] = useState(false);
   const [pazienteId, setPazienteId] = useState<string | null>(null);
   const [sincronizzaDiario, setSincronizzaDiario] = useState(false);
   const [completato, setCompletato] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const DURATE_PRESET = [15, 30, 45, 60, 90, 120];
 
   useEffect(() => {
     if (!open) return;
@@ -51,8 +55,25 @@ export function EventoEditDialog({
       setTitolo(evento.titolo);
       setDescrizione(evento.descrizione ?? "");
       setTipo(evento.tipo);
-      setDataInizio(toLocalInput(new Date(evento.data_inizio)));
-      setDataFine(evento.data_fine ? toLocalInput(new Date(evento.data_fine)) : "");
+      const startD = new Date(evento.data_inizio);
+      setDataInizio(toLocalInput(startD));
+      if (evento.data_fine) {
+        const endD = new Date(evento.data_fine);
+        const diffMin = Math.round((endD.getTime() - startD.getTime()) / 60000);
+        if (diffMin > 0 && diffMin <= 480 && diffMin % 5 === 0) {
+          setModoFine("durata");
+          setDurataMinuti(diffMin);
+          setDataFine("");
+        } else {
+          setModoFine("fine");
+          setDataFine(toLocalInput(endD));
+          setDurataMinuti(60);
+        }
+      } else {
+        setModoFine("durata");
+        setDurataMinuti(60);
+        setDataFine("");
+      }
       setTuttoIlGiorno(evento.tutto_il_giorno);
       setPazienteId(evento.paziente_id);
       setSincronizzaDiario(evento.sincronizza_diario);
@@ -64,6 +85,8 @@ export function EventoEditDialog({
       setTipo("promemoria");
       setDataInizio(toLocalInput(start));
       setDataFine("");
+      setModoFine("durata");
+      setDurataMinuti(60);
       setTuttoIlGiorno(false);
       setPazienteId(defaultPazienteId ?? null);
       setSincronizzaDiario(false);
@@ -84,14 +107,30 @@ export function EventoEditDialog({
       toast.error("Per sincronizzare nel diario seleziona un paziente");
       return;
     }
+    const startDate = fromLocalInput(dataInizio);
+    let fineIso: string | null = null;
+    if (!tuttoIlGiorno) {
+      if (modoFine === "durata") {
+        if (durataMinuti && durataMinuti > 0) {
+          fineIso = new Date(startDate.getTime() + durataMinuti * 60_000).toISOString();
+        }
+      } else if (dataFine) {
+        const endDate = fromLocalInput(dataFine);
+        if (endDate.getTime() < startDate.getTime()) {
+          toast.error("La data di fine deve essere successiva all'inizio");
+          return;
+        }
+        fineIso = endDate.toISOString();
+      }
+    }
     setSaving(true);
     try {
       const payload: any = {
         titolo: titolo.trim(),
         descrizione: descrizione.trim() || null,
         tipo,
-        data_inizio: fromLocalInput(dataInizio).toISOString(),
-        data_fine: dataFine ? fromLocalInput(dataFine).toISOString() : null,
+        data_inizio: startDate.toISOString(),
+        data_fine: fineIso,
         tutto_il_giorno: tuttoIlGiorno,
         paziente_id: pazienteId,
         sincronizza_diario: sincronizzaDiario,
@@ -228,16 +267,71 @@ export function EventoEditDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="ev-start">Inizio *</Label>
-              <Input id="ev-start" type="datetime-local" value={dataInizio} onChange={(e) => setDataInizio(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ev-end">Fine</Label>
-              <Input id="ev-end" type="datetime-local" value={dataFine} onChange={(e) => setDataFine(e.target.value)} />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="ev-start">Inizio *</Label>
+            <Input id="ev-start" type="datetime-local" value={dataInizio} onChange={(e) => setDataInizio(e.target.value)} />
           </div>
+
+          {!tuttoIlGiorno && (
+            <div className="space-y-2 rounded-md border bg-muted/20 p-2.5">
+              <div className="flex items-center gap-1 rounded-md border bg-background p-0.5 w-fit">
+                <Button
+                  type="button"
+                  variant={modoFine === "durata" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setModoFine("durata")}
+                >
+                  Durata
+                </Button>
+                <Button
+                  type="button"
+                  variant={modoFine === "fine" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setModoFine("fine")}
+                >
+                  Fine specifica
+                </Button>
+              </div>
+
+              {modoFine === "durata" ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="ev-durata"
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={durataMinuti}
+                      onChange={(e) => setDurataMinuti(Number(e.target.value) || 0)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">minuti</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {DURATE_PRESET.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        variant={durataMinuti === m ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDurataMinuti(m)}
+                      >
+                        {m < 60 ? `${m}m` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="ev-end">Fine</Label>
+                  <Input id="ev-end" type="datetime-local" value={dataFine} onChange={(e) => setDataFine(e.target.value)} />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <Checkbox id="ev-allday" checked={tuttoIlGiorno} onCheckedChange={(v) => setTuttoIlGiorno(!!v)} />

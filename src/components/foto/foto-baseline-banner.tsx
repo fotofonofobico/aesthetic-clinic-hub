@@ -17,7 +17,8 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
       const { data: piani } = await supabase
         .from("piano_trattamento")
         .select("id")
-        .eq("paziente_id", paziente_id);
+        .eq("paziente_id", paziente_id)
+        .not("stato", "in", "(bozza,annullato)");
       const ids = (piani ?? []).map((p) => (p as { id: string }).id);
       if (ids.length === 0) {
         if (mounted) setCount(0);
