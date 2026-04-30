@@ -18,7 +18,7 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
         .from("piano_trattamento")
         .select("id")
         .eq("paziente_id", paziente_id)
-        .not("stato", "in", "(bozza,annullato)");
+        .neq("stato", "bozza");
       const ids = (piani ?? []).map((p) => (p as { id: string }).id);
       if (ids.length === 0) {
         if (mounted) setCount(0);
@@ -45,7 +45,7 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 sm:mt-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium leading-tight">Foto baseline mancanti</p>
+        <p className="text-sm font-medium leading-tight">Foto PRIMA mancanti</p>
         <p className="mt-0.5 break-words text-xs text-muted-foreground">
           {count} {count === 1 ? "piano" : "piani"} senza foto pre‑trattamento.
         </p>

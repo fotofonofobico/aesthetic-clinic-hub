@@ -111,7 +111,7 @@ export function FotoUploadDialog({
           <DialogDescription>
             {seduta_id
               ? "Foto associate a questa seduta."
-              : "Foto associate al piano (baseline o finali)."}
+              : "Foto associate al piano (PRIMA o finali)."}
           </DialogDescription>
         </DialogHeader>
 

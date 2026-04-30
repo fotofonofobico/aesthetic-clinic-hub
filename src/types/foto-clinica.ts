@@ -5,7 +5,7 @@ export type PianoFotoStato = "completo" | "baseline_mancante" | "non_eseguibile"
 
 export const PIANO_FOTO_STATO_LABELS: Record<PianoFotoStato, string> = {
   completo: "Completo",
-  baseline_mancante: "Baseline mancante",
+  baseline_mancante: "Foto PRIMA mancante",
   non_eseguibile: "Non eseguibile",
 };
 
