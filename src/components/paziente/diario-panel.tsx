@@ -32,14 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { NotaTipo, PazienteNota } from "@/types/clinico";
-
-interface NotaAllegato {
-  path: string;
-  nome: string;
-  mime?: string | null;
-  size?: number | null;
-}
+import type { NotaAllegato, NotaTipo, PazienteNota } from "@/types/clinico";
 
 interface TimelineEvent {
   id: string;
