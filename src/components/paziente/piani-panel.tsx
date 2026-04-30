@@ -1585,11 +1585,13 @@ export function PianiPanel({
                           <h4 className="font-display text-base font-semibold">{p.titolo}</h4>
                           <span
                             className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                              p.stato === "attivo"
-                                ? "border-success/40 bg-success/15 text-success-foreground"
-                                : p.stato === "completato"
-                                  ? "border-border bg-muted text-muted-foreground"
-                                  : "border-warning/40 bg-warning/15"
+                              p.stato === "bozza"
+                                ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                : p.stato === "attivo"
+                                  ? "border-success/40 bg-success/15 text-success-foreground"
+                                  : p.stato === "completato"
+                                    ? "border-border bg-muted text-muted-foreground"
+                                    : "border-warning/40 bg-warning/15"
                             }`}
                           >
                             {STATO_LABELS[p.stato]}
@@ -1609,6 +1611,21 @@ export function PianiPanel({
                       </div>
                     </button>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                      {p.stato === "bozza" && (
+                        <Button
+                          size="sm"
+                          onClick={() => void attivaPiano(p)}
+                          disabled={attivandoPianoId === p.id}
+                          className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
+                        >
+                          {attivandoPianoId === p.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                          Attiva piano
+                        </Button>
+                      )}
                       {!isLegacy && (
                         <Button
                           variant="outline"
@@ -1621,34 +1638,47 @@ export function PianiPanel({
                           Modifica
                         </Button>
                       )}
-                      <Select
-                        value={p.stato}
-                        onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
-                        disabled={p.stato === "completato" || p.stato === "annullato"}
-                      >
-                        <SelectTrigger
-                          className="h-8 w-full sm:w-36"
-                          title={
-                            p.stato === "completato"
-                              ? "Piano completato — stato non più modificabile"
-                              : p.stato === "annullato"
-                                ? "Piano annullato"
-                                : undefined
-                          }
+                      {p.stato !== "bozza" && (
+                        <Select
+                          value={p.stato}
+                          onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
+                          disabled={p.stato === "completato" || p.stato === "annullato"}
                         >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="attivo">Attivo</SelectItem>
-                          <SelectItem value="sospeso">Sospeso</SelectItem>
-                          <SelectItem value="annullato">Annullato</SelectItem>
-                          {p.stato === "completato" && (
-                            <SelectItem value="completato" disabled>
-                              Completato (auto)
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                          <SelectTrigger
+                            className="h-8 w-full sm:w-36"
+                            title={
+                              p.stato === "completato"
+                                ? "Piano completato — stato non più modificabile"
+                                : p.stato === "annullato"
+                                  ? "Piano annullato"
+                                  : undefined
+                            }
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="attivo">Attivo</SelectItem>
+                            <SelectItem value="sospeso">Sospeso</SelectItem>
+                            <SelectItem value="annullato">Annullato</SelectItem>
+                            {p.stato === "completato" && (
+                              <SelectItem value="completato" disabled>
+                                Completato (auto)
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {p.stato === "bozza" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => richiediCambioStato(p, "annullato")}
+                          className="w-full sm:w-auto"
+                        >
+                          <X className="h-3 w-3" />
+                          Annulla
+                        </Button>
+                      )}
                     </div>
                   </div>
 
