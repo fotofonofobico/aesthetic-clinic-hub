@@ -1563,13 +1563,16 @@ export function PianiPanel({
                       <Select
                         value={p.stato}
                         onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
+                        disabled={p.stato === "completato" || p.stato === "annullato"}
                       >
                         <SelectTrigger
                           className="h-8 w-full sm:w-36"
                           title={
                             p.stato === "completato"
-                              ? "Stato impostato automaticamente, ma può essere annullato"
-                              : undefined
+                              ? "Piano completato — stato non più modificabile"
+                              : p.stato === "annullato"
+                                ? "Piano annullato"
+                                : undefined
                           }
                         >
                           <SelectValue />

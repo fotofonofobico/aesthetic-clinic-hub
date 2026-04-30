@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Camera, AlertTriangle } from "lucide-react";
 
@@ -39,21 +38,23 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
   if (count === 0) return null;
 
   return (
-    <Alert className="border-amber-500/40 bg-amber-500/5">
-      <AlertTriangle className="h-4 w-4 text-amber-600" />
-      <AlertTitle className="break-words">Foto baseline mancanti</AlertTitle>
-      <AlertDescription className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="min-w-0 break-words">
-            {count} {count === 1 ? "piano" : "piani"} senza foto PRIMA del trattamento.
-          </span>
-          {onClickPiano && (
-            <Button size="sm" variant="outline" onClick={onClickPiano}>
-              <Camera className="h-4 w-4" /> Gestisci foto
-            </Button>
-          )}
-        </div>
-      </AlertDescription>
-    </Alert>
+    <div
+      role="alert"
+      className="flex flex-wrap items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 sm:items-center"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 sm:mt-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium leading-tight">Foto baseline mancanti</p>
+        <p className="mt-0.5 break-words text-xs text-muted-foreground">
+          {count} {count === 1 ? "piano" : "piani"} senza foto pre‑trattamento.
+        </p>
+      </div>
+      {onClickPiano && (
+        <Button size="sm" variant="outline" onClick={onClickPiano} className="shrink-0">
+          <Camera className="h-4 w-4" />
+          Gestisci
+        </Button>
+      )}
+    </div>
   );
 }

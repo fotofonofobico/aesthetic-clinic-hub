@@ -1,135 +1,83 @@
-# Piano operativo definitivo — 15 fix + archivio + versioning consensi
+# Fix bug e rifiniture (12 punti)
 
-## 1. Bug & UX rapidi
+## 1 · Tasto "Scarica PDF" non funziona (anteprima consenso/anamnesi)
+In `src/components/pdf-blob-dialog.tsx` il flusso usa `URL.createObjectURL` + `<a download>`, ma in alcuni browser/embed il click programmatico non parte se il blob non è "noto". Sostituisco con:
+- usare un `Blob` esplicito con MIME `application/pdf`,
+- per Safari/iOS aprire in nuovo tab (già c'è) **e** anche per desktop Safari,
+- aggiungere fallback `window.location.href = url` se `link.click()` non genera download entro 1s,
+- log esplicito `console.warn` per capire cosa succede in produzione.
 
-**#1 Scarica PDF non scarica**
-- `pdf-blob-dialog.tsx`: rimpiazzare `window.print()` con apertura del blob in nuovo tab + fallback download (`<a download>` su iOS). Stesso fix sul tasto "Stampa".
-- Verifica anche pulsanti "Scarica" in `consensi-panel.tsx` e nella pagina firma.
+## 2 · Dashboard "Alert" sempre verde
+La logica attuale conta solo: anamnesi >12 mesi, lotti sotto soglia con `qta > 0`, consensi mancanti per sedute nei prossimi 7gg. In uno studio nuovo è normale sia tutto vuoto. Espando in `src/components/dashboard/alerts-section.tsx`:
+- **Lotti scaduti / in scadenza < 30gg** (oggi non li conta);
+- **Consensi obsoleti** (template con `versione` diversa dallo snapshot firmato) e **consensi in scadenza < 30gg**;
+- **Pazienti senza anamnesi firmata**;
+- Mantengo gli alert esistenti.
+Aggiungo anche tooltip "Tutto in regola" che spiega *cosa* è stato controllato, così si capisce che non è un bug.
 
-**#2 Rinomina**
-- "Nuovo template consensi" → "Nuovo consenso" in `src/routes/_authenticated/consensi.tsx` e `consensi-panel.tsx`.
+## 3 · Piano "completato (auto)" annullabile manualmente
+In `src/components/paziente/piani-panel.tsx` il `Select` permette di passare `completato → annullato` perché `richiediCambioStato` non blocca quel caso. Modifico:
+- se `p.stato === "completato"`, il `Select` resta abilitato **solo** se ci sono ancora sedute future programmate (caso raro). Nel caso normale, il select diventa read‑only con tooltip "Piano completato — non più modificabile".
+- nascondo l'opzione "Annullato" quando `p.stato === "completato"`.
 
-**#5 Testo decentrato / overflow**
-- `foto-baseline-banner.tsx`: aggiungere `flex-wrap` + `min-w-0 break-words` al contenitore testo.
-- Pass generale di micro-fix tipografici: spazi mancanti nei badge "Seduta#1", "x2ml", header pannelli paziente.
+## 4 · Banner "Foto baseline mancanti" — testo sbordato
+In `src/components/foto/foto-baseline-banner.tsx` il problema è il padding sinistro forzato da `[&>svg~*]:pl-7` di `Alert` quando il contenuto è lungo su viewport stretti. Cambio struttura:
+- uso `min-w-0`, `flex-wrap` + `break-words` su titolo e descrizione,
+- rimuovo l'icona dentro `<Alert>` come prefix e la metto inline dentro il flex per evitare il padding fisso `pl-7` su ogni riga,
+- testo accorciato: "{n} piani senza foto pre‑trattamento".
 
-**#14 Tipologia prodotto libera**
-- `prodotto-form-dialog.tsx`: sostituire Select fissa con Combobox (cmdk) che mostra tipologie esistenti + opzione "Crea «X»".
+## 5 · Diario: ora non si aggiorna automaticamente
+In `src/components/paziente/diario-panel.tsx` `dataEvento` viene inizializzato una sola volta (al mount). Quando l'utente arriva sul tab dopo qualche minuto, l'ora è vecchia. Soluzione:
+- al focus dell'input data o all'apertura del tab Diario, riallineo `dataEvento = now()` se l'utente non l'ha modificato manualmente,
+- aggiungo bottone "Ora" accanto all'input datetime che resetta a `new Date()`.
 
-## 2. Piani & Sedute
+## 6 · Export cartella PDF non parte il download
+Stesso problema del punto 1: `esportaCartella` in `src/routes/_authenticated/pazienti.$id.tsx` usa il pattern `<a download>` che a volte non triggera. Refactor:
+- estraggo helper `triggerBlobDownload(blob, filename)` in `src/lib/download.ts` con: `URL.createObjectURL`, link `download`, fallback `window.open` per Safari/iOS, fallback finale `location.href = url` con `target="_blank"`,
+- uso lo stesso helper in `pdf-blob-dialog.tsx` (punto 1) e ovunque serva.
 
-**#3 Annullare un piano completato**
-- In `piani-panel.tsx` rimuovere il check che disabilita "Annulla" quando `stato='completato'`.
+## 7‑8‑9 · Modifiche non visibili in Magazzino / Trattamenti / Pazienti
+Nelle conversazioni precedenti l'UI di archiviazione e altri fix sono stati applicati **solo a Consensi**. Estendo lo stesso pattern alle altre sezioni:
+- **Magazzino** (`src/routes/_authenticated/magazzino.index.tsx`): bottoni Archivia/Ripristina sui prodotti (usano `archiviato_il` già a DB), toggle "Mostra archiviati", uso hook `useArchivioFilter` esistente.
+- **Trattamenti** (`src/routes/_authenticated/trattamenti.index.tsx`): stesso pattern (la migrazione precedente ha aggiunto `archiviato_il` a `trattamenti`).
+- **Pazienti** (`src/routes/_authenticated/pazienti.index.tsx`): l'archiviazione esiste già via `deleted_at`. Aggiungo toggle "Mostra archiviati" (per medici, già policy esistente) + bottone Ripristina.
+Confermo all'utente quali modifiche risultano applicate, perché probabilmente vedeva solo Consensi.
 
-**#7 Motivazione cambio stato piano (annulla / riattiva)**
-- Nuovo dialog `piano-cambio-stato-dialog.tsx` con textarea obbligatoria (≥5 caratteri).
-- Al submit: update `piano_trattamento.stato` + insert in `paziente_nota` (tipo `clinica`, `auto_generata=true`) con testo tipo "Piano «X» annullato — motivo: …".
+## 10 · Magazzino: tipologie principali con flag + "altro"
+In `src/components/magazzino/prodotto-form-dialog.tsx` il combobox tipologia mostra solo quelle già usate. Aggiungo:
+- elenco predefinito (filler, biostimolante, tossina, peeling, anestetico, ago/cannula, materiale di consumo, skincare, integratore),
+- merge con tipologie già presenti nel DB,
+- input libero "altro" (già supportato dal Combobox quando si digita un nuovo valore).
 
-**#6 Sedute non erogate cancellate quando piano annullato**
-- Trigger `piano_annulla_sedute_pendenti` su `piano_trattamento` AFTER UPDATE: se `NEW.stato='annullato'` → `DELETE FROM seduta WHERE piano_id=NEW.id AND completata=false`.
-- (Sedute completate restano per tracciabilità.)
+## 11 · "Errore caricamento prodotto" alla creazione
+Probabilmente è errore RLS o validazione. In `src/lib/magazzino.ts → creaProdotto` aggiungo:
+- check `requireUserId` (già presente ma migliorare messaggi),
+- log dettagliato dell'errore Postgres (`error.message`, `error.code`) → `toast.error(error.message)` invece di un generico,
+- gestione esplicita di `unita_misura` e `modalita_tracking` (la migrazione recente potrebbe aver introdotto vincoli più stretti — verifico col dev server log dopo).
+Verifico anche il trigger `archiviato_il` non blocchi gli `INSERT`.
 
-## 3. Diario
-
-**#4 Allegati nel diario**
-- Aggiungere colonna `allegati jsonb DEFAULT '[]'` a `paziente_nota` (array di `{path, nome, mime, size}`).
-- Nuovo bucket privato `nota-allegati` con RLS analoga a `foto-cliniche`.
-- `diario-panel.tsx`: input file multiplo + chip allegati cliccabili (signed URL).
-
-**#8 Diario più ricco**
-- Hook `useDiarioTimeline` che unisce: `paziente_nota`, eventi creazione/modifica anagrafica (da `audit_log`), nuove versioni `anamnesi_versione`, firme/revoche `consenso_firmato`, cambi stato piano.
-- Render unificato con icona per tipo evento.
-
-## 4. Consensi — versioning automatico
-
-**Comportamento attuale**: versione testo libero, modificata a mano nel form template.
-
-**Nuovo comportamento**:
-- Trigger `consenso_template_bump_version` BEFORE UPDATE su `consenso_template`: se `titolo`, `testo`, `categoria`, `durata_*`, `validita_mesi` o `richiede_firma_medico` cambiano → incrementa `versione` con regola semver minor (`1.0` → `1.1`, `1.9` → `1.10`, oppure se contiene solo intero `2` → `2.1`).
-- Campo "Versione" nel form template diventa **read-only** con tooltip "Aggiornata automaticamente ad ogni modifica".
-- I consensi già firmati restano legati al loro `versione_snapshot` (immutabilità garantita dal trigger esistente `consenso_firmato_immutable`), quindi nessun impatto sullo storico.
-
-## 5. Magazzino
-
-**#15 Lotto/scadenza su prodotti `solo_uso`**
-- `consumo-step.tsx`: per modalità `solo_uso` mostrare comunque input lotto + scadenza (oggi nascosti).
-- `magazzino_consuma_seduta` (DB function): nel ramo `solo_uso`, se arrivano `numero_lotto` + `data_scadenza` ma `lotto_id` è null → trovare/creare riga in `prodotto_lotto` (con `quantita_iniziale=0`, `quantita_disponibile=0` perché solo informativo) e linkarla al movimento.
-- Se il lotto esiste già con scadenza diversa → aggiornare `data_scadenza`.
-
-## 6. Export PDF cartella paziente (#11, #12)
-
-- Nuovo `src/lib/pdf-cartella-paziente.ts` (jsPDF) che assembla: anagrafica, anamnesi firmata corrente, lista consensi con stato, piani + sedute, ultime note diario.
-- Pulsante "Esporta cartella" nella tab Documenti del paziente.
-- Versione "blank" (senza intestazione studio) per stampa neutra dei consensi (#10).
-
-## 7. Archivio unificato (la parte grossa)
-
-Adotto la struttura suggerita da ChatGPT, **integrandola** con quello che già abbiamo, **senza rinominare** colonne (evitiamo refactor a rischio).
-
-### 7.1 Modello dati (3 livelli sempre distinti)
-
-| Concetto | Dove vive oggi | Cosa cambia |
-|---|---|---|
-| **Tipo di gestione** (come tracciamo) | `prodotto.modalita_tracking` (`tracciato`/`solo_uso`/`standby`) | **Resta così**. È giusto che sia sul prodotto. ChatGPT lo chiamerebbe `management_type` ma il rename costa molto e rende poco — lasciamo `modalita_tracking`. |
-| **Stato operativo** (attivo / archiviato) | `prodotto.attivo`, `consenso_template.attivo`, `trattamenti.attivo`, `pazienti.deleted_at` | Sostituiamo con un campo unico `archiviato_il timestamptz NULL` su tutte le entità "di catalogo". `attivo` resta per retro-compatibilità (calcolato come `archiviato_il IS NULL`). Per `pazienti` riusiamo il `deleted_at` esistente. |
-| **Versioning** (storia immutabile) | `consenso_template.versione` + `consenso_firmato.versione_snapshot` | Già c'è per consensi e anamnesi. Lo estendiamo con auto-bump (vedi §4). Per trattamenti/prodotti **non** introduciamo versioning ora: non serve clinicamente. |
-
-### 7.2 Migrazione
-
-```sql
-ALTER TABLE prodotto             ADD COLUMN archiviato_il timestamptz;
-ALTER TABLE trattamenti          ADD COLUMN archiviato_il timestamptz;
-ALTER TABLE consenso_template    ADD COLUMN archiviato_il timestamptz;
--- pazienti: usiamo deleted_at esistente come "archivio soft"
-```
-
-Indici parziali per performance:
-```sql
-CREATE INDEX prodotto_attivi_idx        ON prodotto(id)          WHERE archiviato_il IS NULL;
-CREATE INDEX trattamenti_attivi_idx     ON trattamenti(id)       WHERE archiviato_il IS NULL;
-CREATE INDEX consenso_template_attivi_idx ON consenso_template(id) WHERE archiviato_il IS NULL;
-```
-
-### 7.3 Regole UI
-
-- Tutti i Select operativi (nuovo piano, nuova seduta, scelta consenso da firmare) → solo `archiviato_il IS NULL`.
-- Liste catalogo (Magazzino, Trattamenti, Consensi, Pazienti) → toggle "Mostra archiviati" (default off). Riga archiviata: badge grigio "Archiviato" + data.
-- Azione "Archivia" / "Ripristina" sostituisce la cancellazione. Eliminazione fisica resta solo per medico, dopo conferma esplicita.
-- Storico (sedute/firme già fatte) **continua a vedere** i nomi anche se archiviati: il join non viene filtrato, solo i picker.
-
-### 7.4 Helper condiviso
-
-`src/hooks/useArchivioFilter.ts` — restituisce `{ mostraArchiviati, toggle, queryFilter }` riutilizzabile in tutte le liste catalogo.
-
-## 8. Adattamento al prompt di ChatGPT — cosa accetto e cosa cambio
-
-| Suggerimento ChatGPT | Decisione |
-|---|---|
-| Separare stato / tipo gestione / versioning | ✅ Adottato come architettura |
-| Rinominare `modalita_tracking` → `management_type` | ❌ Costo/beneficio sfavorevole, lasciamo così |
-| Usare enum dedicato per stato | ⚠️ Useremo timestamp `archiviato_il` (più semplice, già pattern usato per `deleted_at`) |
-| Versioning su tutte le entità | ⚠️ Solo dove serve clinicamente: consensi (auto-bump) e anamnesi (già c'è). Prodotti/trattamenti no. |
-| Mai cancellazione fisica | ✅ Default archivio. Cancellazione solo come azione esplicita medico. |
-| Coerenza cross-sistema | ✅ Stesso pattern e stesso helper UI ovunque |
-
-## 9. File toccati (sintesi)
-
-DB migration: nuove colonne + 2 trigger (`piano_annulla_sedute_pendenti`, `consenso_template_bump_version`) + bucket `nota-allegati` con policy.
-
-Frontend:
-- `src/components/pdf-blob-dialog.tsx`
-- `src/components/paziente/piani-panel.tsx` + nuovo `piano-cambio-stato-dialog.tsx`
-- `src/components/paziente/diario-panel.tsx` + hook `useDiarioTimeline`
-- `src/components/paziente/foto-baseline-banner.tsx`
-- `src/components/magazzino/prodotto-form-dialog.tsx`, `consumo-step.tsx`
-- `src/components/consensi/template-form-dialog.tsx` (versione read-only)
-- `src/routes/_authenticated/consensi.tsx`, `magazzino.tsx`, `trattamenti.tsx` (toggle archiviati)
-- `src/lib/pdf-cartella-paziente.ts` (nuovo)
-- `src/hooks/useArchivioFilter.ts` (nuovo)
-- `src/lib/magazzino.ts` (lotto su solo_uso)
-
-Codice esistente non viene riscritto: aggiungiamo accanto, filtriamo dove serve.
+## 12 · Rinominare "Solo uso..." in "Solo uso"
+In `src/types/magazzino.ts` la label è già "Solo uso", ma in `magazzino.index.tsx` riga 168 e nel `Select` del prodotto‑form si vede "Solo uso (registra senza decremento)" o simile. Uniformo a **"Solo uso"** ovunque (label corta) lasciando la descrizione sotto come testo secondario.
 
 ---
 
-Confermi e procedo con l'implementazione?
+## Dettagli tecnici (per chi vuole leggere il diff)
+
+**File principali modificati:**
+- `src/components/pdf-blob-dialog.tsx` (download robusto)
+- `src/lib/download.ts` (nuovo helper)
+- `src/routes/_authenticated/pazienti.$id.tsx` (usa helper)
+- `src/components/dashboard/alerts-section.tsx` (più check)
+- `src/components/paziente/piani-panel.tsx` (blocca completato→annullato)
+- `src/components/foto/foto-baseline-banner.tsx` (layout fix)
+- `src/components/paziente/diario-panel.tsx` (ora auto‑aggiornata + bottone "Ora")
+- `src/routes/_authenticated/magazzino.index.tsx` (archivio + label)
+- `src/routes/_authenticated/trattamenti.index.tsx` (archivio)
+- `src/routes/_authenticated/pazienti.index.tsx` (toggle archiviati)
+- `src/components/magazzino/prodotto-form-dialog.tsx` (tipologie predefinite + error log)
+- `src/lib/magazzino.ts` (creaProdotto: messaggi errore espliciti)
+- `src/types/magazzino.ts` (label uniformi)
+
+**Nessuna migrazione DB necessaria** — i campi `archiviato_il` esistono già su `prodotto`, `trattamenti`, `consenso_template` dalle migrazioni precedenti.
+
+Dopo l'implementazione provo manualmente: creazione prodotto, archivia/ripristina in magazzino e trattamenti, annullamento piano completato (deve essere bloccato), download PDF cartella + consenso, e verifico la dashboard alert con dati reali.

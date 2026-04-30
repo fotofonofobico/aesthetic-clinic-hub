@@ -99,6 +99,10 @@ export interface ListProdottiOptions {
   marca_id?: string | null;
   includiStandby?: boolean;
   includiInattivi?: boolean;
+  /** Mostra anche prodotti archiviati */
+  includiArchiviati?: boolean;
+  /** Mostra SOLO i prodotti archiviati (per la vista "archivio") */
+  soloArchiviati?: boolean;
 }
 
 export async function listProdotti(opt: ListProdottiOptions = {}): Promise<ProdottoConDettagli[]> {
@@ -112,6 +116,11 @@ export async function listProdotti(opt: ListProdottiOptions = {}): Promise<Prodo
   if (opt.modalita) q = q.eq("modalita_tracking", opt.modalita);
   if (opt.marca_id) q = q.eq("marca_id", opt.marca_id);
   if (opt.search && opt.search.trim()) q = q.ilike("nome", `%${opt.search.trim()}%`);
+  if (opt.soloArchiviati) {
+    q = q.not("archiviato_il", "is", null);
+  } else if (!opt.includiArchiviati) {
+    q = q.is("archiviato_il", null);
+  }
 
   const { data, error } = await q;
   if (error) throw error;
@@ -160,23 +169,23 @@ export interface CreaProdottoInput {
 
 export async function creaProdotto(input: CreaProdottoInput): Promise<Prodotto> {
   const uid = await requireUserId();
-  const { data, error } = await supabase
-    .from("prodotto")
-    .insert({
-      nome: input.nome.trim(),
-      tipologia: input.tipologia ?? null,
-      marca_id: input.marca_id ?? null,
-      fornitore_id: input.fornitore_id ?? null,
-      unita_misura: input.unita_misura || "pz",
-      costo_unitario_default: input.costo_unitario_default ?? null,
-      soglia_minima: input.soglia_minima ?? 0,
-      modalita_tracking: input.modalita_tracking ?? "solo_uso",
-      note: input.note ?? null,
-      created_by: uid,
-    })
-    .select()
-    .single();
-  if (error) throw error;
+  const payload = {
+    nome: input.nome.trim(),
+    tipologia: input.tipologia ?? null,
+    marca_id: input.marca_id ?? null,
+    fornitore_id: input.fornitore_id ?? null,
+    unita_misura: (input.unita_misura || "pz").trim(),
+    costo_unitario_default: input.costo_unitario_default ?? null,
+    soglia_minima: input.soglia_minima ?? 0,
+    modalita_tracking: input.modalita_tracking ?? "solo_uso",
+    note: input.note ?? null,
+    created_by: uid,
+  };
+  const { data, error } = await supabase.from("prodotto").insert(payload).select().single();
+  if (error) {
+    console.error("[creaProdotto] error", { code: error.code, message: error.message, details: error.details, payload });
+    throw new Error(error.message || "Errore creazione prodotto");
+  }
   return data as Prodotto;
 }
 
@@ -194,6 +203,22 @@ export async function cambiaModalita(id: string, modalita: ModalitaTracking): Pr
 
 export async function disattivaProdotto(id: string): Promise<void> {
   await aggiornaProdotto(id, { attivo: false });
+}
+
+export async function archiviaProdotto(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("prodotto")
+    .update({ archiviato_il: new Date().toISOString() } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function ripristinaProdotto(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("prodotto")
+    .update({ archiviato_il: null } as never)
+    .eq("id", id);
+  if (error) throw error;
 }
 
 /** Lista tipologie distinte già usate nei prodotti (per combobox) */

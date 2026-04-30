@@ -29,10 +29,12 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
+  archiviaProdotto,
   cambiaModalita,
   listLottiPerProdotti,
   listMovimenti,
   listProdotti,
+  ripristinaProdotto,
 } from "@/lib/magazzino";
 import type {
   Lotto,
@@ -76,6 +78,7 @@ function MagazzinoPage() {
   const [search, setSearch] = React.useState("");
   const [filtroModalita, setFiltroModalita] = React.useState<string>("__all__");
   const [includiStandby, setIncludiStandby] = React.useState(false);
+  const [mostraArchiviati, setMostraArchiviati] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const [openNuovoProdotto, setOpenNuovoProdotto] = React.useState(false);
@@ -101,6 +104,7 @@ function MagazzinoPage() {
         search,
         modalita: filtroModalita !== "__all__" ? (filtroModalita as ModalitaTracking) : null,
         includiStandby,
+        soloArchiviati: mostraArchiviati,
       });
       setProdotti(p);
       const ids = p.map((x) => x.id);
@@ -113,7 +117,7 @@ function MagazzinoPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filtroModalita, includiStandby]);
+  }, [search, filtroModalita, includiStandby, mostraArchiviati]);
 
   React.useEffect(() => {
     void ricarica();
@@ -175,6 +179,13 @@ function MagazzinoPage() {
               onClick={() => setIncludiStandby((v) => !v)}
             >
               {includiStandby ? "Nascondi standby" : "Mostra standby"}
+            </Button>
+            <Button
+              variant={mostraArchiviati ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMostraArchiviati((v) => !v)}
+            >
+              {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
             </Button>
           </div>
 
@@ -389,6 +400,27 @@ function MagazzinoPage() {
                       <SelectItem value="standby">Standby</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        if (drawerProdotto.archiviato_il) {
+                          await ripristinaProdotto(drawerProdotto.id);
+                          toast.success("Prodotto ripristinato");
+                        } else {
+                          await archiviaProdotto(drawerProdotto.id);
+                          toast.success("Prodotto archiviato");
+                        }
+                        setDrawerProdotto(null);
+                        void ricarica();
+                      } catch (e: unknown) {
+                        toast.error(e instanceof Error ? e.message : "Errore");
+                      }
+                    }}
+                  >
+                    {drawerProdotto.archiviato_il ? "Ripristina" : "Archivia"}
+                  </Button>
                 </div>
 
                 <div>
