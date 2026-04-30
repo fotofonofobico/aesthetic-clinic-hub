@@ -29,10 +29,12 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
+  archiviaProdotto,
   cambiaModalita,
   listLottiPerProdotti,
   listMovimenti,
   listProdotti,
+  ripristinaProdotto,
 } from "@/lib/magazzino";
 import type {
   Lotto,
@@ -76,6 +78,7 @@ function MagazzinoPage() {
   const [search, setSearch] = React.useState("");
   const [filtroModalita, setFiltroModalita] = React.useState<string>("__all__");
   const [includiStandby, setIncludiStandby] = React.useState(false);
+  const [mostraArchiviati, setMostraArchiviati] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
   const [openNuovoProdotto, setOpenNuovoProdotto] = React.useState(false);
@@ -101,6 +104,7 @@ function MagazzinoPage() {
         search,
         modalita: filtroModalita !== "__all__" ? (filtroModalita as ModalitaTracking) : null,
         includiStandby,
+        soloArchiviati: mostraArchiviati,
       });
       setProdotti(p);
       const ids = p.map((x) => x.id);
@@ -113,7 +117,7 @@ function MagazzinoPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filtroModalita, includiStandby]);
+  }, [search, filtroModalita, includiStandby, mostraArchiviati]);
 
   React.useEffect(() => {
     void ricarica();
