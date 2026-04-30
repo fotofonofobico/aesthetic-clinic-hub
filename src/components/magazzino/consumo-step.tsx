@@ -130,6 +130,7 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
 
       {righe.map((r, idx) => {
         const tracciato = r._prodotto?.modalita_tracking === "tracciato";
+        const soloUso = r._prodotto?.modalita_tracking === "solo_uso";
         const lotti = Array.isArray(r._lotti) ? r._lotti : [];
         return (
           <div
