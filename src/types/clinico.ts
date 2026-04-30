@@ -46,6 +46,13 @@ export interface FlagRischio {
   created_at: string;
 }
 
+export interface NotaAllegato {
+  path: string;
+  nome: string;
+  mime?: string | null;
+  size?: number | null;
+}
+
 export interface PazienteNota {
   id: string;
   paziente_id: string;
@@ -55,6 +62,7 @@ export interface PazienteNota {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  allegati?: NotaAllegato[] | null;
 }
 
 export interface AnamnesiVersione {
