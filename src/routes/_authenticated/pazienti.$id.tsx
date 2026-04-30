@@ -82,16 +82,10 @@ function PazienteDetailPage() {
     setExportingPdf(true);
     try {
       const { blob, filename } = await generaPdfCartellaPaziente(paziente.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      triggerBlobDownload(blob, filename, "application/pdf");
       toast.success("Cartella PDF generata");
     } catch (e) {
+      console.error("[esportaCartella]", e);
       const msg = e instanceof Error ? e.message : "Errore generazione PDF";
       toast.error(msg);
     } finally {
