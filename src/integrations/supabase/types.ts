@@ -393,6 +393,7 @@ export type Database = {
       }
       consenso_template: {
         Row: {
+          archiviato_il: string | null
           attivo: boolean
           categoria: Database["public"]["Enums"]["consenso_categoria"]
           created_at: string
@@ -410,6 +411,7 @@ export type Database = {
           versione: string
         }
         Insert: {
+          archiviato_il?: string | null
           attivo?: boolean
           categoria?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
@@ -427,6 +429,7 @@ export type Database = {
           versione?: string
         }
         Update: {
+          archiviato_il?: string | null
           attivo?: boolean
           categoria?: Database["public"]["Enums"]["consenso_categoria"]
           created_at?: string
@@ -821,6 +824,7 @@ export type Database = {
       }
       paziente_nota: {
         Row: {
+          allegati: Json
           auto_generata: boolean
           created_at: string
           created_by: string | null
@@ -835,6 +839,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allegati?: Json
           auto_generata?: boolean
           created_at?: string
           created_by?: string | null
@@ -849,6 +854,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allegati?: Json
           auto_generata?: boolean
           created_at?: string
           created_by?: string | null
@@ -1173,6 +1179,7 @@ export type Database = {
       }
       prodotto: {
         Row: {
+          archiviato_il: string | null
           attivo: boolean
           costo_unitario_default: number | null
           created_at: string
@@ -1189,6 +1196,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archiviato_il?: string | null
           attivo?: boolean
           costo_unitario_default?: number | null
           created_at?: string
@@ -1205,6 +1213,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archiviato_il?: string | null
           attivo?: boolean
           costo_unitario_default?: number | null
           created_at?: string
@@ -1567,6 +1576,7 @@ export type Database = {
       }
       trattamenti: {
         Row: {
+          archiviato_il: string | null
           attivo: boolean
           categoria: string | null
           consenso_template_id: string | null
@@ -1583,6 +1593,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archiviato_il?: string | null
           attivo?: boolean
           categoria?: string | null
           consenso_template_id?: string | null
@@ -1599,6 +1610,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archiviato_il?: string | null
           attivo?: boolean
           categoria?: string | null
           consenso_template_id?: string | null
