@@ -1,11 +1,12 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Download, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Printer, RefreshCw } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PdfCanvasViewer } from "@/components/pdf-canvas-viewer";
+import { openBlobInNewTab } from "@/lib/download";
 
 const pdfSearchSchema = z.object({
   bucket: z.enum(["anamnesi-pdf", "consensi-pdf"]),
@@ -18,26 +19,19 @@ export const Route = createFileRoute("/_authenticated/pdf-viewer")({
   component: PdfViewerPage,
 });
 
-function safeFilename(value: string): string {
-  return `${value.replace(/[^a-z0-9._-]+/gi, "_") || "documento"}.pdf`;
-}
-
 function PdfViewerPage() {
   const { bucket, path, title } = Route.useSearch();
   const [blob, setBlob] = React.useState<Blob | null>(null);
-  const [url, setUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const displayTitle = title || "Documento PDF";
 
   React.useEffect(() => {
-    let objectUrl: string | null = null;
     let cancelled = false;
 
     async function loadPdf() {
       setLoading(true);
       setError(null);
-      setUrl(null);
       setBlob(null);
       const { data, error: downloadError } = await supabase.storage.from(bucket).download(path);
       if (cancelled) return;
@@ -47,9 +41,7 @@ function PdfViewerPage() {
         return;
       }
       const pdfBlob = data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
-      objectUrl = URL.createObjectURL(pdfBlob);
       setBlob(pdfBlob);
-      setUrl(objectUrl);
       setLoading(false);
     }
 
@@ -57,27 +49,15 @@ function PdfViewerPage() {
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [bucket, path]);
 
-  function downloadPdf() {
-    if (!url) return;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = safeFilename(displayTitle);
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
-
   function printPdf() {
-    try {
-      window.print();
-    } catch {
-      toast.error("Se la stampa non parte, scarica il PDF e stampalo dal dispositivo.");
+    if (!blob) {
+      toast.error("PDF non ancora pronto");
+      return;
     }
+    openBlobInNewTab(blob, "application/pdf");
   }
 
   return (
@@ -91,13 +71,9 @@ function PdfViewerPage() {
           <h1 className="truncate text-sm font-semibold text-foreground">{displayTitle}</h1>
           <p className="truncate text-xs text-muted-foreground">Anteprima PDF interna</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!url}>
+        <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob}>
           <Printer className="h-4 w-4" />
           Stampa
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!url}>
-          <Download className="h-4 w-4" />
-          Scarica PDF
         </Button>
       </header>
 
