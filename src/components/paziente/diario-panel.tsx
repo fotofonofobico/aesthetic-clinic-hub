@@ -86,45 +86,57 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
 
   async function load() {
     setLoading(true);
-    const [pRes, anRes, fRes, alRes, plRes, sdRes, fuRes, cnRes, ntRes] = await Promise.all([
-      supabase.from("pazienti").select("created_at").eq("id", pazienteId).maybeSingle(),
-      supabase
-        .from("anamnesi")
-        .select("updated_at, created_at")
-        .eq("paziente_id", pazienteId)
-        .maybeSingle(),
-      supabase
-        .from("anamnesi_flag_rischio")
-        .select("id, etichetta, severity, origine, created_at")
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("paziente_alert")
-        .select("id, testo, severity, created_at, attivo")
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("piano_trattamento")
-        .select("id, titolo, stato, created_at")
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("seduta")
-        .select("id, numero_seduta, data_seduta, completata, note_cliniche")
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("followup")
-        .select(
-          "id, data_followup, esito, note, complicanza_segnalata, complicanza_descrizione",
-        )
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("consenso_firmato")
-        .select("id, titolo_snapshot, firmato_il")
-        .eq("paziente_id", pazienteId),
-      supabase
-        .from("paziente_nota")
-        .select("*")
-        .eq("paziente_id", pazienteId)
-        .order("data_evento", { ascending: false }),
-    ]);
+    const [pRes, anRes, fRes, alRes, plRes, sdRes, fuRes, cnRes, ntRes, auRes, avRes] =
+      await Promise.all([
+        supabase.from("pazienti").select("created_at").eq("id", pazienteId).maybeSingle(),
+        supabase
+          .from("anamnesi")
+          .select("updated_at, created_at")
+          .eq("paziente_id", pazienteId)
+          .maybeSingle(),
+        supabase
+          .from("anamnesi_flag_rischio")
+          .select("id, etichetta, severity, origine, created_at")
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("paziente_alert")
+          .select("id, testo, severity, created_at, attivo")
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("piano_trattamento")
+          .select("id, titolo, stato, created_at")
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("seduta")
+          .select("id, numero_seduta, data_seduta, completata, note_cliniche")
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("followup")
+          .select(
+            "id, data_followup, esito, note, complicanza_segnalata, complicanza_descrizione",
+          )
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("consenso_firmato")
+          .select("id, titolo_snapshot, firmato_il")
+          .eq("paziente_id", pazienteId),
+        supabase
+          .from("paziente_nota")
+          .select("*")
+          .eq("paziente_id", pazienteId)
+          .order("data_evento", { ascending: false }),
+        supabase
+          .from("audit_log")
+          .select("id, action, entity_type, metadata, created_at")
+          .eq("entity_type", "paziente")
+          .eq("entity_id", pazienteId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("anamnesi_versione")
+          .select("id, created_at")
+          .eq("paziente_id", pazienteId)
+          .order("created_at", { ascending: false }),
+      ]);
 
     const ev: TimelineEvent[] = [];
 
