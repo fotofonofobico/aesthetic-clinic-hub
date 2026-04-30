@@ -5,8 +5,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import type { Paziente, AlertSeverity } from "@/types/clinico";
@@ -128,16 +126,13 @@ function PazientiListPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="mostra-archiviati-pazienti"
-            checked={mostraArchiviati}
-            onCheckedChange={setMostraArchiviati}
-          />
-          <Label htmlFor="mostra-archiviati-pazienti" className="text-xs text-muted-foreground">
-            Mostra archiviati
-          </Label>
-        </div>
+        <Button
+          variant={mostraArchiviati ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMostraArchiviati((v) => !v)}
+        >
+          {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
+        </Button>
       </div>
 
       {loading ? (
