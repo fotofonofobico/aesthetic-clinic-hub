@@ -267,16 +267,71 @@ export function EventoEditDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="ev-start">Inizio *</Label>
-              <Input id="ev-start" type="datetime-local" value={dataInizio} onChange={(e) => setDataInizio(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ev-end">Fine</Label>
-              <Input id="ev-end" type="datetime-local" value={dataFine} onChange={(e) => setDataFine(e.target.value)} />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="ev-start">Inizio *</Label>
+            <Input id="ev-start" type="datetime-local" value={dataInizio} onChange={(e) => setDataInizio(e.target.value)} />
           </div>
+
+          {!tuttoIlGiorno && (
+            <div className="space-y-2 rounded-md border bg-muted/20 p-2.5">
+              <div className="flex items-center gap-1 rounded-md border bg-background p-0.5 w-fit">
+                <Button
+                  type="button"
+                  variant={modoFine === "durata" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setModoFine("durata")}
+                >
+                  Durata
+                </Button>
+                <Button
+                  type="button"
+                  variant={modoFine === "fine" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setModoFine("fine")}
+                >
+                  Fine specifica
+                </Button>
+              </div>
+
+              {modoFine === "durata" ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="ev-durata"
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={durataMinuti}
+                      onChange={(e) => setDurataMinuti(Number(e.target.value) || 0)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">minuti</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {DURATE_PRESET.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        variant={durataMinuti === m ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDurataMinuti(m)}
+                      >
+                        {m < 60 ? `${m}m` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="ev-end">Fine</Label>
+                  <Input id="ev-end" type="datetime-local" value={dataFine} onChange={(e) => setDataFine(e.target.value)} />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <Checkbox id="ev-allday" checked={tuttoIlGiorno} onCheckedChange={(v) => setTuttoIlGiorno(!!v)} />
