@@ -21,11 +21,12 @@ export function printBlob(blob: Blob, mime = "application/pdf"): void {
   const iframe = document.createElement("iframe");
   iframe.id = "__pdf_print_frame__";
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
   iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
   iframe.src = url;
 
   let printed = false;
@@ -36,7 +37,7 @@ export function printBlob(blob: Blob, mime = "application/pdf"): void {
       const cw = iframe.contentWindow;
       if (!cw) throw new Error("iframe contentWindow non disponibile");
       cw.focus();
-      cw.print();
+      requestAnimationFrame(() => cw.print());
     } catch (err) {
       console.warn("[print] iframe.print fallito, fallback a nuova tab", err);
       const w = window.open(url, "_blank", "noopener,noreferrer");
@@ -45,8 +46,9 @@ export function printBlob(blob: Blob, mime = "application/pdf"): void {
   };
 
   iframe.onload = () => {
-    // Piccolo delay per dare tempo al PDF viewer di rendersi pronto
-    setTimeout(triggerPrint, 200);
+    // Delay più ampio: il viewer PDF deve finire di montare prima della stampa,
+    // altrimenti alcuni browser mostrano un'anteprima vuota.
+    setTimeout(triggerPrint, 650);
   };
 
   document.body.appendChild(iframe);
