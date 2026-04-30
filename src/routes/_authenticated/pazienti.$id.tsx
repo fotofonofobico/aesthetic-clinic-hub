@@ -26,6 +26,7 @@ import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
+import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
