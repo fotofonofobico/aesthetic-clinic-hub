@@ -326,6 +326,14 @@ function PazienteDetailPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <PdfBlobDialog
+        open={cartellaOpen}
+        onOpenChange={setCartellaOpen}
+        blob={cartellaBlob}
+        title={`Cartella paziente — ${paziente.cognome} ${paziente.nome}`}
+        filename={cartellaFilename}
+      />
     </div>
   );
 }
