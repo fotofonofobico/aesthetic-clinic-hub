@@ -85,6 +85,13 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
         toast.error("Impossibile caricare i lotti del prodotto");
         lotti = [];
       }
+    } else if (id && p?.modalita_tracking === "solo_uso") {
+      // Anche per solo_uso recuperiamo lotti già registrati per riutilizzarli
+      try {
+        lotti = await listLotti({ prodotto_id: id, includiEsauriti: true });
+      } catch {
+        lotti = [];
+      }
     }
     updateRiga(idx, {
       prodotto_id: id ?? "",
