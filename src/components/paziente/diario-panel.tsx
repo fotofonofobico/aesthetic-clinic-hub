@@ -350,7 +350,8 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
 
       setTesto("");
       setTipo("clinica");
-      setDataEvento(new Date().toISOString().slice(0, 16));
+      setDataEvento(nowLocal());
+      setDataEventoTouched(false);
       setAggiungiAlCalendario(false);
       setAllegatiFile([]);
       toast.success("Nota aggiunta al diario");
