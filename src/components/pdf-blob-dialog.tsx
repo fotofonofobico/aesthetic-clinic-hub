@@ -30,7 +30,8 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title }: PdfBlobDialog
       return;
     }
 
-    const pdfBlob = blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
+    const pdfBlob =
+      blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
     const nextUrl = URL.createObjectURL(pdfBlob);
     setUrl(nextUrl);
 
@@ -49,9 +50,17 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title }: PdfBlobDialog
           <div className="flex flex-wrap items-center gap-2 pr-8">
             <div className="min-w-0 flex-1">
               <DialogTitle className="truncate text-base">{title}</DialogTitle>
-              <DialogDescription>Anteprima PDF interna. Usa Stampa per stampare o salvare.</DialogDescription>
+              <DialogDescription>
+                Anteprima PDF interna. Usa Stampa per stampare o salvare.
+              </DialogDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob || !printReady}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={printPdf}
+              disabled={!blob || !printReady}
+            >
               <Printer className="h-4 w-4" />
               Stampa
             </Button>

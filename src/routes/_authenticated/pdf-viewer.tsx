@@ -41,7 +41,8 @@ function PdfViewerPage() {
         setLoading(false);
         return;
       }
-      const pdfBlob = data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
+      const pdfBlob =
+        data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
       setBlob(pdfBlob);
       setLoading(false);
     }
@@ -72,7 +73,13 @@ function PdfViewerPage() {
           <h1 className="truncate text-sm font-semibold text-foreground">{displayTitle}</h1>
           <p className="truncate text-xs text-muted-foreground">Anteprima PDF interna</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob || !printReady}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={printPdf}
+          disabled={!blob || !printReady}
+        >
           <Printer className="h-4 w-4" />
           Stampa
         </Button>
@@ -88,12 +95,16 @@ function PdfViewerPage() {
         {!loading && error && (
           <div className="flex h-full items-center justify-center px-4 text-center">
             <div className="max-w-md space-y-3">
-              <h2 className="font-display text-xl font-semibold text-foreground">PDF non disponibile</h2>
+              <h2 className="font-display text-xl font-semibold text-foreground">
+                PDF non disponibile
+              </h2>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
         )}
-        {!loading && !error && blob && <PdfCanvasViewer blob={blob} onReadyChange={setPrintReady} />}
+        {!loading && !error && blob && (
+          <PdfCanvasViewer blob={blob} onReadyChange={setPrintReady} />
+        )}
       </main>
     </div>
   );

@@ -61,7 +61,9 @@ export function PdfCanvasViewer({ blob, className, onError, onReadyChange }: Pdf
     async function render() {
       try {
         const data = await pdfBlob.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data, useWorkerFetch: false } as Parameters<typeof pdfjsLib.getDocument>[0]).promise;
+        const pdf = await pdfjsLib.getDocument({ data, useWorkerFetch: false } as Parameters<
+          typeof pdfjsLib.getDocument
+        >[0]).promise;
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         const cssWidth = Math.max(280, width - 32);
 
@@ -82,7 +84,8 @@ export function PdfCanvasViewer({ blob, className, onError, onReadyChange }: Pdf
           canvas.className = "mx-auto my-4 block rounded-md bg-background shadow-sm";
           context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          await page.render({ canvas, canvasContext: context, viewport, intent: "display" }).promise;
+          await page.render({ canvas, canvasContext: context, viewport, intent: "display" })
+            .promise;
           if (!cancelled) currentHost.appendChild(canvas);
 
           const printViewport = page.getViewport({ scale: 2 });
@@ -94,7 +97,12 @@ export function PdfCanvasViewer({ blob, className, onError, onReadyChange }: Pdf
           printCanvas.style.width = `${(baseViewport.width * 25.4) / 72}mm`;
           printCanvas.style.height = `${(baseViewport.height * 25.4) / 72}mm`;
 
-          await page.render({ canvas: printCanvas, canvasContext: printContext, viewport: printViewport, intent: "print" }).promise;
+          await page.render({
+            canvas: printCanvas,
+            canvasContext: printContext,
+            viewport: printViewport,
+            intent: "print",
+          }).promise;
           if (!cancelled) currentPrintHost.appendChild(printCanvas);
         }
         await pdf.destroy();
@@ -103,7 +111,9 @@ export function PdfCanvasViewer({ blob, className, onError, onReadyChange }: Pdf
         if (cancelled) return;
         const message = (e as Error).message || "Anteprima PDF non riuscita";
         console.error("[pdf preview]", e);
-        setError("Anteprima PDF non riuscita su questo browser. Usa il pulsante Stampa per aprirlo nativamente.");
+        setError(
+          "Anteprima PDF non riuscita su questo browser. Usa il pulsante Stampa per aprirlo nativamente.",
+        );
         onReadyChange?.(false);
         onError?.(message);
       } finally {
