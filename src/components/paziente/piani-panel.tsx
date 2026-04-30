@@ -32,6 +32,7 @@ import {
   MapPin,
   Pencil,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -58,6 +59,7 @@ import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
 
 const STATO_LABELS: Record<PianoStato, string> = {
+  bozza: "Proposta",
   attivo: "Attivo",
   completato: "Completato",
   sospeso: "Sospeso",

@@ -1,4 +1,4 @@
-export type PianoStato = "attivo" | "completato" | "sospeso" | "annullato";
+export type PianoStato = "bozza" | "attivo" | "completato" | "sospeso" | "annullato";
 
 export type ConsensoCategoria =
   | "gdpr"
