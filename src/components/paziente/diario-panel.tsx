@@ -21,6 +21,7 @@ import {
   ClipboardList,
   FileSignature,
   MessageCircle,
+  Paperclip,
   Phone,
   Plus,
   ShieldAlert,
@@ -28,6 +29,7 @@ import {
   Stethoscope,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaTipo, PazienteNota } from "@/types/clinico";
