@@ -141,7 +141,8 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
@@ -149,33 +150,50 @@
     text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
   }
 }
 
+[data-pdf-print-pages] {
+  display: none;
+}
+
 @media print {
+  @page {
+    margin: 0;
+  }
+
   body * {
-    visibility: hidden;
+    display: none !important;
   }
 
   [data-pdf-print-pages],
   [data-pdf-print-pages] * {
-    visibility: visible;
+    display: block !important;
   }
 
   [data-pdf-print-pages] {
-    position: absolute;
-    inset: 0;
+    position: static !important;
+    width: auto !important;
     height: auto !important;
     overflow: visible !important;
     background: white !important;
   }
 
   [data-pdf-print-pages] canvas {
-    max-width: 100% !important;
+    margin: 0 auto !important;
+    page-break-after: always;
     break-after: page;
     box-shadow: none !important;
+  }
+
+  [data-pdf-print-pages] canvas:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
 }

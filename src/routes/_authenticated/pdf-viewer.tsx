@@ -23,6 +23,7 @@ function PdfViewerPage() {
   const [blob, setBlob] = React.useState<Blob | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [printReady, setPrintReady] = React.useState(false);
   const displayTitle = title || "Documento PDF";
 
   React.useEffect(() => {
@@ -32,6 +33,7 @@ function PdfViewerPage() {
       setLoading(true);
       setError(null);
       setBlob(null);
+      setPrintReady(false);
       const { data, error: downloadError } = await supabase.storage.from(bucket).download(path);
       if (cancelled) return;
       if (downloadError || !data) {
@@ -39,7 +41,8 @@ function PdfViewerPage() {
         setLoading(false);
         return;
       }
-      const pdfBlob = data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
+      const pdfBlob =
+        data.type === "application/pdf" ? data : new Blob([data], { type: "application/pdf" });
       setBlob(pdfBlob);
       setLoading(false);
     }
@@ -52,7 +55,7 @@ function PdfViewerPage() {
   }, [bucket, path]);
 
   function printPdf() {
-    if (!blob) {
+    if (!blob || !printReady) {
       toast.error("PDF non ancora pronto");
       return;
     }
@@ -70,7 +73,13 @@ function PdfViewerPage() {
           <h1 className="truncate text-sm font-semibold text-foreground">{displayTitle}</h1>
           <p className="truncate text-xs text-muted-foreground">Anteprima PDF interna</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={printPdf}
+          disabled={!blob || !printReady}
+        >
           <Printer className="h-4 w-4" />
           Stampa
         </Button>
@@ -86,12 +95,16 @@ function PdfViewerPage() {
         {!loading && error && (
           <div className="flex h-full items-center justify-center px-4 text-center">
             <div className="max-w-md space-y-3">
-              <h2 className="font-display text-xl font-semibold text-foreground">PDF non disponibile</h2>
+              <h2 className="font-display text-xl font-semibold text-foreground">
+                PDF non disponibile
+              </h2>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
           </div>
         )}
-        {!loading && !error && blob && <PdfCanvasViewer blob={blob} />}
+        {!loading && !error && blob && (
+          <PdfCanvasViewer blob={blob} onReadyChange={setPrintReady} />
+        )}
       </main>
     </div>
   );
