@@ -39,6 +39,19 @@ interface Props {
 
 const UNITA = ["pz", "ml", "fiala", "siringa", "flacone", "applicazione", "U"];
 
+const TIPOLOGIE_PREDEFINITE = [
+  "Filler",
+  "Biostimolante",
+  "Tossina botulinica",
+  "Peeling",
+  "Anestetico",
+  "Ago / cannula",
+  "Materiale di consumo",
+  "Skincare",
+  "Integratore",
+  "Altro",
+];
+
 export function ProdottoFormDialog({
   open,
   onOpenChange,
@@ -72,7 +85,17 @@ export function ProdottoFormDialog({
       setSoglia("0");
       setNote("");
       listMarche().then(setMarche).catch(() => setMarche([]));
-      listTipologie().then(setTipologie).catch(() => setTipologie([]));
+      listTipologie()
+        .then((db) => {
+          // Merge predefinite + DB, dedup case-insensitive, ordina
+          const map = new Map<string, string>();
+          [...TIPOLOGIE_PREDEFINITE, ...db].forEach((t) => {
+            const k = t.trim().toLowerCase();
+            if (k && !map.has(k)) map.set(k, t.trim());
+          });
+          setTipologie(Array.from(map.values()).sort((a, b) => a.localeCompare(b)));
+        })
+        .catch(() => setTipologie(TIPOLOGIE_PREDEFINITE));
     }
   }, [open, defaultModalita]);
 
