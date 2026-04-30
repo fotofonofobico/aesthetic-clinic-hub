@@ -113,7 +113,7 @@ export function FotoBaselineDialog({
           <>
             <p className="text-sm text-muted-foreground">
               Puoi procedere comunque (il piano resterà marcato come{" "}
-              <strong>Baseline mancante</strong> finché non carichi le foto), oppure
+              <strong>Foto PRIMA mancante</strong> finché non carichi le foto), oppure
               caricarle ora.
             </p>
             <DialogFooter className="flex w-full flex-col gap-2 sm:flex-col">

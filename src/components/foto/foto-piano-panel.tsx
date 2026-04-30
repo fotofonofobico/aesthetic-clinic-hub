@@ -75,7 +75,7 @@ export function FotoPianoPanel({ paziente_id, piano_id, piano_titolo }: Props) {
   }
 
   async function handleRiapri() {
-    if (!confirm('Riaprire questo piano? Lo stato tornerà "Baseline mancante".')) return;
+    if (!confirm('Riaprire questo piano? Lo stato tornerà "Foto PRIMA mancante".')) return;
     try {
       await riapriPiano(piano_id);
       toast.success("Piano riaperto");
