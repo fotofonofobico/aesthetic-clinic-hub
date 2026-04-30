@@ -1566,13 +1566,13 @@ export function PianiPanel({
                       )}
                       <Select
                         value={p.stato}
-                        onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
+                        onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
                       >
                         <SelectTrigger
                           className="h-8 w-full sm:w-36"
                           title={
                             p.stato === "completato"
-                              ? "Stato impostato automaticamente al termine di tutte le sedute"
+                              ? "Stato impostato automaticamente, ma può essere annullato"
                               : undefined
                           }
                         >
