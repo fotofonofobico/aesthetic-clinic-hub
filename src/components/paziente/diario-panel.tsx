@@ -83,6 +83,8 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
   );
   const [aggiungiAlCalendario, setAggiungiAlCalendario] = useState(false);
   const [filtro, setFiltro] = useState<string>("tutti");
+  const [allegatiFile, setAllegatiFile] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     void load();
