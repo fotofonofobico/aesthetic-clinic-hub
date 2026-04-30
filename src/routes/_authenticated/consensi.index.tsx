@@ -96,7 +96,7 @@ function ConsensiPage() {
             <DialogTrigger asChild>
               <Button onClick={() => setEditing(null)}>
                 <Plus className="h-4 w-4" />
-                Nuovo template consenso
+                Nuovo consenso
               </Button>
             </DialogTrigger>
             <TemplateDialog
@@ -119,12 +119,12 @@ function ConsensiPage() {
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <FileSignature className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nessun template consenso ancora creato.
+              Nessun consenso ancora creato.
             </p>
             {isMedico && (
               <Button onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Crea il primo template
+                Crea il primo consenso
               </Button>
             )}
           </CardContent>
@@ -422,7 +422,7 @@ function TemplateDialog({
     <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="font-display">
-          {editing ? "Modifica template consenso" : "Nuovo template consenso"}
+          {editing ? "Modifica consenso" : "Nuovo consenso"}
         </DialogTitle>
       </DialogHeader>
       <div className="space-y-3">
