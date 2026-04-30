@@ -73,9 +73,13 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
   // form nuova nota
   const [tipo, setTipo] = useState<NotaTipo>("clinica");
   const [testo, setTesto] = useState("");
-  const [dataEvento, setDataEvento] = useState<string>(() =>
-    new Date().toISOString().slice(0, 16),
-  );
+  const nowLocal = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  };
+  const [dataEvento, setDataEvento] = useState<string>(() => nowLocal());
+  const [dataEventoTouched, setDataEventoTouched] = useState(false);
   const [aggiungiAlCalendario, setAggiungiAlCalendario] = useState(false);
   const [filtro, setFiltro] = useState<string>("tutti");
   const [allegatiFile, setAllegatiFile] = useState<File[]>([]);
@@ -414,11 +418,29 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Data / ora</Label>
+              <div className="flex items-center justify-between">
+                <Label>Data / ora</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDataEvento(nowLocal());
+                    setDataEventoTouched(false);
+                  }}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Adesso
+                </button>
+              </div>
               <input
                 type="datetime-local"
                 value={dataEvento}
-                onChange={(e) => setDataEvento(e.target.value)}
+                onChange={(e) => {
+                  setDataEvento(e.target.value);
+                  setDataEventoTouched(true);
+                }}
+                onFocus={() => {
+                  if (!dataEventoTouched) setDataEvento(nowLocal());
+                }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
