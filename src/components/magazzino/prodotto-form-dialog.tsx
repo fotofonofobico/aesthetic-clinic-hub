@@ -263,7 +263,11 @@ export function ProdottoFormDialog({
           <div>
             <Label>Modalità tracking</Label>
             <Select value={modalita} onValueChange={(v) => setModalita(v as ModalitaTracking)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue>
+                  {MODALITA_LABELS[modalita]}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {(Object.keys(MODALITA_LABELS) as ModalitaTracking[]).map((m) => (
                   <SelectItem key={m} value={m}>
