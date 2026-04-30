@@ -134,7 +134,7 @@ export async function generaPdfCartellaPaziente(pazienteId: string): Promise<Car
     supabase.from("anamnesi").select("*").eq("paziente_id", pazienteId).maybeSingle(),
     supabase
       .from("piano_trattamento")
-      .select("id, titolo, stato, descrizione, created_at, numero_sedute_previste")
+      .select("id, titolo, stato, note, created_at, numero_sedute_previste")
       .eq("paziente_id", pazienteId)
       .order("created_at", { ascending: false }),
     supabase
