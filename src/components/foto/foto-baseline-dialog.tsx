@@ -91,7 +91,7 @@ export function FotoBaselineDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
-            Foto baseline mancanti
+            Foto PRIMA mancanti
           </DialogTitle>
           <DialogDescription>
             Per questo piano non sono ancora state caricate foto PRIMA del trattamento.
@@ -104,7 +104,7 @@ export function FotoBaselineDialog({
             <AlertTitle>Incoerenza data</AlertTitle>
             <AlertDescription>
               Sono presenti foto PRIMA con data successiva alla prima seduta:
-              non valide come baseline.
+              non valide come riferimento iniziale.
             </AlertDescription>
           </Alert>
         )}
@@ -124,7 +124,7 @@ export function FotoBaselineDialog({
                 </Button>
                 <Button onClick={onCarica} className="w-full sm:flex-1">
                   <Camera className="h-4 w-4" />
-                  Carica baseline ora
+                  Carica foto PRIMA ora
                 </Button>
               </div>
               {isMedico && (
