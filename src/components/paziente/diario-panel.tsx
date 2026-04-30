@@ -22,6 +22,7 @@ import {
   FileSignature,
   MessageCircle,
   Paperclip,
+  Pencil,
   Phone,
   Plus,
   ShieldAlert,
