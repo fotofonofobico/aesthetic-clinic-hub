@@ -55,6 +55,7 @@ export interface Prodotto {
   modalita_tracking: ModalitaTracking;
   attivo: boolean;
   note: string | null;
+  archiviato_il: string | null;
   created_at: string;
   updated_at: string;
 }
