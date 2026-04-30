@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, ArrowLeft, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
