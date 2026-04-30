@@ -47,6 +47,7 @@ function ConsensiPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ConsensoTemplate | null>(null);
   const [open, setOpen] = useState(false);
+  const archivio = useArchivioFilter(false);
 
   useEffect(() => {
     void load();
@@ -73,6 +74,20 @@ function ConsensiPage() {
       toast.error(error.message);
       return;
     }
+    void load();
+  }
+
+  async function toggleArchiviato(t: ConsensoTemplate) {
+    const archiviato = (t as any).archiviato_il != null;
+    const { error } = await supabase
+      .from("consenso_template")
+      .update({ archiviato_il: archiviato ? null : new Date().toISOString() } as any)
+      .eq("id", t.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(archiviato ? "Consenso ripristinato" : "Consenso archiviato");
     void load();
   }
 
