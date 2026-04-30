@@ -390,10 +390,9 @@ function TemplateDialog({
     }
 
     setSaving(true);
-    const payload = {
+    const basePayload = {
       titolo: titolo.trim(),
       testo: testo.trim(),
-      versione: versione.trim() || "1.0",
       categoria: categoriaSalvata,
       validita_mesi: validitaMesiSalvata,
       durata_tipo: duratTipoSalvato,
@@ -404,17 +403,18 @@ function TemplateDialog({
     const { error } = editing
       ? await supabase
           .from("consenso_template")
-          .update(payload)
+          // versione NON inclusa: il trigger la incrementa automaticamente se cambia il contenuto
+          .update(basePayload)
           .eq("id", editing.id)
       : await supabase
           .from("consenso_template")
-          .insert({ ...payload, created_by: user?.id });
+          .insert({ ...basePayload, versione: "1.0", created_by: user?.id });
     setSaving(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success(editing ? "Template aggiornato" : "Template creato");
+    toast.success(editing ? "Consenso aggiornato (versione incrementata se modificato)" : "Consenso creato");
     onSaved();
   }
 
