@@ -106,7 +106,7 @@ export function FotoPianoPanel({ paziente_id, piano_id, piano_titolo }: Props) {
               <Camera className="h-4 w-4" /> + DOPO
             </Button>
             <Button size="sm" onClick={() => apriUpload("prima")}>
-              <Camera className="h-4 w-4" /> + Baseline (PRIMA)
+              <Camera className="h-4 w-4" /> + Foto PRIMA
             </Button>
           </div>
         </div>
@@ -122,10 +122,10 @@ export function FotoPianoPanel({ paziente_id, piano_id, piano_titolo }: Props) {
         {stato?.incoerenza_data && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Foto baseline incoerenti</AlertTitle>
+            <AlertTitle>Foto PRIMA incoerenti</AlertTitle>
             <AlertDescription>
-              Esistono foto PRIMA con data successiva alla prima seduta. Non vengono
-              considerate baseline valide. Carica una foto con data antecedente o
+              Esistono foto PRIMA con data successiva alla prima seduta. Non sono
+              valide come riferimento iniziale. Carica una foto con data antecedente o
               uguale alla prima seduta per chiudere lo stato.
             </AlertDescription>
           </Alert>
@@ -139,13 +139,13 @@ export function FotoPianoPanel({ paziente_id, piano_id, piano_titolo }: Props) {
           <div className="space-y-4">
             <section className="space-y-2">
               <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Baseline (PRIMA piano)
+                Foto PRIMA (piano)
               </h4>
               <FotoGrid
                 foto={baselinePrima}
                 canDelete={isMedico}
                 onDeleted={() => void load()}
-                emptyHint="Nessuna foto baseline. Carica le foto PRIMA per chiudere lo stato."
+                emptyHint="Nessuna foto PRIMA. Carica le foto PRIMA per chiudere lo stato."
               />
             </section>
 
