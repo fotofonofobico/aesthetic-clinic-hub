@@ -21,6 +21,7 @@ import {
   ClipboardList,
   FileSignature,
   MessageCircle,
+  Paperclip,
   Phone,
   Plus,
   ShieldAlert,
@@ -28,9 +29,17 @@ import {
   Stethoscope,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaTipo, PazienteNota } from "@/types/clinico";
+
+interface NotaAllegato {
+  path: string;
+  nome: string;
+  mime?: string | null;
+  size?: number | null;
+}
 
 interface TimelineEvent {
   id: string;
@@ -50,6 +59,7 @@ interface TimelineEvent {
   detail?: string;
   severity?: "info" | "attenzione" | "critico";
   notaTipo?: NotaTipo;
+  allegati?: NotaAllegato[];
 }
 
 const TIPO_LABEL: Record<NotaTipo, string> = {
@@ -73,6 +83,8 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
   );
   const [aggiungiAlCalendario, setAggiungiAlCalendario] = useState(false);
   const [filtro, setFiltro] = useState<string>("tutti");
+  const [allegatiFile, setAllegatiFile] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     void load();

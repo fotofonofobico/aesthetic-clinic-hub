@@ -888,24 +888,86 @@ export function PianiPanel({
   }
 
   // ---------- stato piano (manuale, esclude completato) ----------
-  async function aggiornaStato(p: PianoTrattamento, stato: PianoStato) {
+  // Cambi che richiedono motivazione (annullamento/sospensione/riattivazione di un annullato)
+  const [statoChangeReq, setStatoChangeReq] = useState<{
+    piano: PianoTrattamento;
+    nuovoStato: PianoStato;
+  } | null>(null);
+  const [statoMotivo, setStatoMotivo] = useState("");
+  const [statoSaving, setStatoSaving] = useState(false);
+
+  function richiediCambioStato(p: PianoTrattamento, stato: PianoStato) {
     if (stato === "completato") {
-      toast.info(
-        "Lo stato 'completato' è automatico al termine di tutte le sedute",
-      );
+      toast.info("Lo stato 'completato' è automatico al termine di tutte le sedute");
       return;
     }
-    const { error } = await supabase
-      .from("piano_trattamento")
-      .update({ stato } as never)
-      .eq("id", p.id);
-    if (error) {
-      toast.error(error.message);
+    if (stato === p.stato) return;
+    // Cambi che richiedono motivazione: annulla, sospendi, riattiva (da annullato/sospeso ad attivo)
+    const richiedeMotivo =
+      stato === "annullato" ||
+      stato === "sospeso" ||
+      (stato === "attivo" && (p.stato === "annullato" || p.stato === "sospeso"));
+    if (richiedeMotivo) {
+      setStatoMotivo("");
+      setStatoChangeReq({ piano: p, nuovoStato: stato });
       return;
     }
-    void load();
-    onChanged?.();
+    void eseguiCambioStato(p, stato, null);
   }
+
+  async function eseguiCambioStato(
+    p: PianoTrattamento,
+    stato: PianoStato,
+    motivo: string | null,
+  ) {
+    setStatoSaving(true);
+    try {
+      const { error } = await supabase
+        .from("piano_trattamento")
+        .update({ stato } as never)
+        .eq("id", p.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      // Inserisci nota nel diario
+      const azioneLabel =
+        stato === "annullato"
+          ? "annullato"
+          : stato === "sospeso"
+            ? "sospeso"
+            : stato === "attivo"
+              ? p.stato === "annullato"
+                ? "riattivato (era annullato)"
+                : "riattivato (era sospeso)"
+              : "modificato";
+      const testo = motivo
+        ? `Piano «${p.titolo}» ${azioneLabel}.\nMotivo: ${motivo}`
+        : `Piano «${p.titolo}» ${azioneLabel}.`;
+      await supabase.from("paziente_nota").insert({
+        paziente_id: pazienteId,
+        tipo: "clinica",
+        testo,
+        data_evento: new Date().toISOString(),
+        created_by: user?.id,
+        auto_generata: true,
+      } as never);
+
+      if (stato === "annullato") {
+        toast.success("Piano annullato. Le sedute non eseguite sono state rimosse.");
+      } else {
+        toast.success("Stato piano aggiornato");
+      }
+      setStatoChangeReq(null);
+      setStatoMotivo("");
+      void load();
+      onChanged?.();
+    } finally {
+      setStatoSaving(false);
+    }
+  }
+
 
   function toggle(id: string) {
     setExpanded((cur) => {
@@ -1500,13 +1562,13 @@ export function PianiPanel({
                       )}
                       <Select
                         value={p.stato}
-                        onValueChange={(v) => void aggiornaStato(p, v as PianoStato)}
+                        onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
                       >
                         <SelectTrigger
                           className="h-8 w-full sm:w-36"
                           title={
                             p.stato === "completato"
-                              ? "Stato impostato automaticamente al termine di tutte le sedute"
+                              ? "Stato impostato automaticamente, ma può essere annullato"
                               : undefined
                           }
                         >
@@ -1721,6 +1783,79 @@ export function PianiPanel({
           }
         }}
       />
+
+      <Dialog
+        open={!!statoChangeReq}
+        onOpenChange={(v) => {
+          if (!v && !statoSaving) {
+            setStatoChangeReq(null);
+            setStatoMotivo("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {statoChangeReq?.nuovoStato === "annullato"
+                ? "Annulla piano"
+                : statoChangeReq?.nuovoStato === "sospeso"
+                  ? "Sospendi piano"
+                  : "Riattiva piano"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {statoChangeReq?.nuovoStato === "annullato" && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                Le sedute non ancora eseguite verranno cancellate. Le sedute già completate
+                rimangono nello storico clinico.
+              </p>
+            )}
+            <div>
+              <Label>Motivazione *</Label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                rows={4}
+                value={statoMotivo}
+                onChange={(e) => setStatoMotivo(e.target.value)}
+                placeholder="Spiega brevemente il motivo (verrà registrato nel diario del paziente)"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Almeno 5 caratteri.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStatoChangeReq(null);
+                setStatoMotivo("");
+              }}
+              disabled={statoSaving}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={() => {
+                if (statoMotivo.trim().length < 5) {
+                  toast.error("Inserisci una motivazione di almeno 5 caratteri");
+                  return;
+                }
+                if (statoChangeReq) {
+                  void eseguiCambioStato(
+                    statoChangeReq.piano,
+                    statoChangeReq.nuovoStato,
+                    statoMotivo.trim(),
+                  );
+                }
+              }}
+              disabled={statoSaving}
+            >
+              {statoSaving ? "Salvataggio…" : "Conferma"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

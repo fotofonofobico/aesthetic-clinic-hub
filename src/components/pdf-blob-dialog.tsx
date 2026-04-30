@@ -36,21 +36,47 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
   }, [blob, open]);
 
   function downloadPdf() {
-    if (!url) return;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    if (!blob) return;
+    try {
+      const pdfBlob = blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
+      const dlUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = dlUrl;
+      link.download = filename;
+      link.rel = "noopener noreferrer";
+      // su iOS Safari il download può non partire: in tal caso apriamo in nuovo tab
+      const ua = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+      if (isIOS) {
+        window.open(dlUrl, "_blank", "noopener,noreferrer");
+        setTimeout(() => URL.revokeObjectURL(dlUrl), 30_000);
+        return;
+      }
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(dlUrl), 5_000);
+    } catch (err) {
+      console.error("[pdf-blob-dialog] download failed", err);
+      toast.error("Impossibile scaricare il PDF. Riprova o usa Stampa.");
+    }
   }
 
   function printPdf() {
+    if (!blob) return;
     try {
-      window.print();
-    } catch {
-      toast.error("Se la stampa non parte, usa Scarica PDF e stampa dal visualizzatore del dispositivo.");
+      const pdfBlob = blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
+      const printUrl = URL.createObjectURL(pdfBlob);
+      const w = window.open(printUrl, "_blank", "noopener,noreferrer");
+      if (!w) {
+        toast.error("Popup bloccato. Abilita i popup o usa Scarica PDF.");
+        URL.revokeObjectURL(printUrl);
+        return;
+      }
+      setTimeout(() => URL.revokeObjectURL(printUrl), 60_000);
+    } catch (err) {
+      console.error("[pdf-blob-dialog] print failed", err);
+      toast.error("Se la stampa non parte, usa Scarica PDF.");
     }
   }
 
@@ -63,11 +89,11 @@ export function PdfBlobDialog({ open, onOpenChange, blob, title, filename }: Pdf
               <DialogTitle className="truncate text-base">{title}</DialogTitle>
               <DialogDescription>Anteprima PDF interna, senza popup o schede fittizie.</DialogDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!url}>
+            <Button type="button" variant="outline" size="sm" onClick={printPdf} disabled={!blob}>
               <Printer className="h-4 w-4" />
               Stampa
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!url}>
+            <Button type="button" variant="outline" size="sm" onClick={downloadPdf} disabled={!blob}>
               <Download className="h-4 w-4" />
               Scarica PDF
             </Button>

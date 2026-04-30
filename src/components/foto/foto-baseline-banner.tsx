@@ -41,16 +41,18 @@ export function FotoBaselineBanner({ paziente_id, onClickPiano }: Props) {
   return (
     <Alert className="border-amber-500/40 bg-amber-500/5">
       <AlertTriangle className="h-4 w-4 text-amber-600" />
-      <AlertTitle>Foto baseline mancanti</AlertTitle>
-      <AlertDescription className="flex flex-wrap items-center gap-2">
-        <span>
-          {count} {count === 1 ? "piano" : "piani"} senza foto PRIMA del trattamento.
-        </span>
-        {onClickPiano && (
-          <Button size="sm" variant="outline" onClick={onClickPiano}>
-            <Camera className="h-4 w-4" /> Gestisci foto
-          </Button>
-        )}
+      <AlertTitle className="break-words">Foto baseline mancanti</AlertTitle>
+      <AlertDescription className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 break-words">
+            {count} {count === 1 ? "piano" : "piani"} senza foto PRIMA del trattamento.
+          </span>
+          {onClickPiano && (
+            <Button size="sm" variant="outline" onClick={onClickPiano}>
+              <Camera className="h-4 w-4" /> Gestisci foto
+            </Button>
+          )}
+        </div>
       </AlertDescription>
     </Alert>
   );
