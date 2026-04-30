@@ -29,10 +29,6 @@ function PazientiListPage() {
   const [mostraArchiviati, setMostraArchiviati] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   const load = useCallback(async () => {
     setLoading(true);
     const { data: pData, error } = await supabase
@@ -71,6 +67,10 @@ function PazientiListPage() {
     setPazienti(enriched);
     setLoading(false);
   }, [mostraArchiviati]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function ripristinaPaziente(id: string) {
     if (!isMedico) {
