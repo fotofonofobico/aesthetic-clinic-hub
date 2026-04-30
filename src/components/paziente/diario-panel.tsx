@@ -388,6 +388,55 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               />
             </div>
           </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label
+                htmlFor="diario-allegati"
+                className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                <Paperclip className="h-4 w-4" />
+                Allega file
+              </Label>
+              <input
+                id="diario-allegati"
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  setAllegatiFile((prev) => [...prev, ...files]);
+                  e.target.value = "";
+                }}
+              />
+              {allegatiFile.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {allegatiFile.length} file selezionati
+                </span>
+              )}
+            </div>
+            {allegatiFile.length > 0 && (
+              <ul className="space-y-1">
+                {allegatiFile.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between gap-2 rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+                  >
+                    <span className="truncate">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAllegatiFile((prev) => prev.filter((_, idx) => idx !== i))
+                      }
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label="Rimuovi"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <Checkbox
@@ -396,9 +445,9 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
               />
               <span className="text-muted-foreground">Aggiungi anche al calendario</span>
             </label>
-            <Button onClick={aggiungiNota} disabled={!testo.trim()}>
+            <Button onClick={aggiungiNota} disabled={!testo.trim() || uploading}>
               <Plus className="h-4 w-4" />
-              Aggiungi
+              {uploading ? "Salvataggio…" : "Aggiungi"}
             </Button>
           </div>
         </CardContent>
