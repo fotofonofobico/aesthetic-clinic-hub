@@ -968,10 +968,6 @@ export function PianiPanel({
     }
   }
 
-  // Wrapper retro-compatibile per non rompere altre chiamate
-  async function aggiornaStato(p: PianoTrattamento, stato: PianoStato) {
-    richiediCambioStato(p, stato);
-  }
 
   function toggle(id: string) {
     setExpanded((cur) => {
