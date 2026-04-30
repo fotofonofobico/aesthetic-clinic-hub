@@ -156,26 +156,36 @@
 }
 
 @media print {
+  @page {
+    margin: 0;
+  }
+
   body * {
-    visibility: hidden;
+    display: none !important;
   }
 
   [data-pdf-print-pages],
   [data-pdf-print-pages] * {
-    visibility: visible;
+    display: block !important;
   }
 
   [data-pdf-print-pages] {
-    position: absolute;
-    inset: 0;
+    position: static !important;
+    width: auto !important;
     height: auto !important;
     overflow: visible !important;
     background: white !important;
   }
 
   [data-pdf-print-pages] canvas {
-    max-width: 100% !important;
+    margin: 0 auto !important;
+    page-break-after: always;
     break-after: page;
     box-shadow: none !important;
+  }
+
+  [data-pdf-print-pages] canvas:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
 }
