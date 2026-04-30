@@ -12,7 +12,7 @@ export function useArchivioFilter(initial = false) {
   const toggle = useCallback(() => setMostraArchiviati((v) => !v), []);
 
   const filterRow = useCallback(
-    (row: { archiviato_il?: string | null } | null | undefined): boolean => {
+    (row: any): boolean => {
       if (!row) return false;
       if (mostraArchiviati) return true;
       return row.archiviato_il == null;
