@@ -490,11 +490,36 @@ export function PianiPanel({
   );
 
   // ---------- apertura dialog ----------
+  function resetDecisione() {
+    setTipoDecisione("piano");
+    setTrattamentoRichiestoId("");
+    setAttesaTipo("documentazione");
+    setAttesaDescrizione("");
+    setAttesaScadenza("");
+    setNonIndicatoMotivo("controindicazione");
+    setDecisioneNota("");
+    setConvertingFrom(null);
+  }
+
   function apriNuovo() {
     setEditingPianoId(null);
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetDecisione();
+    setOpen(true);
+  }
+
+  function apriConverti(p: PianoTrattamento) {
+    setEditingPianoId(null);
+    setRighe([]);
+    setScontoTipo("nessuno");
+    setScontoValore(0);
+    resetDecisione();
+    // pre-compila trattamento richiesto se presente nel piano sorgente
+    if (p.trattamento_richiesto_id) setTrattamentoRichiestoId(p.trattamento_richiesto_id);
+    setConvertingFrom(p.id);
+    setTipoDecisione("piano");
     setOpen(true);
   }
 
