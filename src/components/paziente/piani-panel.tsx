@@ -1148,9 +1148,155 @@ export function PianiPanel({
         <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto p-4 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-3xl sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-display">
-              {editingPianoId ? "Modifica piano" : "Nuovo piano"}
+              {editingPianoId
+                ? "Modifica piano"
+                : tipoDecisione === "piano"
+                  ? convertingFrom
+                    ? "Converti in piano"
+                    : "Nuovo piano"
+                  : "Decisione clinica"}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Step 0 — Come procedere? Solo per nuovo, non per modifica */}
+          {!editingPianoId && (
+            <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Come procedere?
+              </Label>
+              <RadioGroup
+                value={tipoDecisione}
+                onValueChange={(v) => setTipoDecisione(v as TipoDecisione)}
+                className="grid gap-2 sm:grid-cols-3"
+              >
+                <Label
+                  htmlFor="td-piano"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "piano" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="piano" id="td-piano" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  Procedi con un piano
+                </Label>
+                <Label
+                  htmlFor="td-attesa"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "in_attesa" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="in_attesa" id="td-attesa" />
+                  <Clock className="h-4 w-4 text-warning" />
+                  In attesa
+                </Label>
+                <Label
+                  htmlFor="td-nonind"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "non_indicato" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="non_indicato" id="td-nonind" />
+                  <Ban className="h-4 w-4 text-destructive" />
+                  Non indicato
+                </Label>
+              </RadioGroup>
+
+              {tipoDecisione === "piano" && (
+                <div className="space-y-1 pt-2">
+                  <Label className="text-xs">Trattamento richiesto dal paziente (opzionale)</Label>
+                  <Select
+                    value={trattamentoRichiestoId || undefined}
+                    onValueChange={(v) => setTrattamentoRichiestoId(v)}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trattamenti.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Compila se il paziente richiedeva un trattamento diverso da quello pianificato.
+                  </p>
+                </div>
+              )}
+
+              {tipoDecisione === "in_attesa" && (
+                <div className="space-y-2 pt-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">Tipo</Label>
+                      <Select value={attesaTipo} onValueChange={(v) => setAttesaTipo(v as AttesaTipo)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(ATTESA_TIPO_LABELS) as AttesaTipo[]).map((k) => (
+                            <SelectItem key={k} value={k}>{ATTESA_TIPO_LABELS[k]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Scadenza (opzionale)</Label>
+                      <Input type="date" value={attesaScadenza} onChange={(e) => setAttesaScadenza(e.target.value)} className="h-9" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Cosa serve?</Label>
+                    <Input
+                      placeholder="es. esami coagulazione, visita dermatologica…"
+                      value={attesaDescrizione}
+                      onChange={(e) => setAttesaDescrizione(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Trattamento di riferimento (opzionale)</Label>
+                    <Select value={trattamentoRichiestoId || undefined} onValueChange={(v) => setTrattamentoRichiestoId(v)}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        {trattamenti.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Note (opzionale)</Label>
+                    <Textarea value={decisioneNota} onChange={(e) => setDecisioneNota(e.target.value)} rows={2} />
+                  </div>
+                </div>
+              )}
+
+              {tipoDecisione === "non_indicato" && (
+                <div className="space-y-2 pt-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">Trattamento valutato (opzionale)</Label>
+                      <Select value={trattamentoRichiestoId || undefined} onValueChange={(v) => setTrattamentoRichiestoId(v)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {trattamenti.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Motivo</Label>
+                      <Select value={nonIndicatoMotivo} onValueChange={(v) => setNonIndicatoMotivo(v as NonIndicatoMotivo)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(NON_INDICATO_MOTIVO_LABELS) as NonIndicatoMotivo[]).map((k) => (
+                            <SelectItem key={k} value={k}>{NON_INDICATO_MOTIVO_LABELS[k]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Nota (opzionale)</Label>
+                    <Textarea value={decisioneNota} onChange={(e) => setDecisioneNota(e.target.value)} rows={2} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             {righe.length === 0 && (
