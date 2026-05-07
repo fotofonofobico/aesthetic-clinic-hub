@@ -1141,6 +1141,7 @@ export function PianiPanel({
             setRighe([]);
             setScontoTipo("nessuno");
             setScontoValore(0);
+            resetDecisione();
           }
         }}
       >
