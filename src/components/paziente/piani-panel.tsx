@@ -690,6 +690,62 @@ export function PianiPanel({
   }
 
   // ---------- creazione piano ----------
+  async function salvaDecisione() {
+    if (tipoDecisione === "in_attesa" && !attesaDescrizione.trim()) {
+      toast.error("Indica cosa serve per l'attesa");
+      return;
+    }
+    setSaving(true);
+    try {
+      const trattNome = trattamenti.find((t) => t.id === trattamentoRichiestoId)?.nome;
+      const titolo =
+        tipoDecisione === "in_attesa"
+          ? `In attesa: ${attesaDescrizione || ATTESA_TIPO_LABELS[attesaTipo]}${trattNome ? ` (${trattNome})` : ""}`
+          : `Non indicato${trattNome ? `: ${trattNome}` : ""} — ${NON_INDICATO_MOTIVO_LABELS[nonIndicatoMotivo]}`;
+      const payload: Record<string, unknown> = {
+        paziente_id: pazienteId,
+        trattamento_id: null,
+        titolo,
+        numero_sedute_previste: 0,
+        prezzo_totale: 0,
+        prezzo_finale: 0,
+        sconto_tipo: "nessuno",
+        sconto_valore: 0,
+        stato: tipoDecisione,
+        tipo_decisione: tipoDecisione,
+        trattamento_richiesto_id: trattamentoRichiestoId || null,
+        decisione_nota: decisioneNota || null,
+        created_by: user?.id,
+      };
+      if (tipoDecisione === "in_attesa") {
+        payload.attesa_tipo = attesaTipo;
+        payload.attesa_descrizione = attesaDescrizione || null;
+        payload.attesa_scadenza = attesaScadenza || null;
+      } else {
+        payload.non_indicato_motivo = nonIndicatoMotivo;
+      }
+      const { error } = await supabase.from("piano_trattamento").insert(payload as never);
+      if (error) throw error;
+      // diario
+      await supabase.from("paziente_nota").insert({
+        paziente_id: pazienteId,
+        tipo: "clinica",
+        testo: `Decisione: ${titolo}${decisioneNota ? `\nNote: ${decisioneNota}` : ""}`,
+        data_evento: new Date().toISOString(),
+        created_by: user?.id,
+        auto_generata: true,
+      } as never);
+      toast.success("Decisione salvata");
+      setOpen(false);
+      void load();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore salvataggio decisione");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function creaPiano() {
     const err = validaForm();
     if (err) {
