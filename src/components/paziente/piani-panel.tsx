@@ -1871,73 +1871,92 @@ export function PianiPanel({
                       </div>
                     </button>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                      {p.stato === "bozza" && (
-                        <Button
-                          size="sm"
-                          onClick={() => void attivaPiano(p)}
-                          disabled={attivandoPianoId === p.id}
-                          className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
-                        >
-                          {attivandoPianoId === p.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3" />
-                          )}
-                          Attiva piano
-                        </Button>
-                      )}
-                      {!isLegacy && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => apriModifica(p)}
-                          disabled={p.stato === "annullato"}
-                          className="w-full sm:w-auto"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Modifica
-                        </Button>
-                      )}
-                      {p.stato !== "bozza" && (
-                        <Select
-                          value={p.stato}
-                          onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
-                          disabled={p.stato === "completato" || p.stato === "annullato"}
-                        >
-                          <SelectTrigger
-                            className="h-8 w-full sm:w-36"
-                            title={
-                              p.stato === "completato"
-                                ? "Piano completato — stato non più modificabile"
-                                : p.stato === "annullato"
-                                  ? "Piano annullato"
-                                  : undefined
-                            }
+                      {(p.tipo_decisione === "in_attesa" || p.tipo_decisione === "non_indicato") ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => apriConverti(p)}
+                            disabled={p.stato === "annullato"}
+                            className="w-full sm:w-auto"
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="attivo">Attivo</SelectItem>
-                            <SelectItem value="sospeso">Sospeso</SelectItem>
-                            <SelectItem value="annullato">Annullato</SelectItem>
-                            {p.stato === "completato" && (
-                              <SelectItem value="completato" disabled>
-                                Completato (auto)
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {p.stato === "bozza" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => richiediCambioStato(p, "annullato")}
-                          className="w-full sm:w-auto"
-                        >
-                          <X className="h-3 w-3" />
-                          Annulla
-                        </Button>
+                            <RefreshCw className="h-3 w-3" />
+                            {p.tipo_decisione === "in_attesa" ? "Converti in piano" : "Riapri come piano"}
+                          </Button>
+                          {p.stato !== "annullato" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => richiediCambioStato(p, "annullato")}
+                              className="w-full sm:w-auto"
+                            >
+                              <X className="h-3 w-3" />
+                              Archivia
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {p.stato === "bozza" && (
+                            <Button
+                              size="sm"
+                              onClick={() => void attivaPiano(p)}
+                              disabled={attivandoPianoId === p.id}
+                              className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
+                            >
+                              {attivandoPianoId === p.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              Attiva piano
+                            </Button>
+                          )}
+                          {!isLegacy && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => apriModifica(p)}
+                              disabled={p.stato === "annullato"}
+                              className="w-full sm:w-auto"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Modifica
+                            </Button>
+                          )}
+                          {p.stato !== "bozza" && (
+                            <Select
+                              value={p.stato}
+                              onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
+                              disabled={p.stato === "completato" || p.stato === "annullato"}
+                            >
+                              <SelectTrigger className="h-8 w-full sm:w-36">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="attivo">Attivo</SelectItem>
+                                <SelectItem value="sospeso">Sospeso</SelectItem>
+                                <SelectItem value="annullato">Annullato</SelectItem>
+                                {p.stato === "completato" && (
+                                  <SelectItem value="completato" disabled>
+                                    Completato (auto)
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          {p.stato === "bozza" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => richiediCambioStato(p, "annullato")}
+                              className="w-full sm:w-auto"
+                            >
+                              <X className="h-3 w-3" />
+                              Annulla
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
