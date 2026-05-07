@@ -43,7 +43,11 @@ import type {
   ProdottoPrevisto,
   PianoVoce,
   ScontoTipo,
+  TipoDecisione,
+  AttesaTipo,
+  NonIndicatoMotivo,
 } from "@/types/trattamenti";
+import { ATTESA_TIPO_LABELS, NON_INDICATO_MOTIVO_LABELS } from "@/types/trattamenti";
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
 import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
@@ -57,6 +61,9 @@ import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Clock, Ban, RefreshCw } from "lucide-react";
 
 const STATO_LABELS: Record<PianoStato, string> = {
   bozza: "Proposta",
@@ -64,6 +71,8 @@ const STATO_LABELS: Record<PianoStato, string> = {
   completato: "Completato",
   sospeso: "Sospeso",
   annullato: "Annullato",
+  in_attesa: "In attesa",
+  non_indicato: "Non indicato",
 };
 
 // ---------- helpers ----------
