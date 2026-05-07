@@ -1298,7 +1298,7 @@ export function PianiPanel({
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3" hidden={tipoDecisione !== "piano" && !editingPianoId}>
             {righe.length === 0 && (
               <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                 Aggiungi uno o più trattamenti per costruire il piano.
