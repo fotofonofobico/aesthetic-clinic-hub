@@ -208,6 +208,16 @@ export function PianiPanel({
   const [firmaVoceKey, setFirmaVoceKey] = useState<string | null>(null);
   const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
 
+  // ---- decisione clinica (step 0 del nuovo piano) ----
+  const [tipoDecisione, setTipoDecisione] = useState<TipoDecisione>("piano");
+  const [trattamentoRichiestoId, setTrattamentoRichiestoId] = useState<string>("");
+  const [attesaTipo, setAttesaTipo] = useState<AttesaTipo>("documentazione");
+  const [attesaDescrizione, setAttesaDescrizione] = useState("");
+  const [attesaScadenza, setAttesaScadenza] = useState<string>("");
+  const [nonIndicatoMotivo, setNonIndicatoMotivo] = useState<NonIndicatoMotivo>("controindicazione");
+  const [decisioneNota, setDecisioneNota] = useState("");
+  const [convertingFrom, setConvertingFrom] = useState<string | null>(null);
+
   useEffect(() => {
     void load();
   }, [pazienteId]);
