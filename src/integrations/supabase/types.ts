@@ -1065,9 +1065,15 @@ export type Database = {
       }
       piano_trattamento: {
         Row: {
+          attesa_descrizione: string | null
+          attesa_scadenza: string | null
+          attesa_tipo: string | null
+          convertito_da_piano_id: string | null
           created_at: string
           created_by: string | null
+          decisione_nota: string | null
           id: string
+          non_indicato_motivo: string | null
           note: string | null
           numero_sedute_previste: number
           paziente_id: string
@@ -1077,14 +1083,23 @@ export type Database = {
           sconto_tipo: string
           sconto_valore: number
           stato: Database["public"]["Enums"]["piano_stato"]
+          tipo_decisione: string
           titolo: string
           trattamento_id: string | null
+          trattamento_richiesto_id: string | null
+          trattamento_richiesto_testo: string | null
           updated_at: string
         }
         Insert: {
+          attesa_descrizione?: string | null
+          attesa_scadenza?: string | null
+          attesa_tipo?: string | null
+          convertito_da_piano_id?: string | null
           created_at?: string
           created_by?: string | null
+          decisione_nota?: string | null
           id?: string
+          non_indicato_motivo?: string | null
           note?: string | null
           numero_sedute_previste?: number
           paziente_id: string
@@ -1094,14 +1109,23 @@ export type Database = {
           sconto_tipo?: string
           sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
+          tipo_decisione?: string
           titolo: string
           trattamento_id?: string | null
+          trattamento_richiesto_id?: string | null
+          trattamento_richiesto_testo?: string | null
           updated_at?: string
         }
         Update: {
+          attesa_descrizione?: string | null
+          attesa_scadenza?: string | null
+          attesa_tipo?: string | null
+          convertito_da_piano_id?: string | null
           created_at?: string
           created_by?: string | null
+          decisione_nota?: string | null
           id?: string
+          non_indicato_motivo?: string | null
           note?: string | null
           numero_sedute_previste?: number
           paziente_id?: string
@@ -1111,11 +1135,21 @@ export type Database = {
           sconto_tipo?: string
           sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
+          tipo_decisione?: string
           titolo?: string
           trattamento_id?: string | null
+          trattamento_richiesto_id?: string | null
+          trattamento_richiesto_testo?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "piano_trattamento_convertito_da_piano_id_fkey"
+            columns: ["convertito_da_piano_id"]
+            isOneToOne: false
+            referencedRelation: "piano_trattamento"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "piano_trattamento_paziente_id_fkey"
             columns: ["paziente_id"]
@@ -1126,6 +1160,13 @@ export type Database = {
           {
             foreignKeyName: "piano_trattamento_trattamento_id_fkey"
             columns: ["trattamento_id"]
+            isOneToOne: false
+            referencedRelation: "trattamenti"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "piano_trattamento_trattamento_richiesto_id_fkey"
+            columns: ["trattamento_richiesto_id"]
             isOneToOne: false
             referencedRelation: "trattamenti"
             referencedColumns: ["id"]
@@ -1768,6 +1809,8 @@ export type Database = {
         | "annullato"
         | "bozza"
         | "confermato"
+        | "in_attesa"
+        | "non_indicato"
       sesso: "M" | "F" | "altro"
     }
     CompositeTypes: {
@@ -1932,6 +1975,8 @@ export const Constants = {
         "annullato",
         "bozza",
         "confermato",
+        "in_attesa",
+        "non_indicato",
       ],
       sesso: ["M", "F", "altro"],
     },
