@@ -1841,13 +1841,17 @@ export function PianiPanel({
                           <h4 className="font-display text-base font-semibold">{p.titolo}</h4>
                           <span
                             className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                              p.stato === "bozza"
+                              p.stato === "in_attesa"
                                 ? "border-warning/50 bg-warning/20 text-warning-foreground"
-                                : p.stato === "attivo"
-                                  ? "border-success/40 bg-success/15 text-success-foreground"
-                                  : p.stato === "completato"
-                                    ? "border-border bg-muted text-muted-foreground"
-                                    : "border-warning/40 bg-warning/15"
+                                : p.stato === "non_indicato"
+                                  ? "border-destructive/40 bg-destructive/15 text-destructive-foreground"
+                                  : p.stato === "bozza"
+                                    ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                    : p.stato === "attivo"
+                                      ? "border-success/40 bg-success/15 text-success-foreground"
+                                      : p.stato === "completato"
+                                        ? "border-border bg-muted text-muted-foreground"
+                                        : "border-warning/40 bg-warning/15"
                             }`}
                           >
                             {STATO_LABELS[p.stato]}
