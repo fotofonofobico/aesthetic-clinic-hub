@@ -317,18 +317,16 @@ function TrattamentoDialog({
       toast.error("Seleziona la categoria");
       return;
     }
-    if (!consensoId) {
-      toast.error("Collega un consenso al trattamento");
-      return;
-    }
-    const selectedTemplate = templates.find((t) => t.id === consensoId);
-    if (tipo === "ciclo" && selectedTemplate?.categoria !== "trattamento_ciclo") {
-      toast.error("Per un ciclo serve un consenso ciclo");
-      return;
-    }
-    if (tipo === "singolo" && selectedTemplate?.categoria !== "trattamento_singolo") {
-      toast.error("Per un trattamento singolo serve consenso singolo");
-      return;
+    const selectedTemplate = consensoId ? templates.find((t) => t.id === consensoId) : null;
+    if (selectedTemplate) {
+      if (tipo === "ciclo" && selectedTemplate.categoria !== "trattamento_ciclo") {
+        toast.error("Per un ciclo serve un consenso ciclo");
+        return;
+      }
+      if (tipo === "singolo" && selectedTemplate.categoria !== "trattamento_singolo") {
+        toast.error("Per un trattamento singolo serve consenso singolo");
+        return;
+      }
     }
 
     setSaving(true);
@@ -338,7 +336,7 @@ function TrattamentoDialog({
       durata_ciclo_valore: durValN,
       durata_ciclo_unita: durUnitN,
       categoria,
-      consenso_template_id: consensoId,
+      consenso_template_id: consensoId || null,
       durata_minuti: durata ? Number(durata) : null,
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
       descrizione: null,
