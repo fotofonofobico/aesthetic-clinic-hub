@@ -1717,18 +1717,24 @@ export function PianiPanel({
               Annulla
             </Button>
             <Button
-              onClick={() => void (editingPianoId ? modificaPiano() : creaPiano())}
+              onClick={() => {
+                if (editingPianoId) return void modificaPiano();
+                if (tipoDecisione === "piano") return void creaPiano();
+                return void salvaDecisione();
+              }}
               disabled={saving}
             >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                  {editingPianoId ? "Salvataggio…" : "Creazione…"}
+                  {editingPianoId ? "Salvataggio…" : "Salvataggio…"}
                 </>
               ) : editingPianoId ? (
                 "Salva modifiche"
-              ) : (
+              ) : tipoDecisione === "piano" ? (
                 "Crea piano"
+              ) : (
+                "Salva decisione"
               )}
             </Button>
           </DialogFooter>
