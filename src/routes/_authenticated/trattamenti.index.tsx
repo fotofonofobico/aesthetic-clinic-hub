@@ -336,7 +336,7 @@ function TrattamentoDialog({
       durata_ciclo_valore: durValN,
       durata_ciclo_unita: durUnitN,
       categoria,
-      consenso_template_id: consensoId,
+      consenso_template_id: consensoId || null,
       durata_minuti: durata ? Number(durata) : null,
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
       descrizione: null,
