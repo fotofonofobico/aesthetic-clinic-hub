@@ -393,11 +393,7 @@ function TemplateDialog({
     let trattamentoIdSalvato: string | null = null;
 
     if (tipoUI === "trattamento") {
-      if (!trattamentoId) {
-        toast.error("Seleziona il trattamento collegato");
-        return;
-      }
-      trattamentoIdSalvato = trattamentoId;
+      trattamentoIdSalvato = trattamentoId || null;
       if (modValidita === "singola") {
         categoriaSalvata = "trattamento_singolo";
         validitaMesiSalvata = null;
