@@ -1,4 +1,36 @@
-export type PianoStato = "bozza" | "attivo" | "completato" | "sospeso" | "annullato";
+export type PianoStato =
+  | "bozza"
+  | "attivo"
+  | "completato"
+  | "sospeso"
+  | "annullato"
+  | "in_attesa"
+  | "non_indicato";
+
+export type TipoDecisione = "piano" | "in_attesa" | "non_indicato";
+
+export type AttesaTipo = "documentazione" | "approfondimento" | "rivalutazione";
+
+export type NonIndicatoMotivo =
+  | "anatomia_non_idonea"
+  | "aspettative_non_realistiche"
+  | "controindicazione"
+  | "paziente_ha_rifiutato"
+  | "altro";
+
+export const ATTESA_TIPO_LABELS: Record<AttesaTipo, string> = {
+  documentazione: "Documentazione",
+  approfondimento: "Approfondimento clinico",
+  rivalutazione: "Rivalutazione",
+};
+
+export const NON_INDICATO_MOTIVO_LABELS: Record<NonIndicatoMotivo, string> = {
+  anatomia_non_idonea: "Anatomia non idonea",
+  aspettative_non_realistiche: "Aspettative non realistiche",
+  controindicazione: "Controindicazione",
+  paziente_ha_rifiutato: "Paziente ha rifiutato",
+  altro: "Altro",
+};
 
 export type ConsensoCategoria =
   | "gdpr"
@@ -158,6 +190,16 @@ export interface PianoTrattamento {
   note: string | null;
   created_at: string;
   updated_at: string;
+  // decisione clinica
+  tipo_decisione: TipoDecisione;
+  trattamento_richiesto_id: string | null;
+  trattamento_richiesto_testo: string | null;
+  attesa_tipo: AttesaTipo | null;
+  attesa_descrizione: string | null;
+  attesa_scadenza: string | null;
+  non_indicato_motivo: NonIndicatoMotivo | null;
+  decisione_nota: string | null;
+  convertito_da_piano_id: string | null;
 }
 
 export interface ProdottoPrevisto {
