@@ -769,6 +769,9 @@ export function PianiPanel({
           sconto_valore: scontoValore,
           stato: "bozza",
           note: null,
+          tipo_decisione: "piano",
+          trattamento_richiesto_id: trattamentoRichiestoId || null,
+          convertito_da_piano_id: convertingFrom,
           created_by: user?.id,
         } as never)
         .select("id")
