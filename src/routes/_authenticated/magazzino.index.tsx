@@ -27,6 +27,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   archiviaProdotto,
@@ -180,13 +182,16 @@ function MagazzinoPage() {
             >
               {includiStandby ? "Nascondi standby" : "Mostra standby"}
             </Button>
-            <Button
-              variant={mostraArchiviati ? "default" : "outline"}
-              size="sm"
-              onClick={() => setMostraArchiviati((v) => !v)}
-            >
-              {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="mostra-archiviati-magazzino"
+                checked={mostraArchiviati}
+                onCheckedChange={(v) => setMostraArchiviati(Boolean(v))}
+              />
+              <Label htmlFor="mostra-archiviati-magazzino" className="text-xs text-muted-foreground">
+                Mostra archiviati
+              </Label>
+            </div>
           </div>
 
           <div className="rounded-md border">

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -134,13 +135,14 @@ function TrattamentiPage() {
       </header>
 
       <div className="flex items-center justify-end gap-2">
-        <Button
-          variant={mostraArchiviati ? "default" : "outline"}
-          size="sm"
-          onClick={() => setMostraArchiviati((v) => !v)}
-        >
-          {mostraArchiviati ? "Mostra attivi" : "Mostra archiviati"}
-        </Button>
+        <Switch
+          id="mostra-archiviati-trattamenti"
+          checked={mostraArchiviati}
+          onCheckedChange={(v) => setMostraArchiviati(Boolean(v))}
+        />
+        <Label htmlFor="mostra-archiviati-trattamenti" className="text-xs text-muted-foreground">
+          Mostra archiviati
+        </Label>
       </div>
 
       {loading ? (

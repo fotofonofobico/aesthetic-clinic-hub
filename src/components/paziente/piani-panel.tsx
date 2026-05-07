@@ -43,7 +43,11 @@ import type {
   ProdottoPrevisto,
   PianoVoce,
   ScontoTipo,
+  TipoDecisione,
+  AttesaTipo,
+  NonIndicatoMotivo,
 } from "@/types/trattamenti";
+import { ATTESA_TIPO_LABELS, NON_INDICATO_MOTIVO_LABELS } from "@/types/trattamenti";
 import { puoEseguireTrattamento } from "@/lib/access-guard";
 import { PRODOTTI_DEMO } from "@/lib/prodotti-demo";
 import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
@@ -57,6 +61,9 @@ import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { FotoStatoBadgeLive } from "@/components/foto/foto-stato-badge-live";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Clock, Ban, RefreshCw } from "lucide-react";
 
 const STATO_LABELS: Record<PianoStato, string> = {
   bozza: "Proposta",
@@ -64,6 +71,8 @@ const STATO_LABELS: Record<PianoStato, string> = {
   completato: "Completato",
   sospeso: "Sospeso",
   annullato: "Annullato",
+  in_attesa: "In attesa",
+  non_indicato: "Non indicato",
 };
 
 // ---------- helpers ----------
@@ -198,6 +207,16 @@ export function PianiPanel({
   const [firmaOpen, setFirmaOpen] = useState(false);
   const [firmaVoceKey, setFirmaVoceKey] = useState<string | null>(null);
   const [tabletSession, setTabletSession] = useState<SignatureSession | null>(null);
+
+  // ---- decisione clinica (step 0 del nuovo piano) ----
+  const [tipoDecisione, setTipoDecisione] = useState<TipoDecisione>("piano");
+  const [trattamentoRichiestoId, setTrattamentoRichiestoId] = useState<string>("");
+  const [attesaTipo, setAttesaTipo] = useState<AttesaTipo>("documentazione");
+  const [attesaDescrizione, setAttesaDescrizione] = useState("");
+  const [attesaScadenza, setAttesaScadenza] = useState<string>("");
+  const [nonIndicatoMotivo, setNonIndicatoMotivo] = useState<NonIndicatoMotivo>("controindicazione");
+  const [decisioneNota, setDecisioneNota] = useState("");
+  const [convertingFrom, setConvertingFrom] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -471,11 +490,36 @@ export function PianiPanel({
   );
 
   // ---------- apertura dialog ----------
+  function resetDecisione() {
+    setTipoDecisione("piano");
+    setTrattamentoRichiestoId("");
+    setAttesaTipo("documentazione");
+    setAttesaDescrizione("");
+    setAttesaScadenza("");
+    setNonIndicatoMotivo("controindicazione");
+    setDecisioneNota("");
+    setConvertingFrom(null);
+  }
+
   function apriNuovo() {
     setEditingPianoId(null);
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetDecisione();
+    setOpen(true);
+  }
+
+  function apriConverti(p: PianoTrattamento) {
+    setEditingPianoId(null);
+    setRighe([]);
+    setScontoTipo("nessuno");
+    setScontoValore(0);
+    resetDecisione();
+    // pre-compila trattamento richiesto se presente nel piano sorgente
+    if (p.trattamento_richiesto_id) setTrattamentoRichiestoId(p.trattamento_richiesto_id);
+    setConvertingFrom(p.id);
+    setTipoDecisione("piano");
     setOpen(true);
   }
 
@@ -646,6 +690,62 @@ export function PianiPanel({
   }
 
   // ---------- creazione piano ----------
+  async function salvaDecisione() {
+    if (tipoDecisione === "in_attesa" && !attesaDescrizione.trim()) {
+      toast.error("Indica cosa serve per l'attesa");
+      return;
+    }
+    setSaving(true);
+    try {
+      const trattNome = trattamenti.find((t) => t.id === trattamentoRichiestoId)?.nome;
+      const titolo =
+        tipoDecisione === "in_attesa"
+          ? `In attesa: ${attesaDescrizione || ATTESA_TIPO_LABELS[attesaTipo]}${trattNome ? ` (${trattNome})` : ""}`
+          : `Non indicato${trattNome ? `: ${trattNome}` : ""} — ${NON_INDICATO_MOTIVO_LABELS[nonIndicatoMotivo]}`;
+      const payload: Record<string, unknown> = {
+        paziente_id: pazienteId,
+        trattamento_id: null,
+        titolo,
+        numero_sedute_previste: 0,
+        prezzo_totale: 0,
+        prezzo_finale: 0,
+        sconto_tipo: "nessuno",
+        sconto_valore: 0,
+        stato: tipoDecisione,
+        tipo_decisione: tipoDecisione,
+        trattamento_richiesto_id: trattamentoRichiestoId || null,
+        decisione_nota: decisioneNota || null,
+        created_by: user?.id,
+      };
+      if (tipoDecisione === "in_attesa") {
+        payload.attesa_tipo = attesaTipo;
+        payload.attesa_descrizione = attesaDescrizione || null;
+        payload.attesa_scadenza = attesaScadenza || null;
+      } else {
+        payload.non_indicato_motivo = nonIndicatoMotivo;
+      }
+      const { error } = await supabase.from("piano_trattamento").insert(payload as never);
+      if (error) throw error;
+      // diario
+      await supabase.from("paziente_nota").insert({
+        paziente_id: pazienteId,
+        tipo: "clinica",
+        testo: `Decisione: ${titolo}${decisioneNota ? `\nNote: ${decisioneNota}` : ""}`,
+        data_evento: new Date().toISOString(),
+        created_by: user?.id,
+        auto_generata: true,
+      } as never);
+      toast.success("Decisione salvata");
+      setOpen(false);
+      void load();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore salvataggio decisione");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function creaPiano() {
     const err = validaForm();
     if (err) {
@@ -669,6 +769,9 @@ export function PianiPanel({
           sconto_valore: scontoValore,
           stato: "bozza",
           note: null,
+          tipo_decisione: "piano",
+          trattamento_richiesto_id: trattamentoRichiestoId || null,
+          convertito_da_piano_id: convertingFrom,
           created_by: user?.id,
         } as never)
         .select("id")
@@ -1097,17 +1200,164 @@ export function PianiPanel({
             setRighe([]);
             setScontoTipo("nessuno");
             setScontoValore(0);
+            resetDecisione();
           }
         }}
       >
         <DialogContent className="h-[100dvh] max-h-[100dvh] w-screen max-w-none overflow-y-auto p-4 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-3xl sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-display">
-              {editingPianoId ? "Modifica piano" : "Nuovo piano"}
+              {editingPianoId
+                ? "Modifica piano"
+                : tipoDecisione === "piano"
+                  ? convertingFrom
+                    ? "Converti in piano"
+                    : "Nuovo piano"
+                  : "Decisione clinica"}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
+          {/* Step 0 — Come procedere? Solo per nuovo, non per modifica */}
+          {!editingPianoId && (
+            <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Come procedere?
+              </Label>
+              <RadioGroup
+                value={tipoDecisione}
+                onValueChange={(v) => setTipoDecisione(v as TipoDecisione)}
+                className="grid gap-2 sm:grid-cols-3"
+              >
+                <Label
+                  htmlFor="td-piano"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "piano" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="piano" id="td-piano" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  Procedi con un piano
+                </Label>
+                <Label
+                  htmlFor="td-attesa"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "in_attesa" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="in_attesa" id="td-attesa" />
+                  <Clock className="h-4 w-4 text-warning" />
+                  In attesa
+                </Label>
+                <Label
+                  htmlFor="td-nonind"
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm ${tipoDecisione === "non_indicato" ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <RadioGroupItem value="non_indicato" id="td-nonind" />
+                  <Ban className="h-4 w-4 text-destructive" />
+                  Non indicato
+                </Label>
+              </RadioGroup>
+
+              {tipoDecisione === "piano" && (
+                <div className="space-y-1 pt-2">
+                  <Label className="text-xs">Trattamento richiesto dal paziente (opzionale)</Label>
+                  <Select
+                    value={trattamentoRichiestoId || undefined}
+                    onValueChange={(v) => setTrattamentoRichiestoId(v)}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trattamenti.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Compila se il paziente richiedeva un trattamento diverso da quello pianificato.
+                  </p>
+                </div>
+              )}
+
+              {tipoDecisione === "in_attesa" && (
+                <div className="space-y-2 pt-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">Tipo</Label>
+                      <Select value={attesaTipo} onValueChange={(v) => setAttesaTipo(v as AttesaTipo)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(ATTESA_TIPO_LABELS) as AttesaTipo[]).map((k) => (
+                            <SelectItem key={k} value={k}>{ATTESA_TIPO_LABELS[k]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Scadenza (opzionale)</Label>
+                      <Input type="date" value={attesaScadenza} onChange={(e) => setAttesaScadenza(e.target.value)} className="h-9" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Cosa serve?</Label>
+                    <Input
+                      placeholder="es. esami coagulazione, visita dermatologica…"
+                      value={attesaDescrizione}
+                      onChange={(e) => setAttesaDescrizione(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Trattamento di riferimento (opzionale)</Label>
+                    <Select value={trattamentoRichiestoId || undefined} onValueChange={(v) => setTrattamentoRichiestoId(v)}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        {trattamenti.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Note (opzionale)</Label>
+                    <Textarea value={decisioneNota} onChange={(e) => setDecisioneNota(e.target.value)} rows={2} />
+                  </div>
+                </div>
+              )}
+
+              {tipoDecisione === "non_indicato" && (
+                <div className="space-y-2 pt-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">Trattamento valutato (opzionale)</Label>
+                      <Select value={trattamentoRichiestoId || undefined} onValueChange={(v) => setTrattamentoRichiestoId(v)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {trattamenti.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Motivo</Label>
+                      <Select value={nonIndicatoMotivo} onValueChange={(v) => setNonIndicatoMotivo(v as NonIndicatoMotivo)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(NON_INDICATO_MOTIVO_LABELS) as NonIndicatoMotivo[]).map((k) => (
+                            <SelectItem key={k} value={k}>{NON_INDICATO_MOTIVO_LABELS[k]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Nota (opzionale)</Label>
+                    <Textarea value={decisioneNota} onChange={(e) => setDecisioneNota(e.target.value)} rows={2} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3" hidden={tipoDecisione !== "piano" && !editingPianoId}>
             {righe.length === 0 && (
               <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                 Aggiungi uno o più trattamenti per costruire il piano.
@@ -1526,18 +1776,24 @@ export function PianiPanel({
               Annulla
             </Button>
             <Button
-              onClick={() => void (editingPianoId ? modificaPiano() : creaPiano())}
+              onClick={() => {
+                if (editingPianoId) return void modificaPiano();
+                if (tipoDecisione === "piano") return void creaPiano();
+                return void salvaDecisione();
+              }}
               disabled={saving}
             >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                  {editingPianoId ? "Salvataggio…" : "Creazione…"}
+                  {editingPianoId ? "Salvataggio…" : "Salvataggio…"}
                 </>
               ) : editingPianoId ? (
                 "Salva modifiche"
-              ) : (
+              ) : tipoDecisione === "piano" ? (
                 "Crea piano"
+              ) : (
+                "Salva decisione"
               )}
             </Button>
           </DialogFooter>
@@ -1585,13 +1841,17 @@ export function PianiPanel({
                           <h4 className="font-display text-base font-semibold">{p.titolo}</h4>
                           <span
                             className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                              p.stato === "bozza"
+                              p.stato === "in_attesa"
                                 ? "border-warning/50 bg-warning/20 text-warning-foreground"
-                                : p.stato === "attivo"
-                                  ? "border-success/40 bg-success/15 text-success-foreground"
-                                  : p.stato === "completato"
-                                    ? "border-border bg-muted text-muted-foreground"
-                                    : "border-warning/40 bg-warning/15"
+                                : p.stato === "non_indicato"
+                                  ? "border-destructive/40 bg-destructive/15 text-destructive-foreground"
+                                  : p.stato === "bozza"
+                                    ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                    : p.stato === "attivo"
+                                      ? "border-success/40 bg-success/15 text-success-foreground"
+                                      : p.stato === "completato"
+                                        ? "border-border bg-muted text-muted-foreground"
+                                        : "border-warning/40 bg-warning/15"
                             }`}
                           >
                             {STATO_LABELS[p.stato]}
@@ -1611,73 +1871,92 @@ export function PianiPanel({
                       </div>
                     </button>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                      {p.stato === "bozza" && (
-                        <Button
-                          size="sm"
-                          onClick={() => void attivaPiano(p)}
-                          disabled={attivandoPianoId === p.id}
-                          className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
-                        >
-                          {attivandoPianoId === p.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3" />
-                          )}
-                          Attiva piano
-                        </Button>
-                      )}
-                      {!isLegacy && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => apriModifica(p)}
-                          disabled={p.stato === "annullato"}
-                          className="w-full sm:w-auto"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Modifica
-                        </Button>
-                      )}
-                      {p.stato !== "bozza" && (
-                        <Select
-                          value={p.stato}
-                          onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
-                          disabled={p.stato === "completato" || p.stato === "annullato"}
-                        >
-                          <SelectTrigger
-                            className="h-8 w-full sm:w-36"
-                            title={
-                              p.stato === "completato"
-                                ? "Piano completato — stato non più modificabile"
-                                : p.stato === "annullato"
-                                  ? "Piano annullato"
-                                  : undefined
-                            }
+                      {(p.tipo_decisione === "in_attesa" || p.tipo_decisione === "non_indicato") ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => apriConverti(p)}
+                            disabled={p.stato === "annullato"}
+                            className="w-full sm:w-auto"
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="attivo">Attivo</SelectItem>
-                            <SelectItem value="sospeso">Sospeso</SelectItem>
-                            <SelectItem value="annullato">Annullato</SelectItem>
-                            {p.stato === "completato" && (
-                              <SelectItem value="completato" disabled>
-                                Completato (auto)
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {p.stato === "bozza" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => richiediCambioStato(p, "annullato")}
-                          className="w-full sm:w-auto"
-                        >
-                          <X className="h-3 w-3" />
-                          Annulla
-                        </Button>
+                            <RefreshCw className="h-3 w-3" />
+                            {p.tipo_decisione === "in_attesa" ? "Converti in piano" : "Riapri come piano"}
+                          </Button>
+                          {p.stato !== "annullato" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => richiediCambioStato(p, "annullato")}
+                              className="w-full sm:w-auto"
+                            >
+                              <X className="h-3 w-3" />
+                              Archivia
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {p.stato === "bozza" && (
+                            <Button
+                              size="sm"
+                              onClick={() => void attivaPiano(p)}
+                              disabled={attivandoPianoId === p.id}
+                              className="w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto"
+                            >
+                              {attivandoPianoId === p.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              Attiva piano
+                            </Button>
+                          )}
+                          {!isLegacy && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => apriModifica(p)}
+                              disabled={p.stato === "annullato"}
+                              className="w-full sm:w-auto"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Modifica
+                            </Button>
+                          )}
+                          {p.stato !== "bozza" && (
+                            <Select
+                              value={p.stato}
+                              onValueChange={(v) => richiediCambioStato(p, v as PianoStato)}
+                              disabled={p.stato === "completato" || p.stato === "annullato"}
+                            >
+                              <SelectTrigger className="h-8 w-full sm:w-36">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="attivo">Attivo</SelectItem>
+                                <SelectItem value="sospeso">Sospeso</SelectItem>
+                                <SelectItem value="annullato">Annullato</SelectItem>
+                                {p.stato === "completato" && (
+                                  <SelectItem value="completato" disabled>
+                                    Completato (auto)
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          {p.stato === "bozza" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => richiediCambioStato(p, "annullato")}
+                              className="w-full sm:w-auto"
+                            >
+                              <X className="h-3 w-3" />
+                              Annulla
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
