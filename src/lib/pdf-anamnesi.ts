@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { sha256Hex } from "./hash";
 import type { DatiPazientePdf } from "./pdf-consenso";
 import {
+  renderFooterPagine,
   renderHeaderPaziente,
   renderMetadata,
   renderSignatureBlock,
