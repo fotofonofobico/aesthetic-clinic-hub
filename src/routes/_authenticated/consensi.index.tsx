@@ -501,7 +501,7 @@ function TemplateDialog({
         {tipoUI === "trattamento" && (
           <>
             <div>
-              <Label>Trattamento collegato *</Label>
+              <Label>Trattamento collegato</Label>
               <Select value={trattamentoId} onValueChange={setTrattamentoId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona un trattamento…" />
