@@ -8,11 +8,14 @@ export const TIPO_LABEL: Record<CalendarioEventoTipo, string> = {
 };
 
 export const TIPO_COLORE: Record<CalendarioEventoTipo, string> = {
-  promemoria: "hsl(var(--primary))",
-  follow_up: "hsl(var(--accent-foreground, var(--primary)))",
-  attivita: "hsl(var(--secondary-foreground, var(--primary)))",
+  promemoria: "hsl(262 83% 58%)",
+  follow_up: "hsl(280 70% 55%)",
+  attivita: "hsl(250 75% 60%)",
   altro: "hsl(var(--muted-foreground))",
 };
+
+/** Colore unico usato come "pallino Eventi" nei filtri/legenda */
+export const COLORE_EVENTO = "hsl(262 83% 58%)";
 
 export const COLORE_SEDUTA = "hsl(217 91% 60%)"; // blu
 export const COLORE_SCADENZA = "hsl(38 92% 50%)"; // ambra
