@@ -1,0 +1,2 @@
+ALTER TABLE public.trattamenti DROP CONSTRAINT IF EXISTS trattamenti_durata_ciclo_unita_check;
+ALTER TABLE public.trattamenti ADD CONSTRAINT trattamenti_durata_ciclo_unita_check CHECK (durata_ciclo_unita IS NULL OR durata_ciclo_unita = ANY (ARRAY['giorni'::text,'settimane'::text,'mesi'::text,'sedute'::text]));
