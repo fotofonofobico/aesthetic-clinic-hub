@@ -418,7 +418,7 @@ function TrattamentoDialog({
         </div>
 
         <div>
-          <Label>Consenso associato *</Label>
+          <Label>Consenso associato</Label>
           <Select value={consensoId} onValueChange={setConsensoId}>
             <SelectTrigger>
               <SelectValue
