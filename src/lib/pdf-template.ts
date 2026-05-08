@@ -24,8 +24,8 @@ function fmtDateTime(d: Date): string {
 }
 
 /**
- * Header paziente in cima al PDF. OBBLIGATORIO: blocca la generazione se
- * mancano cognome o nome.
+ * Header paziente: box bordato compatto in alto. Migliora la leggibilità
+ * stampata e separa visivamente i dati anagrafici dal corpo del documento.
  */
 export function renderHeaderPaziente(
   doc: jsPDF,
@@ -36,36 +36,37 @@ export function renderHeaderPaziente(
   if (!paz.cognome || !paz.nome) {
     throw new Error("PDF invalido: header paziente mancante (cognome/nome obbligatori)");
   }
-  let y = startY;
   const pageW = doc.internal.pageSize.getWidth();
-  doc.setDrawColor(180).setLineWidth(0.5);
-  doc.line(margin, y, pageW - margin, y);
-  y += 14;
-  doc.setFont("helvetica", "bold").setFontSize(10);
-  doc.text("Paziente:", margin, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${paz.cognome.toUpperCase()} ${paz.nome}`, margin + 70, y);
-  y += 14;
-  if (paz.codice_fiscale) {
-    doc.setFont("helvetica", "bold");
-    doc.text("CF:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(paz.codice_fiscale, margin + 70, y);
-    y += 14;
+  const boxX = margin;
+  const boxY = startY;
+  const boxW = pageW - margin * 2;
+  const lineH = 13;
+  // Calcolo righe necessarie
+  const rows: Array<[string, string]> = [
+    ["Paziente", `${paz.cognome.toUpperCase()} ${paz.nome}`],
+  ];
+  if (paz.data_nascita) rows.push(["Data di nascita", fmtDate(paz.data_nascita)]);
+  if (paz.codice_fiscale) rows.push(["Codice fiscale", paz.codice_fiscale]);
+  const boxH = rows.length * lineH + 14;
+
+  doc.setDrawColor(180).setLineWidth(0.6);
+  doc.setFillColor(248, 249, 251);
+  doc.rect(boxX, boxY, boxW, boxH, "FD");
+
+  let y = boxY + 16;
+  doc.setFontSize(9);
+  for (const [label, value] of rows) {
+    doc.setFont("helvetica", "bold").setTextColor(80);
+    doc.text(`${label}:`, boxX + 10, y);
+    doc.setFont("helvetica", "normal").setTextColor(0);
+    doc.text(value, boxX + 100, y);
+    y += lineH;
   }
-  if (paz.data_nascita) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Data di nascita:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(fmtDate(paz.data_nascita), margin + 70, y);
-    y += 14;
-  }
-  doc.line(margin, y, pageW - margin, y);
-  return y + 14;
+  return boxY + boxH + 14;
 }
 
 export interface DocMetadata {
-  tipoDocumento: string; // es: "Consenso informato", "Anamnesi"
+  tipoDocumento: string;
   titolo: string;
   versione: string;
   firmatoIl: Date | null;
@@ -80,32 +81,20 @@ export function renderMetadata(
   if (!meta.tipoDocumento || !meta.titolo) {
     throw new Error("PDF invalido: metadata documento mancanti");
   }
-  let y = startY;
-  doc.setFont("helvetica", "bold").setFontSize(10);
-  doc.text("Documento:", margin, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(meta.tipoDocumento, margin + 70, y);
-  y += 13;
-  doc.setFont("helvetica", "bold");
-  doc.text("Titolo:", margin, y);
-  doc.setFont("helvetica", "normal");
   const pageW = doc.internal.pageSize.getWidth();
-  const titleLines = doc.splitTextToSize(meta.titolo, pageW - margin * 2 - 70) as string[];
-  doc.text(titleLines, margin + 70, y);
-  y += 13 * titleLines.length;
-  doc.setFont("helvetica", "bold");
-  doc.text("Versione:", margin, y);
+  let y = startY;
+  doc.setFontSize(8).setTextColor(110);
   doc.setFont("helvetica", "normal");
-  doc.text(meta.versione, margin + 70, y);
-  y += 13;
-  if (meta.firmatoIl) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Firmato il:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(fmtDateTime(meta.firmatoIl), margin + 70, y);
-    y += 13;
-  }
-  return y + 6;
+  const parts: string[] = [
+    meta.tipoDocumento,
+    `v. ${meta.versione}`,
+  ];
+  if (meta.firmatoIl) parts.push(`Firmato il ${fmtDateTime(meta.firmatoIl)}`);
+  doc.text(parts.join("  •  "), margin, y);
+  doc.setTextColor(0);
+  y += 10;
+  doc.setDrawColor(220).setLineWidth(0.4).line(margin, y, pageW - margin, y);
+  return y + 14;
 }
 
 export interface SignatureBlockInput {
@@ -115,6 +104,8 @@ export interface SignatureBlockInput {
   modalita: "tablet" | "cartaceo" | "pdf_caricato";
   pazienteLabel: string;
   operatoreLabel: string | null;
+  /** Se false, NON renderizza il box "Firma del medico" (default true) */
+  mostraFirmaMedico?: boolean;
 }
 
 export function renderSignatureBlock(
@@ -128,15 +119,25 @@ export function renderSignatureBlock(
   }
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
+  const mostraFirmaMedico = input.mostraFirmaMedico !== false;
   let y = startY;
   if (y > pageH - 160) {
     doc.addPage();
     y = margin;
   }
-  const colW = (pageW - margin * 2 - 30) / 2;
+
+  const colW = mostraFirmaMedico ? (pageW - margin * 2 - 30) / 2 : pageW - margin * 2;
+  const xMedico = margin + colW + 30;
+
+  // Data sopra
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(80);
+  doc.text(`Data: ${fmtDateTime(input.firmatoIl)}`, margin, y);
+  doc.setTextColor(0);
+  y += 14;
+
   doc.setFont("helvetica", "bold").setFontSize(10);
   doc.text("Firma del paziente", margin, y);
-  doc.text("Firma del medico", margin + colW + 30, y);
+  if (mostraFirmaMedico) doc.text("Firma del medico", xMedico, y);
   y += 8;
 
   // Box firma paziente
@@ -147,29 +148,45 @@ export function renderSignatureBlock(
       /* skip */
     }
   }
-  // Box firma medico
-  if (input.firmaMedicoDataUrl) {
+  if (mostraFirmaMedico && input.firmaMedicoDataUrl) {
     try {
-      doc.addImage(input.firmaMedicoDataUrl, "PNG", margin + colW + 30, y, colW, 70);
+      doc.addImage(input.firmaMedicoDataUrl, "PNG", xMedico, y, colW, 70);
     } catch {
       /* skip */
     }
   }
   y += 78;
   doc.setDrawColor(150).line(margin, y, margin + colW, y);
-  doc.line(margin + colW + 30, y, margin + colW * 2 + 30, y);
+  if (mostraFirmaMedico) doc.line(xMedico, y, xMedico + colW, y);
   y += 12;
   doc.setFont("helvetica", "normal").setFontSize(8);
   doc.text(input.pazienteLabel, margin, y);
-  if (input.operatoreLabel) {
-    doc.text(input.operatoreLabel, margin + colW + 30, y);
+  if (mostraFirmaMedico && input.operatoreLabel) {
+    doc.text(input.operatoreLabel, xMedico, y);
   }
   y += 12;
-  doc.setFontSize(8).setTextColor(80);
-  doc.text(`Data: ${fmtDateTime(input.firmatoIl)}`, margin, y);
   if (input.modalita === "cartaceo" || input.modalita === "pdf_caricato") {
-    doc.text("Modalità: cartaceo", margin + colW + 30, y);
+    doc.setFontSize(8).setTextColor(120);
+    doc.text("Modalità: cartaceo", margin, y);
+    doc.setTextColor(0);
+    y += 10;
   }
-  doc.setTextColor(0);
-  return y + 10;
+  return y + 6;
+}
+
+/**
+ * Footer "Pagina X di Y" + nome documento, applicato a tutte le pagine.
+ * Va chiamato a fine generazione.
+ */
+export function renderFooterPagine(doc: jsPDF, nomeDocumento: string, margin: number) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const total = doc.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(140);
+    doc.text(nomeDocumento, margin, pageH - 18);
+    doc.text(`Pagina ${i} di ${total}`, pageW - margin, pageH - 18, { align: "right" });
+    doc.setTextColor(0);
+  }
 }
