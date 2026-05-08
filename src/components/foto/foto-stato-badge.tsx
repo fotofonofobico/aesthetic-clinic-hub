@@ -14,7 +14,7 @@ export function FotoStatoBadge({
 }) {
   if (stato === "completo") {
     return (
-      <Badge variant="secondary" className={className}>
+      <Badge variant="secondary" className={"gap-1.5 " + (className ?? "")}>
         <CheckCircle2 className="h-3 w-3" />
         Foto: {PIANO_FOTO_STATO_LABELS.completo}
       </Badge>
@@ -22,14 +22,14 @@ export function FotoStatoBadge({
   }
   if (stato === "non_eseguibile") {
     return (
-      <Badge variant="outline" className={className}>
+      <Badge variant="outline" className={"gap-1.5 " + (className ?? "")}>
         <Ban className="h-3 w-3" />
         {PIANO_FOTO_STATO_LABELS.non_eseguibile}
       </Badge>
     );
   }
   return (
-    <Badge variant="destructive" className={className}>
+    <Badge variant="destructive" className={"gap-1.5 " + (className ?? "")}>
       <AlertTriangle className="h-3 w-3" />
       {PIANO_FOTO_STATO_LABELS.baseline_mancante}
       {incoerenza ? " (incoerenza data)" : ""}

@@ -1,6 +1,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { FiltriCalendario } from "@/hooks/use-calendario-eventi";
+import { COLORE_EVENTO } from "@/lib/calendario";
 
 interface Props {
   filtri: FiltriCalendario;
@@ -20,7 +21,7 @@ export function CalendarioFiltri({ filtri, onChange }: Props) {
       <FiltroItem
         id="f-ev"
         label="Eventi"
-        color="hsl(var(--primary))"
+        color={COLORE_EVENTO}
         checked={filtri.mostraEventi}
         onChange={(v) => onChange({ ...filtri, mostraEventi: v })}
       />

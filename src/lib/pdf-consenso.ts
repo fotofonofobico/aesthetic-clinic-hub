@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { ConsensoCategoria } from "@/types/trattamenti";
 import { sha256Hex } from "./hash";
 import {
+  renderFooterPagine,
   renderHeaderPaziente,
   renderMetadata,
   renderSignatureBlock,
@@ -130,6 +131,8 @@ export async function generaPdfConsenso(
   }
 
   // 4. SIGNATURE BLOCK
+  // Per GDPR e uso immagini il medico non firma sul tablet → niente riga firma medico
+  const noFirmaMedico = input.categoria === "gdpr" || input.categoria === "uso_immagini";
   y = renderSignatureBlock(
     doc,
     {
@@ -139,6 +142,7 @@ export async function generaPdfConsenso(
       modalita: input.modalitaFirma,
       pazienteLabel: `${input.paziente.cognome} ${input.paziente.nome}`,
       operatoreLabel: input.operatoreNome,
+      mostraFirmaMedico: !noFirmaMedico,
     },
     margin,
     y + 10,
@@ -154,6 +158,7 @@ export async function generaPdfConsenso(
   doc.setPage(totalPages);
   doc.setFontSize(7).setTextColor(120);
   doc.text(`Hash integrità: ${hash}`, margin, pageH - 24);
+  renderFooterPagine(doc, `Consenso — ${input.titolo}`, margin);
   const finalBlob = doc.output("blob");
 
   return { blob: finalBlob, hash };

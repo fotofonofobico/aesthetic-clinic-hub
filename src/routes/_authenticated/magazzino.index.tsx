@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Plus, Search, Package, AlertTriangle, Clock, Settings2 } from "lucide-react";
+import { Plus, Search, Package, AlertTriangle, Clock, Settings2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +84,7 @@ function MagazzinoPage() {
   const [loading, setLoading] = React.useState(false);
 
   const [openNuovoProdotto, setOpenNuovoProdotto] = React.useState(false);
+  const [prodottoInModifica, setProdottoInModifica] = React.useState<ProdottoConDettagli | null>(null);
   const [openLotto, setOpenLotto] = React.useState(false);
   const [openRettifica, setOpenRettifica] = React.useState(false);
   const [prodottoSel, setProdottoSel] = React.useState<ProdottoConDettagli | null>(null);
@@ -229,13 +230,23 @@ function MagazzinoPage() {
                     <TableCell>{p.unita_misura}</TableCell>
                     <TableCell className="text-right">{p.soglia_minima || "—"}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setProdottoSel(p); setLottoSel(null); setOpenLotto(true); }}
-                      >
-                        + Lotto
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Modifica prodotto"
+                          onClick={() => setProdottoInModifica(p)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setProdottoSel(p); setLottoSel(null); setOpenLotto(true); }}
+                        >
+                          + Lotto
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -348,6 +359,12 @@ function MagazzinoPage() {
         open={openNuovoProdotto}
         onOpenChange={setOpenNuovoProdotto}
         onCreated={() => void ricarica()}
+      />
+      <ProdottoFormDialog
+        open={!!prodottoInModifica}
+        onOpenChange={(v) => { if (!v) setProdottoInModifica(null); }}
+        prodottoEsistente={prodottoInModifica}
+        onUpdated={() => { setProdottoInModifica(null); void ricarica(); }}
       />
       {prodottoSel && (
         <LottoFormDialog

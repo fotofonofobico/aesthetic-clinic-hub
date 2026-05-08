@@ -22,7 +22,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { creaProdotto, listMarche, creaMarca, listTipologie } from "@/lib/magazzino";
+import { creaProdotto, aggiornaProdotto, listMarche, creaMarca, listTipologie } from "@/lib/magazzino";
 import type { Marca, ModalitaTracking, Prodotto } from "@/types/magazzino";
 import { MODALITA_DESCRIZIONI, MODALITA_LABELS } from "@/types/magazzino";
 import { cn } from "@/lib/utils";
@@ -33,8 +33,11 @@ interface Props {
   /** Default "solo_uso" — coerente con la fase beta */
   defaultModalita?: ModalitaTracking;
   onCreated?: (p: Prodotto) => void;
+  onUpdated?: () => void;
   /** Versione "rapida" mostra meno campi (per uso inline in seduta) */
   rapido?: boolean;
+  /** Se valorizzato, il dialog è in modalità modifica */
+  prodottoEsistente?: Prodotto | null;
 }
 
 const UNITA = ["pz", "ml", "fiala", "siringa", "flacone", "applicazione", "U"];
@@ -57,8 +60,11 @@ export function ProdottoFormDialog({
   onOpenChange,
   defaultModalita = "solo_uso",
   onCreated,
+  onUpdated,
   rapido = false,
+  prodottoEsistente = null,
 }: Props) {
+  const isEdit = !!prodottoEsistente;
   const [nome, setNome] = React.useState("");
   const [marche, setMarche] = React.useState<Marca[]>([]);
   const [marcaId, setMarcaId] = React.useState<string | null>(null);
@@ -75,19 +81,19 @@ export function ProdottoFormDialog({
 
   React.useEffect(() => {
     if (open) {
-      setNome("");
-      setMarcaId(null);
+      const p = prodottoEsistente;
+      setNome(p?.nome ?? "");
+      setMarcaId(p?.marca_id ?? null);
       setNuovaMarca("");
-      setTipologia("");
-      setUnita("pz");
-      setModalita(defaultModalita);
-      setCosto("");
-      setSoglia("0");
-      setNote("");
+      setTipologia(p?.tipologia ?? "");
+      setUnita(p?.unita_misura ?? "pz");
+      setModalita(p?.modalita_tracking ?? defaultModalita);
+      setCosto(p?.costo_unitario_default != null ? String(p.costo_unitario_default) : "");
+      setSoglia(p?.soglia_minima != null ? String(p.soglia_minima) : "0");
+      setNote(p?.note ?? "");
       listMarche().then(setMarche).catch(() => setMarche([]));
       listTipologie()
         .then((db) => {
-          // Merge predefinite + DB, dedup case-insensitive, ordina
           const map = new Map<string, string>();
           [...TIPOLOGIE_PREDEFINITE, ...db].forEach((t) => {
             const k = t.trim().toLowerCase();
@@ -97,7 +103,7 @@ export function ProdottoFormDialog({
         })
         .catch(() => setTipologie(TIPOLOGIE_PREDEFINITE));
     }
-  }, [open, defaultModalita]);
+  }, [open, defaultModalita, prodottoEsistente]);
 
   async function salva() {
     if (!nome.trim()) {
@@ -111,21 +117,36 @@ export function ProdottoFormDialog({
         const m = await creaMarca(nuovaMarca.trim());
         mid = m.id;
       }
-      const p = await creaProdotto({
-        nome: nome.trim(),
-        marca_id: mid,
-        tipologia: tipologia.trim() || null,
-        unita_misura: unita,
-        modalita_tracking: modalita,
-        costo_unitario_default: costo ? Number(costo) : null,
-        soglia_minima: soglia ? Number(soglia) : 0,
-        note: note.trim() || null,
-      });
-      toast.success("Prodotto creato");
-      onCreated?.(p);
+      if (isEdit && prodottoEsistente) {
+        await aggiornaProdotto(prodottoEsistente.id, {
+          nome: nome.trim(),
+          marca_id: mid,
+          tipologia: tipologia.trim() || null,
+          unita_misura: unita,
+          modalita_tracking: modalita,
+          costo_unitario_default: costo ? Number(costo) : null,
+          soglia_minima: soglia ? Number(soglia) : 0,
+          note: note.trim() || null,
+        });
+        toast.success("Prodotto aggiornato");
+        onUpdated?.();
+      } else {
+        const p = await creaProdotto({
+          nome: nome.trim(),
+          marca_id: mid,
+          tipologia: tipologia.trim() || null,
+          unita_misura: unita,
+          modalita_tracking: modalita,
+          costo_unitario_default: costo ? Number(costo) : null,
+          soglia_minima: soglia ? Number(soglia) : 0,
+          note: note.trim() || null,
+        });
+        toast.success("Prodotto creato");
+        onCreated?.(p);
+      }
       onOpenChange(false);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Errore creazione prodotto";
+      const msg = e instanceof Error ? e.message : "Errore salvataggio prodotto";
       if (/row-level security|Sessione scaduta/i.test(msg)) {
         toast.error("Sessione scaduta. Ricarica la pagina e rifai il login.");
       } else {
@@ -140,7 +161,13 @@ export function ProdottoFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{rapido ? "Nuovo prodotto (rapido)" : "Nuovo prodotto"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? "Modifica prodotto"
+              : rapido
+                ? "Nuovo prodotto (rapido)"
+                : "Nuovo prodotto"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
@@ -297,7 +324,9 @@ export function ProdottoFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Annulla</Button>
-          <Button onClick={salva} disabled={busy}>Crea prodotto</Button>
+          <Button onClick={salva} disabled={busy}>
+            {isEdit ? "Salva modifiche" : "Crea prodotto"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
