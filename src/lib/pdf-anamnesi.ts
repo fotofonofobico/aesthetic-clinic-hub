@@ -134,7 +134,7 @@ export async function generaPdfAnamnesi(
     y += 10;
   }
 
-  // 4. SIGNATURE BLOCK (sempre presente; vuoto in modalità cartaceo)
+  // 4. SIGNATURE BLOCK (solo paziente: il medico non firma sul tablet l'anamnesi)
   y = renderSignatureBlock(
     doc,
     {
@@ -144,6 +144,7 @@ export async function generaPdfAnamnesi(
       modalita,
       pazienteLabel: `${input.paziente.cognome} ${input.paziente.nome}`,
       operatoreLabel: input.operatoreNome,
+      mostraFirmaMedico: false,
     },
     margin,
     y + 10,
@@ -156,6 +157,7 @@ export async function generaPdfAnamnesi(
   doc.setPage(totalPages);
   doc.setFontSize(7).setTextColor(120);
   doc.text(`Hash integrità: ${hash}`, margin, pageH - 24);
+  renderFooterPagine(doc, `Anamnesi v${input.versioneNumero}`, margin);
   const blob = doc.output("blob");
   return { blob, hash };
 }
