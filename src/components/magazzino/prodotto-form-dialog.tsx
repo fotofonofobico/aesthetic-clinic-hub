@@ -161,7 +161,13 @@ export function ProdottoFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{rapido ? "Nuovo prodotto (rapido)" : "Nuovo prodotto"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? "Modifica prodotto"
+              : rapido
+                ? "Nuovo prodotto (rapido)"
+                : "Nuovo prodotto"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
@@ -318,7 +324,9 @@ export function ProdottoFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Annulla</Button>
-          <Button onClick={salva} disabled={busy}>Crea prodotto</Button>
+          <Button onClick={salva} disabled={busy}>
+            {isEdit ? "Salva modifiche" : "Crea prodotto"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
