@@ -688,11 +688,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
           {stato === "compilazione" && isVisita && phase === "anamnesi" && (
             <Button
               onClick={confermaAnamnesi}
-              disabled={
-                !sceltaSingolo ||
-                !firmaSingoloReady ||
-                (docs[anamnesiIdx]?.richiedeFirmaMedico && !firmaSingoloMedReady)
-              }
+              disabled={!sceltaSingolo || !firmaSingoloReady}
             >
               Completa e salva
             </Button>
