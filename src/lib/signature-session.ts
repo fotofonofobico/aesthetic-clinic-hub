@@ -112,8 +112,8 @@ export async function buildVisitaSession(
 
   const docs: SessionDoc[] = [];
 
-  // 1) GDPR
-  const gdprTpl = templates.find((t) => t.categoria === "gdpr");
+  // 1) GDPR — solo l'ultima versione attiva
+  const gdprTpl = ultimaVersione(templates.filter((t) => t.categoria === "gdpr"));
   const ultimoGdpr = ultimoPerCategoria(rows, "gdpr");
   const gdprNeeded =
     !ultimoGdpr ||
@@ -135,8 +135,8 @@ export async function buildVisitaSession(
     );
   }
 
-  // 2) Uso immagini
-  const imgTpl = templates.find((t) => t.categoria === "uso_immagini");
+  // 2) Uso immagini — solo l'ultima versione attiva
+  const imgTpl = ultimaVersione(templates.filter((t) => t.categoria === "uso_immagini"));
   const ultimoImg = ultimoPerCategoria(rows, "uso_immagini");
   const imgNeeded =
     !ultimoImg ||
