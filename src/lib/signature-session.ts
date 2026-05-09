@@ -4,6 +4,8 @@ import {
   type ConsensoStatoRow,
   statoIsBlocking,
   ultimoPerCategoria,
+  ultimaVersione,
+  ultimaVersionePerChiave,
 } from "./consensi-engine";
 
 /**
