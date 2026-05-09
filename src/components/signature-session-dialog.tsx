@@ -654,15 +654,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                   <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
 
                 </div>
-                {docs[currentTratt].richiedeFirmaMedico && (
-                  <div>
-                    <Label className="text-sm font-semibold">Firma del medico *</Label>
-                    <SignaturePad
-                      ref={sigSingoloMedRef}
-                      onChange={(empty) => setFirmaSingoloMedReady(!empty)}
-                    />
-                  </div>
-                )}
+                {/* La firma del medico è stata rimossa: firma solo il paziente. */}
               </div>
             )}
           </div>
