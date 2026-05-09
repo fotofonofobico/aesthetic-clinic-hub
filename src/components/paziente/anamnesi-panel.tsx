@@ -406,9 +406,8 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       return;
     }
     const firmaPaz = padPaz.toDataURL();
-    const padMed = sigMedRef.current;
-    const firmaMed = padMed && !padMed.isEmpty() ? padMed.toDataURL() : null;
-    void firmaAnamnesi(firmaPaz, firmaMed);
+    // Firma del medico rimossa: passiamo sempre null.
+    void firmaAnamnesi(firmaPaz, null);
   }
 
   /** Stampa anamnesi senza firme per workflow cartaceo. */
