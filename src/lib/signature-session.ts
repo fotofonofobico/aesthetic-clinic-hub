@@ -265,7 +265,12 @@ export async function buildTrattamentoSession(
     .eq("attivo", true)
     .in("trattamento_id", trattamentoIds);
 
-  const templates = (tplRes.data ?? []) as ConsensoTemplate[];
+  const allTemplates = (tplRes.data ?? []) as ConsensoTemplate[];
+  // Per ogni (trattamento_id + categoria) tieni solo l'ultima versione attiva.
+  const templates = ultimaVersionePerChiave(
+    allTemplates,
+    (t) => `${t.trattamento_id ?? ""}::${t.categoria}`,
+  );
   if (templates.length === 0) {
     return { tipo: "trattamento", pazienteId, trattamentiSelezionati: trattamentoIds, documenti: [] };
   }
