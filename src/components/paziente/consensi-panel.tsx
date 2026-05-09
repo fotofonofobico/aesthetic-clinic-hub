@@ -45,7 +45,7 @@ import {
   type ConsensoTemplate,
   type ConsensoModalitaFirma,
 } from "@/types/trattamenti";
-import { STATO_BADGE } from "@/lib/consensi-engine";
+import { STATO_BADGE, ultimaVersionePerChiave } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
