@@ -122,7 +122,7 @@ export function renderSignatureBlock(
   }
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const mostraFirmaMedico = input.mostraFirmaMedico !== false;
+  const mostraFirmaMedico = input.mostraFirmaMedico === true;
   let y = startY;
   if (y > pageH - 160) {
     doc.addPage();
