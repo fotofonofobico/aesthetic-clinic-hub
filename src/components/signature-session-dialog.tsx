@@ -193,21 +193,13 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
       return;
     }
     const firma = pad.toDataURL();
-    let firmaMed: string | null = null;
-    if (docs[anamnesiIdx].richiedeFirmaMedico) {
-      const padMed = sigSingoloMedRef.current;
-      if (!padMed || padMed.isEmpty()) {
-        toast.error("La firma del medico è obbligatoria per questo documento");
-        return;
-      }
-      firmaMed = padMed.toDataURL();
-    }
+    // Il medico non firma più sui documenti: firmaMedico sempre null.
     const next = [...docs];
     next[anamnesiIdx] = {
       ...next[anamnesiIdx],
       scelta: sceltaSingolo,
       firmaPaziente: firma,
-      firmaMedico: firmaMed,
+      firmaMedico: null,
       completato: true,
     };
     setDocs(next);
