@@ -45,7 +45,7 @@ import {
   type ConsensoTemplate,
   type ConsensoModalitaFirma,
 } from "@/types/trattamenti";
-import { STATO_BADGE } from "@/lib/consensi-engine";
+import { STATO_BADGE, ultimaVersionePerChiave } from "@/lib/consensi-engine";
 import { ShareConsensoButton } from "@/components/share-consenso-button";
 import { PdfSignedLink } from "@/components/pdf-signed-link";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
@@ -93,7 +93,13 @@ export function ConsensiPanel({
     ]);
     const list = (fRes.data ?? []) as unknown as ConsensoFirmato[];
     setFirmati(list);
-    setTemplates((tRes.data ?? []) as unknown as ConsensoTemplate[]);
+    const allTemplates = (tRes.data ?? []) as unknown as ConsensoTemplate[];
+    // Mostra solo l'ultima versione di ciascun template (per categoria + trattamento).
+    const latestTemplates = ultimaVersionePerChiave(
+      allTemplates,
+      (t) => `${t.categoria}::${t.trattamento_id ?? ""}`,
+    );
+    setTemplates(latestTemplates);
     const map: StatoMap = {};
     for (const r of (sRes.data ?? []) as Array<{
       consenso_id: string;

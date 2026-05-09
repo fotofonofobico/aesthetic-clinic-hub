@@ -98,8 +98,12 @@ export async function generaPdfConsenso(
   // 3. CONTENUTO
   doc.setFont("helvetica", "normal").setFontSize(10);
   const lines = doc.splitTextToSize(input.testo, pageW - margin * 2);
+  // Riempi la pagina fino a margine inferiore (lasciando spazio al footer);
+  // se non c'è spazio sufficiente, lo signature block si occupa di andare a
+  // pagina nuova.
+  const bodyBottom = pageH - margin - 20;
   for (const line of lines as string[]) {
-    if (y > pageH - 200) {
+    if (y > bodyBottom) {
       doc.addPage();
       y = margin;
     }
@@ -109,7 +113,7 @@ export async function generaPdfConsenso(
   y += 10;
 
   // Esito
-  if (y > pageH - 200) {
+  if (y > pageH - 80) {
     doc.addPage();
     y = margin;
   }
@@ -130,19 +134,17 @@ export async function generaPdfConsenso(
     y += 14;
   }
 
-  // 4. SIGNATURE BLOCK
-  // Per GDPR e uso immagini il medico non firma sul tablet → niente riga firma medico
-  const noFirmaMedico = input.categoria === "gdpr" || input.categoria === "uso_immagini";
+  // 4. SIGNATURE BLOCK — solo paziente. Il medico non firma sui consensi.
   y = renderSignatureBlock(
     doc,
     {
       firmaPazienteDataUrl: input.firmaPazienteDataUrl,
-      firmaMedicoDataUrl: input.firmaMedicoDataUrl,
+      firmaMedicoDataUrl: null,
       firmatoIl: input.firmatoIl,
       modalita: input.modalitaFirma,
       pazienteLabel: `${input.paziente.cognome} ${input.paziente.nome}`,
-      operatoreLabel: input.operatoreNome,
-      mostraFirmaMedico: !noFirmaMedico,
+      operatoreLabel: null,
+      mostraFirmaMedico: false,
     },
     margin,
     y + 10,

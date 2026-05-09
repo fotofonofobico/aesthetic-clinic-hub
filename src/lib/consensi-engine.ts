@@ -72,3 +72,50 @@ export function ultimoPerCategoria(
   }
   return null;
 }
+
+/**
+ * Confronta due stringhe versione tipo "1.0" / "1.10" in ordine numerico.
+ * Ritorna un numero compatibile con Array.sort.
+ */
+export function compareVersioni(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/**
+ * Da una lista di template/oggetti versionati, restituisce solo l'elemento
+ * con la versione più alta (tie-break su `updated_at` se presente).
+ * Se la lista è vuota ritorna null.
+ */
+export function ultimaVersione<
+  T extends { versione: string; updated_at?: string | null },
+>(list: T[]): T | null {
+  if (list.length === 0) return null;
+  return [...list].sort((a, b) => {
+    const v = compareVersioni(b.versione, a.versione);
+    if (v !== 0) return v;
+    const au = a.updated_at ?? "";
+    const bu = b.updated_at ?? "";
+    return bu.localeCompare(au);
+  })[0];
+}
+
+/**
+ * Raggruppa per chiave e per ciascun gruppo tiene solo l'ultima versione.
+ */
+export function ultimaVersionePerChiave<
+  T extends { versione: string; updated_at?: string | null },
+>(list: T[], keyFn: (item: T) => string): T[] {
+  const groups = new Map<string, T[]>();
+  for (const item of list) {
+    const key = keyFn(item);
+    const arr = groups.get(key) ?? [];
+    arr.push(item);
+    groups.set(key, arr);
+  }
+  const out: T[] = [];
+  for (const arr of groups.values()) {
+    const latest = ultimaVersione(arr);
+    if (latest) out.push(latest);
+  }
+  return out;
+}

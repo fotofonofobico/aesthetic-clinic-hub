@@ -193,21 +193,13 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
       return;
     }
     const firma = pad.toDataURL();
-    let firmaMed: string | null = null;
-    if (docs[anamnesiIdx].richiedeFirmaMedico) {
-      const padMed = sigSingoloMedRef.current;
-      if (!padMed || padMed.isEmpty()) {
-        toast.error("La firma del medico è obbligatoria per questo documento");
-        return;
-      }
-      firmaMed = padMed.toDataURL();
-    }
+    // Il medico non firma più sui documenti: firmaMedico sempre null.
     const next = [...docs];
     next[anamnesiIdx] = {
       ...next[anamnesiIdx],
       scelta: sceltaSingolo,
       firmaPaziente: firma,
-      firmaMedico: firmaMed,
+      firmaMedico: null,
       completato: true,
     };
     setDocs(next);
@@ -233,21 +225,13 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
       return;
     }
     const firma = pad.toDataURL();
-    let firmaMed: string | null = null;
-    if (doc.richiedeFirmaMedico) {
-      const padMed = sigSingoloMedRef.current;
-      if (!padMed || padMed.isEmpty()) {
-        toast.error("La firma del medico è obbligatoria per questo documento");
-        return;
-      }
-      firmaMed = padMed.toDataURL();
-    }
+    // Il medico non firma più sui consensi: firmaMedico sempre null.
     const next = [...docs];
     next[currentTratt] = {
       ...doc,
       scelta: sceltaSingolo,
       firmaPaziente: firma,
-      firmaMedico: firmaMed,
+      firmaMedico: null,
       completato: true,
     };
     setDocs(next);
@@ -612,15 +596,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                   <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
 
                 </div>
-                {docs[anamnesiIdx].richiedeFirmaMedico && (
-                  <div>
-                    <Label className="text-sm font-semibold">Firma del medico *</Label>
-                    <SignaturePad
-                      ref={sigSingoloMedRef}
-                      onChange={(empty) => setFirmaSingoloMedReady(!empty)}
-                    />
-                  </div>
-                )}
+                {/* La firma del medico è stata rimossa: firma solo il paziente. */}
               </div>
             )}
 
@@ -678,15 +654,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
                   <OppureInviaTablet session={session} onClick={onInviaTablet} onClose={onClose} />
 
                 </div>
-                {docs[currentTratt].richiedeFirmaMedico && (
-                  <div>
-                    <Label className="text-sm font-semibold">Firma del medico *</Label>
-                    <SignaturePad
-                      ref={sigSingoloMedRef}
-                      onChange={(empty) => setFirmaSingoloMedReady(!empty)}
-                    />
-                  </div>
-                )}
+                {/* La firma del medico è stata rimossa: firma solo il paziente. */}
               </div>
             )}
           </div>
@@ -720,11 +688,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
           {stato === "compilazione" && isVisita && phase === "anamnesi" && (
             <Button
               onClick={confermaAnamnesi}
-              disabled={
-                !sceltaSingolo ||
-                !firmaSingoloReady ||
-                (docs[anamnesiIdx]?.richiedeFirmaMedico && !firmaSingoloMedReady)
-              }
+              disabled={!sceltaSingolo || !firmaSingoloReady}
             >
               Completa e salva
             </Button>
@@ -732,11 +696,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
           {stato === "compilazione" && !isVisita && currentTratt !== undefined && (
             <Button
               onClick={confermaTrattamento}
-              disabled={
-                !sceltaSingolo ||
-                !firmaSingoloReady ||
-                (docs[currentTratt].richiedeFirmaMedico && !firmaSingoloMedReady)
-              }
+              disabled={!sceltaSingolo || !firmaSingoloReady}
             >
               {trattamentoStep + 1 < trattamentoIdxs.length
                 ? "Conferma e prosegui"

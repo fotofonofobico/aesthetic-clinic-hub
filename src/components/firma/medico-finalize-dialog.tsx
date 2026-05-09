@@ -30,15 +30,9 @@ export function MedicoFinalizeDialog({ open, row, onCompleted, onClose }: Props)
   const docs = useMemo<SessionDoc[]>(() => row?.payload?.documenti ?? [], [row]);
   const risposte: RispostaDocumento[] = row?.acconsensi?.risposte ?? [];
 
-  const docsCheServonoFirmaMedico = useMemo(
-    () =>
-      docs.filter((d) => {
-        const r = risposte.find((x) => x.localId === d.localId);
-        // firma medico solo se il doc la richiede E il paziente ha acconsentito
-        return d.richiedeFirmaMedico && r?.scelta === "acconsento";
-      }),
-    [docs, risposte],
-  );
+  // La firma del medico è stata rimossa da tutti i documenti: nessun pad da
+  // mostrare. Manteniamo lo stato dei refs per retrocompatibilità.
+  const docsCheServonoFirmaMedico = useMemo<SessionDoc[]>(() => [], []);
 
   useEffect(() => {
     if (!open) {

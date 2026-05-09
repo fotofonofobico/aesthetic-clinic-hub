@@ -4,6 +4,8 @@ import {
   type ConsensoStatoRow,
   statoIsBlocking,
   ultimoPerCategoria,
+  ultimaVersione,
+  ultimaVersionePerChiave,
 } from "./consensi-engine";
 
 /**
@@ -110,8 +112,8 @@ export async function buildVisitaSession(
 
   const docs: SessionDoc[] = [];
 
-  // 1) GDPR
-  const gdprTpl = templates.find((t) => t.categoria === "gdpr");
+  // 1) GDPR — solo l'ultima versione attiva
+  const gdprTpl = ultimaVersione(templates.filter((t) => t.categoria === "gdpr"));
   const ultimoGdpr = ultimoPerCategoria(rows, "gdpr");
   const gdprNeeded =
     !ultimoGdpr ||
@@ -133,8 +135,8 @@ export async function buildVisitaSession(
     );
   }
 
-  // 2) Uso immagini
-  const imgTpl = templates.find((t) => t.categoria === "uso_immagini");
+  // 2) Uso immagini — solo l'ultima versione attiva
+  const imgTpl = ultimaVersione(templates.filter((t) => t.categoria === "uso_immagini"));
   const ultimoImg = ultimoPerCategoria(rows, "uso_immagini");
   const imgNeeded =
     !ultimoImg ||
@@ -263,7 +265,12 @@ export async function buildTrattamentoSession(
     .eq("attivo", true)
     .in("trattamento_id", trattamentoIds);
 
-  const templates = (tplRes.data ?? []) as ConsensoTemplate[];
+  const allTemplates = (tplRes.data ?? []) as ConsensoTemplate[];
+  // Per ogni (trattamento_id + categoria) tieni solo l'ultima versione attiva.
+  const templates = ultimaVersionePerChiave(
+    allTemplates,
+    (t) => `${t.trattamento_id ?? ""}::${t.categoria}`,
+  );
   if (templates.length === 0) {
     return { tipo: "trattamento", pazienteId, trattamentiSelezionati: trattamentoIds, documenti: [] };
   }

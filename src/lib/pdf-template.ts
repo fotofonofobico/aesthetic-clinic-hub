@@ -104,7 +104,10 @@ export interface SignatureBlockInput {
   modalita: "tablet" | "cartaceo" | "pdf_caricato";
   pazienteLabel: string;
   operatoreLabel: string | null;
-  /** Se false, NON renderizza il box "Firma del medico" (default true) */
+  /**
+   * Default false: il medico non firma sui documenti del paziente.
+   * Lasciato per estensioni future (referti, relazioni cliniche).
+   */
   mostraFirmaMedico?: boolean;
 }
 
@@ -119,7 +122,7 @@ export function renderSignatureBlock(
   }
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const mostraFirmaMedico = input.mostraFirmaMedico !== false;
+  const mostraFirmaMedico = input.mostraFirmaMedico === true;
   let y = startY;
   if (y > pageH - 160) {
     doc.addPage();

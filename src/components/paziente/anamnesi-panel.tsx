@@ -406,9 +406,8 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       return;
     }
     const firmaPaz = padPaz.toDataURL();
-    const padMed = sigMedRef.current;
-    const firmaMed = padMed && !padMed.isEmpty() ? padMed.toDataURL() : null;
-    void firmaAnamnesi(firmaPaz, firmaMed);
+    // Firma del medico rimossa: passiamo sempre null.
+    void firmaAnamnesi(firmaPaz, null);
   }
 
   /** Stampa anamnesi senza firme per workflow cartaceo. */
@@ -1038,12 +1037,7 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
                   />
                 </div>
               </div>
-              <div>
-                <p className="mb-2 text-sm font-medium">
-                  Firma del medico <span className="text-muted-foreground">(opzionale)</span>
-                </p>
-                <SignaturePad ref={sigMedRef} />
-              </div>
+              {/* La firma del medico è stata rimossa: firma solo il paziente. */}
             </React.Suspense>
             <p className="text-xs text-muted-foreground">
               Firmando, il paziente conferma la veridicità delle informazioni. Il record diventerà
