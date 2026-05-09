@@ -696,11 +696,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
           {stato === "compilazione" && !isVisita && currentTratt !== undefined && (
             <Button
               onClick={confermaTrattamento}
-              disabled={
-                !sceltaSingolo ||
-                !firmaSingoloReady ||
-                (docs[currentTratt].richiedeFirmaMedico && !firmaSingoloMedReady)
-              }
+              disabled={!sceltaSingolo || !firmaSingoloReady}
             >
               {trattamentoStep + 1 < trattamentoIdxs.length
                 ? "Conferma e prosegui"
