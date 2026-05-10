@@ -27,7 +27,7 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature, History, Printer, Upload } from "lucide-react";
+import { Lock, FileSignature, History, Printer, Upload, FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
