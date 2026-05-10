@@ -262,11 +262,11 @@ export async function generaPdfAnamnesi(
     y,
   );
 
-  // 3. CONTENUTO
-  y = renderSection(doc, "1. Generale", input.payload.generale, y, margin, pageW, pageH);
-  y = renderSection(doc, "2. Patologica", input.payload.patologica, y, margin, pageW, pageH);
-  y = renderSection(doc, "3. Farmacologica", input.payload.farmacologica, y, margin, pageW, pageH);
-  y = renderSection(doc, "4. Estetica", input.payload.estetica, y, margin, pageW, pageH);
+  // 3. CONTENUTO — itera sulle sezioni dichiarate (label fisse + valori)
+  for (const sec of SECTIONS) {
+    const sectionData = input.payload[sec.sectionKey] as Record<string, unknown> | null;
+    y = renderSection(doc, sec.title, sectionData, sec.fields, y, margin, pageW, pageH);
+  }
 
   if (input.payload.note_libere) {
     if (y > pageH - 80) {
