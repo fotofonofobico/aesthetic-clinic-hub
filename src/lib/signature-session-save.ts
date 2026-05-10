@@ -59,6 +59,13 @@ export async function salvaSessioneFirme(
         if (doc.scelta === "non_acconsento") continue;
         if (!doc.firmaPaziente) continue;
 
+        // Carica il payload reale dell'anamnesi così il PDF non risulta vuoto.
+        const { data: anamRow } = await supabase
+          .from("anamnesi")
+          .select("generale, patologica, farmacologica, estetica, note_libere")
+          .eq("id", doc.kind.anamnesiId)
+          .single();
+
         const { blob, hash } = await generaPdfAnamnesi({
           paziente: {
             nome: paz.nome,
@@ -69,11 +76,11 @@ export async function salvaSessioneFirme(
           versioneNumero: doc.kind.versioneNumero,
           firmataIl: firmatoIl,
           payload: {
-            generale: null,
-            patologica: null,
-            farmacologica: null,
-            estetica: null,
-            note_libere: null,
+            generale: (anamRow?.generale ?? null) as Record<string, unknown> | null,
+            patologica: (anamRow?.patologica ?? null) as Record<string, unknown> | null,
+            farmacologica: (anamRow?.farmacologica ?? null) as Record<string, unknown> | null,
+            estetica: (anamRow?.estetica ?? null) as Record<string, unknown> | null,
+            note_libere: (anamRow?.note_libere ?? null) as string | null,
           },
           firmaPazienteDataUrl: doc.firmaPaziente,
           firmaMedicoDataUrl: doc.firmaMedico ?? null,
