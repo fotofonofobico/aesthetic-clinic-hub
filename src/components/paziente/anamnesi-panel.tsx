@@ -595,17 +595,23 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           )}
         </div>
       </div>
-      {isSigned && data.pdf_url && (
+      {isSigned && isCartaceo(data) && data.pdf_url && (
         <PdfSignedLink
           bucket="anamnesi-pdf"
           path={data.pdf_url}
-          label={isCartaceo(data) ? "Apri PDF cartaceo firmato" : "Apri PDF anamnesi firmata"}
+          label="Apri PDF cartaceo firmato"
         />
       )}
-      {isSigned && !data.pdf_url && (
-        <p className="text-xs text-muted-foreground">
-          PDF non disponibile (versione anteriore alla generazione automatica)
-        </p>
+      {isSigned && !isCartaceo(data) && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void apriPdfRigenerato()}
+          className="w-fit"
+        >
+          <FileText className="h-4 w-4" />
+          Apri PDF anamnesi firmata
+        </Button>
       )}
       {forking && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
