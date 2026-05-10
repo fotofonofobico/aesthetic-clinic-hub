@@ -396,6 +396,22 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       toast.info("Già firmata. Modifica un campo per creare una nuova versione.");
       return;
     }
+    // Persistiamo il payload corrente prima di aprire la sessione di firma:
+    // così le selezioni (fumo/alcol/caffè ecc.) non vanno perse al reload post-firma.
+    const { error: persistErr } = await supabase
+      .from("anamnesi")
+      .update({
+        generale: (data.generale ?? {}) as never,
+        patologica: (data.patologica ?? {}) as never,
+        farmacologica: (data.farmacologica ?? {}) as never,
+        estetica: (data.estetica ?? {}) as never,
+        note_libere: data.note_libere,
+      })
+      .eq("id", data.id);
+    if (persistErr) {
+      toast.error(`Errore salvataggio bozza: ${persistErr.message}`);
+      return;
+    }
     // Avvia sessione visita unificata: anamnesi + eventuali consensi GDPR/uso immagini
     const session = await buildVisitaSession(pazienteId);
     if (!session) {
