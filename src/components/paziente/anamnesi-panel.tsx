@@ -304,6 +304,13 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       const { error: updErr } = await supabase
         .from("anamnesi")
         .update({
+          // Persistiamo SEMPRE il payload corrente (lo stato locale può contenere
+          // modifiche non ancora salvate quando l'utente firma direttamente).
+          generale: (data.generale ?? {}) as never,
+          patologica: (data.patologica ?? {}) as never,
+          farmacologica: (data.farmacologica ?? {}) as never,
+          estetica: (data.estetica ?? {}) as never,
+          note_libere: data.note_libere,
           stato: "signed",
           firmata_il: firmataIl.toISOString(),
           firmata_da_medico: user?.id ?? null,
