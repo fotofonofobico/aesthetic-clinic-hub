@@ -27,7 +27,7 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature, History, Printer, Upload } from "lucide-react";
+import { Lock, FileSignature, History, Printer, Upload, FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -471,7 +471,53 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
     }
   }
 
-  /** Carica PDF cartaceo già firmato. */
+  /** Rigenera il PDF firmato a partire dai dati attuali del DB e lo apre in dialog. */
+  async function apriPdfRigenerato() {
+    if (!data) return;
+    try {
+      const [pazRes, profRes] = await Promise.all([
+        supabase
+          .from("pazienti")
+          .select("nome, cognome, codice_fiscale, data_nascita")
+          .eq("id", pazienteId)
+          .single(),
+        user?.id
+          ? supabase.from("profiles").select("nome, cognome").eq("user_id", user.id).maybeSingle()
+          : Promise.resolve({ data: null, error: null } as const),
+      ]);
+      if (pazRes.error || !pazRes.data) {
+        throw new Error(pazRes.error?.message ?? "Paziente non trovato");
+      }
+      const operatoreNome = profRes.data
+        ? `${profRes.data.cognome ?? ""} ${profRes.data.nome ?? ""}`.trim() || null
+        : null;
+      const firmataIl = data.firmata_il ? new Date(data.firmata_il) : new Date();
+      const { blob } = await generaPdfAnamnesi({
+        paziente: {
+          nome: pazRes.data.nome,
+          cognome: pazRes.data.cognome,
+          codice_fiscale: pazRes.data.codice_fiscale ?? null,
+          data_nascita: pazRes.data.data_nascita ?? null,
+        },
+        versioneNumero: data.versione_numero ?? 1,
+        firmataIl,
+        payload: {
+          generale: (data.generale ?? {}) as Record<string, unknown>,
+          patologica: (data.patologica ?? {}) as Record<string, unknown>,
+          farmacologica: (data.farmacologica ?? {}) as Record<string, unknown>,
+          estetica: (data.estetica ?? {}) as Record<string, unknown>,
+          note_libere: data.note_libere,
+        },
+        firmaPazienteDataUrl: data.firma_paziente,
+        firmaMedicoDataUrl: null,
+        operatoreNome,
+      });
+      setDraftPdfBlob(blob);
+      setDraftPdfOpen(true);
+    } catch (e) {
+      toast.error(`Errore apertura PDF: ${(e as Error).message}`);
+    }
+  }
   async function caricaCartaceo(file: File, dataFirma: string): Promise<boolean> {
     if (!data) return false;
     if (data.stato === "signed") {
@@ -595,17 +641,23 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           )}
         </div>
       </div>
-      {isSigned && data.pdf_url && (
+      {isSigned && isCartaceo(data) && data.pdf_url && (
         <PdfSignedLink
           bucket="anamnesi-pdf"
           path={data.pdf_url}
-          label={isCartaceo(data) ? "Apri PDF cartaceo firmato" : "Apri PDF anamnesi firmata"}
+          label="Apri PDF cartaceo firmato"
         />
       )}
-      {isSigned && !data.pdf_url && (
-        <p className="text-xs text-muted-foreground">
-          PDF non disponibile (versione anteriore alla generazione automatica)
-        </p>
+      {isSigned && !isCartaceo(data) && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void apriPdfRigenerato()}
+          className="w-fit"
+        >
+          <FileText className="h-4 w-4" />
+          Apri PDF anamnesi firmata
+        </Button>
       )}
       {forking && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">

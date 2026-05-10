@@ -27,154 +27,229 @@ export interface AnamnesiPdfInput {
   modalita?: "tablet" | "cartaceo";
 }
 
-type FieldType = "bool" | "ternary" | "text" | "number" | "enum";
-
-interface FieldDef {
-  k: string;
-  l: string;
-  type: FieldType;
-  /** opzionale: chiave del campo "note" associato (mostrato solo se valorizzato) */
-  noteKey?: string;
-  /** opzionale: mappa enum value → label */
-  enumLabels?: Record<string, string>;
-}
-
 const TERNARY_LABELS: Record<string, string> = {
   si: "Sì",
   no: "No",
   occasionale: "Occasionale",
 };
 
-const SECTIONS: { sectionKey: "generale" | "patologica" | "farmacologica" | "estetica"; title: string; fields: FieldDef[] }[] = [
-  {
-    sectionKey: "generale",
-    title: "1. Generale",
-    fields: [
-      { k: "allergie", l: "Allergie", type: "bool", noteKey: "allergie_note" },
-      { k: "lidocaina_sensibile", l: "Sensibilità lidocaina", type: "bool" },
-      { k: "fumo", l: "Fumo", type: "ternary" },
-      { k: "alcol", l: "Alcol", type: "ternary" },
-      { k: "caffe", l: "Caffè", type: "ternary" },
-      { k: "sport", l: "Sport", type: "bool", noteKey: "sport_note" },
-      {
-        k: "alimentazione",
-        l: "Alimentazione",
-        type: "enum",
-        enumLabels: {
-          sana: "Sana ed equilibrata",
-          abbastanza: "Abbastanza equilibrata",
-          disequilibrata: "Disequilibrata",
-        },
-      },
-      { k: "acqua_litri", l: "Acqua (litri/die)", type: "number" },
-      {
-        k: "condizioni_ormonali",
-        l: "Condizioni ormonali",
-        type: "enum",
-        enumLabels: {
-          nessuna: "Nessuna",
-          gravidanza: "Gravidanza",
-          allattamento: "Allattamento",
-          menopausa: "Menopausa",
-        },
-      },
-      { k: "vaccino_recente", l: "Vaccino recente", type: "bool", noteKey: "vaccino_note" },
-    ],
-  },
-  {
-    sectionKey: "patologica",
-    title: "2. Patologica",
-    fields: [
-      { k: "diabete", l: "Diabete", type: "bool" },
-      { k: "ipertensione", l: "Ipertensione", type: "bool" },
-      { k: "tiroide", l: "Patologie tiroidee", type: "bool" },
-      { k: "cardiopatia", l: "Cardiopatie", type: "bool" },
-      { k: "varici", l: "Varici arti inferiori", type: "bool" },
-      { k: "coagulopatia", l: "Coagulopatie / patologie ematologiche", type: "bool" },
-      { k: "asma_bpco", l: "Asma / BPCO", type: "bool" },
-      { k: "oncologico_attivo", l: "Oncologico attivo", type: "bool" },
-      { k: "neoplasia_pregressa", l: "Neoplasia pregressa", type: "bool" },
-      { k: "autoimmune", l: "Malattie autoimmuni", type: "bool" },
-      { k: "cheloidi", l: "Cheloidi", type: "bool" },
-      { k: "dermatopatie", l: "Dermatopatie", type: "bool" },
-      { k: "hsv", l: "HSV (Herpes simplex)", type: "bool" },
-      { k: "altro", l: "Altro patologie", type: "bool", noteKey: "altro_note" },
-      { k: "interventi", l: "Interventi pregressi", type: "bool", noteKey: "interventi_altro_note" },
-    ],
-  },
-  {
-    sectionKey: "farmacologica",
-    title: "3. Farmacologica",
-    fields: [
-      { k: "anticoagulanti", l: "Anticoagulante / antiaggregante", type: "bool" },
-      { k: "cortisonici", l: "Cortisonica in corso", type: "bool" },
-      { k: "isotretinoina", l: "Isotretinoina ultimi 6 mesi", type: "bool" },
-      { k: "immunosoppressori", l: "Immunosoppressiva", type: "bool" },
-      { k: "integratori", l: "Integratori / omeopatici", type: "bool" },
-      { k: "altro", l: "Altri farmaci", type: "bool", noteKey: "altro_note" },
-    ],
-  },
-  {
-    sectionKey: "estetica",
-    title: "4. Estetica",
-    fields: [
-      {
-        k: "fototipo",
-        l: "Fototipo",
-        type: "enum",
-        enumLabels: { I: "I", II: "II", III: "III", IV: "IV", V: "V", VI: "VI" },
-      },
-      {
-        k: "texture",
-        l: "Texture cutanea",
-        type: "enum",
-        enumLabels: {
-          omogenea: "Omogenea",
-          parziale: "Parziale",
-          disomogenea: "Disomogenea",
-        },
-      },
-      { k: "abbronzatura", l: "Abbronzatura attiva", type: "bool" },
-      { k: "elastosi", l: "Elastosi solare", type: "bool" },
-      { k: "spf_uso", l: "Uso SPF", type: "bool" },
-      {
-        k: "trattamenti_pregressi",
-        l: "Trattamenti estetici pregressi",
-        type: "bool",
-        noteKey: "trattamenti_pregressi_note",
-      },
-      {
-        k: "reazioni_pregresse",
-        l: "Reazioni avverse pregresse",
-        type: "bool",
-        noteKey: "reazioni_pregresse_note",
-      },
-    ],
-  },
-];
+const PATOLOGIE_LABELS: Record<string, string> = {
+  diabete: "Diabete",
+  ipertensione: "Ipertensione",
+  tiroide: "Patologie tiroidee",
+  cardiopatia: "Cardiopatie",
+  varici: "Varici arti inferiori",
+  coagulopatia: "Coagulopatie / patologie ematologiche",
+  asma_bpco: "Asma / BPCO",
+  oncologico_attivo: "Oncologico attivo",
+  neoplasia_pregressa: "Neoplasia pregressa",
+  autoimmune: "Malattie autoimmuni",
+  cheloidi: "Cheloidi",
+  dermatopatie: "Dermatopatie",
+  hsv: "HSV (Herpes simplex)",
+  altro: "Altro",
+};
 
-function formatField(def: FieldDef, raw: unknown): string {
-  if (raw === null || raw === undefined || raw === "") return "Non compilato";
-  switch (def.type) {
-    case "bool":
-      return raw ? "Sì" : "No";
-    case "ternary":
-      return TERNARY_LABELS[String(raw)] ?? "Non compilato";
-    case "enum":
-      return def.enumLabels?.[String(raw)] ?? String(raw);
-    case "number":
-      return typeof raw === "number" ? String(raw) : String(raw);
-    case "text":
-    default:
-      return String(raw);
+const TERAPIE_LABELS: Record<string, string> = {
+  anticoagulanti: "Anticoagulante / antiaggregante",
+  cortisonici: "Cortisonica in corso",
+  isotretinoina: "Isotretinoina ultimi 6 mesi",
+  immunosoppressori: "Immunosoppressiva",
+  integratori: "Integratori / omeopatici",
+  altro: "Altro",
+};
+
+const ALIMENTAZIONE_LABELS: Record<string, string> = {
+  sana: "Sana ed equilibrata",
+  abbastanza: "Abbastanza equilibrata",
+  disequilibrata: "Disequilibrata",
+};
+
+const CONDIZIONI_ORM_LABELS: Record<string, string> = {
+  nessuna: "Nessuna",
+  gravidanza: "Gravidanza",
+  allattamento: "Allattamento",
+  menopausa: "Menopausa",
+};
+
+const TEXTURE_LABELS: Record<string, string> = {
+  omogenea: "Omogenea",
+  parziale: "Parziale",
+  disomogenea: "Disomogenea",
+};
+
+interface Row {
+  label: string;
+  value: string;
+}
+
+function isFilled(v: unknown): boolean {
+  return v !== null && v !== undefined && v !== "";
+}
+
+function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
+  const rows: Row[] = [];
+  if (!g) return rows;
+  if (isFilled(g.allergie)) {
+    rows.push({ label: "Allergie", value: g.allergie ? "Sì" : "No" });
+    if (g.allergie && isFilled(g.allergie_note)) {
+      rows.push({ label: "  Note allergie", value: String(g.allergie_note) });
+    }
   }
+  if (isFilled(g.lidocaina_sensibile)) {
+    rows.push({ label: "Sensibilità lidocaina", value: g.lidocaina_sensibile ? "Sì" : "No" });
+  }
+  for (const k of ["fumo", "alcol", "caffe"] as const) {
+    if (isFilled(g[k])) {
+      const lbl = k === "caffe" ? "Caffè" : k.charAt(0).toUpperCase() + k.slice(1);
+      rows.push({ label: lbl, value: TERNARY_LABELS[String(g[k])] ?? String(g[k]) });
+    }
+  }
+  if (isFilled(g.sport)) {
+    rows.push({ label: "Sport", value: g.sport ? "Sì" : "No" });
+    if (g.sport && isFilled(g.sport_note)) {
+      rows.push({ label: "  Note sport", value: String(g.sport_note) });
+    }
+  }
+  if (isFilled(g.alimentazione)) {
+    rows.push({
+      label: "Alimentazione",
+      value: ALIMENTAZIONE_LABELS[String(g.alimentazione)] ?? String(g.alimentazione),
+    });
+  }
+  if (isFilled(g.acqua_litri)) {
+    rows.push({ label: "Acqua (litri/die)", value: String(g.acqua_litri) });
+  }
+  if (isFilled(g.condizioni_ormonali) && g.condizioni_ormonali !== "nessuna") {
+    rows.push({
+      label: "Condizioni ormonali",
+      value: CONDIZIONI_ORM_LABELS[String(g.condizioni_ormonali)] ?? String(g.condizioni_ormonali),
+    });
+  }
+  if (isFilled(g.vaccino_recente)) {
+    rows.push({
+      label: "Vaccinazione ultimi 14 giorni",
+      value: g.vaccino_recente ? "Sì" : "No",
+    });
+    if (g.vaccino_recente && isFilled(g.vaccino_note)) {
+      rows.push({ label: "  Note vaccino", value: String(g.vaccino_note) });
+    }
+  }
+  return rows;
+}
+
+function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
+  const rows: Row[] = [];
+  if (!p) return rows;
+  // Presenza patologie
+  if (isFilled(p.presenti)) {
+    rows.push({ label: "Presenza patologie", value: p.presenti ? "Sì" : "No" });
+    if (p.presenti) {
+      for (const k of Object.keys(PATOLOGIE_LABELS)) {
+        if (p[k] === true) {
+          rows.push({ label: `  ${PATOLOGIE_LABELS[k]}`, value: "Sì" });
+        }
+      }
+      if (p.altro && isFilled(p.altro_note)) {
+        rows.push({ label: "  Specifica altra patologia", value: String(p.altro_note) });
+      }
+    }
+  }
+  // Interventi chirurgici
+  if (isFilled(p.interventi)) {
+    rows.push({ label: "Interventi chirurgici / traumi", value: p.interventi ? "Sì" : "No" });
+    if (p.interventi) {
+      const tipi = (p.interventi_tipi ?? {}) as Record<string, unknown>;
+      const tipiLabels: Record<string, string> = {
+        maggiore: "Intervento maggiore",
+        traumi: "Traumi",
+        estetica: "Chirurgia estetica",
+        dermatologica: "Chirurgia dermatologica",
+        altro: "Altro",
+      };
+      for (const [k, l] of Object.entries(tipiLabels)) {
+        if (tipi[k] === true) rows.push({ label: `  ${l}`, value: "Sì" });
+      }
+      if (isFilled(p.interventi_altro_note)) {
+        rows.push({ label: "  Note interventi", value: String(p.interventi_altro_note) });
+      } else if (isFilled(p.interventi_note)) {
+        // legacy
+        rows.push({ label: "  Note interventi", value: String(p.interventi_note) });
+      }
+    }
+  }
+  return rows;
+}
+
+function buildFarmacologicaRows(fa: Record<string, unknown> | null): Row[] {
+  const rows: Row[] = [];
+  if (!fa) return rows;
+  if (isFilled(fa.presenti)) {
+    rows.push({ label: "Terapie in corso", value: fa.presenti ? "Sì" : "No" });
+    if (fa.presenti) {
+      for (const k of Object.keys(TERAPIE_LABELS)) {
+        if (fa[k] === true) {
+          rows.push({ label: `  ${TERAPIE_LABELS[k]}`, value: "Sì" });
+        }
+      }
+      if (fa.altro && isFilled(fa.altro_note)) {
+        rows.push({ label: "  Specifica altra terapia", value: String(fa.altro_note) });
+      }
+    }
+  }
+  return rows;
+}
+
+function buildEsteticaRows(es: Record<string, unknown> | null): Row[] {
+  const rows: Row[] = [];
+  if (!es) return rows;
+  if (isFilled(es.fototipo)) rows.push({ label: "Fototipo", value: String(es.fototipo) });
+  if (isFilled(es.texture)) {
+    rows.push({
+      label: "Texture cutanea",
+      value: TEXTURE_LABELS[String(es.texture)] ?? String(es.texture),
+    });
+  }
+  if (isFilled(es.abbronzatura)) {
+    rows.push({ label: "Abbronzatura attiva", value: es.abbronzatura ? "Sì" : "No" });
+  }
+  if (isFilled(es.elastosi)) {
+    rows.push({ label: "Elastosi solare", value: es.elastosi ? "Sì" : "No" });
+  }
+  if (isFilled(es.spf_uso)) {
+    rows.push({ label: "Uso SPF", value: es.spf_uso ? "Sì" : "No" });
+  }
+  if (isFilled(es.trattamenti_pregressi)) {
+    rows.push({
+      label: "Trattamenti estetici pregressi",
+      value: es.trattamenti_pregressi ? "Sì" : "No",
+    });
+    if (es.trattamenti_pregressi && isFilled(es.trattamenti_pregressi_note)) {
+      rows.push({
+        label: "  Note trattamenti pregressi",
+        value: String(es.trattamenti_pregressi_note),
+      });
+    }
+  }
+  if (isFilled(es.reazioni_pregresse)) {
+    rows.push({
+      label: "Reazioni avverse pregresse",
+      value: es.reazioni_pregresse ? "Sì" : "No",
+    });
+    if (es.reazioni_pregresse && isFilled(es.reazioni_pregresse_note)) {
+      rows.push({
+        label: "  Note reazioni",
+        value: String(es.reazioni_pregresse_note),
+      });
+    }
+  }
+  return rows;
 }
 
 function renderSection(
   doc: jsPDF,
   title: string,
-  data: Record<string, unknown> | null,
-  fields: FieldDef[],
+  rows: Row[],
   startY: number,
   margin: number,
   pageW: number,
@@ -190,43 +265,27 @@ function renderSection(
   y += 14;
   doc.setFont("helvetica", "normal").setFontSize(9);
 
-  const src = data ?? {};
-  for (const f of fields) {
+  if (rows.length === 0) {
+    doc.setTextColor(120);
+    doc.text("Nessun dato", margin, y);
+    doc.setTextColor(0);
+    return y + 16;
+  }
+
+  const labelW = 220;
+  for (const r of rows) {
     if (y > pageH - 60) {
       doc.addPage();
       y = margin;
     }
-    const value = formatField(f, (src as Record<string, unknown>)[f.k]);
-    const labelW = 200;
     doc.setFont("helvetica", "bold").setTextColor(60);
-    const wrappedLabel = doc.splitTextToSize(`${f.l}:`, labelW - 6) as string[];
-    doc.text(wrappedLabel[0], margin, y);
+    const wrappedLabel = doc.splitTextToSize(`${r.label}:`, labelW - 6) as string[];
+    doc.text(wrappedLabel, margin, y);
     doc.setFont("helvetica", "normal").setTextColor(0);
-    const wrappedVal = doc.splitTextToSize(value, pageW - margin * 2 - labelW) as string[];
+    const wrappedVal = doc.splitTextToSize(r.value, pageW - margin * 2 - labelW) as string[];
     doc.text(wrappedVal, margin + labelW, y);
     const lines = Math.max(wrappedLabel.length, wrappedVal.length);
     y += 12 * lines;
-
-    // Nota associata (es. allergie_note) solo se valorizzata
-    if (f.noteKey) {
-      const note = (src as Record<string, unknown>)[f.noteKey];
-      if (note !== null && note !== undefined && String(note).trim() !== "") {
-        if (y > pageH - 60) {
-          doc.addPage();
-          y = margin;
-        }
-        const noteLines = doc.splitTextToSize(
-          `   Note: ${String(note)}`,
-          pageW - margin * 2,
-        ) as string[];
-        doc.setTextColor(80);
-        for (const l of noteLines) {
-          doc.text(l, margin, y);
-          y += 11;
-        }
-        doc.setTextColor(0);
-      }
-    }
   }
   return y + 8;
 }
@@ -241,15 +300,12 @@ export async function generaPdfAnamnesi(
   let y = margin;
   const modalita = input.modalita ?? "tablet";
 
-  // Titolo
   doc.setFont("helvetica", "bold").setFontSize(14);
   doc.text("ANAMNESI", margin, y);
   y += 22;
 
-  // 1. HEADER paziente
   y = renderHeaderPaziente(doc, input.paziente, margin, y);
 
-  // 2. METADATA
   y = renderMetadata(
     doc,
     {
@@ -262,11 +318,42 @@ export async function generaPdfAnamnesi(
     y,
   );
 
-  // 3. CONTENUTO — itera sulle sezioni dichiarate (label fisse + valori)
-  for (const sec of SECTIONS) {
-    const sectionData = input.payload[sec.sectionKey] as Record<string, unknown> | null;
-    y = renderSection(doc, sec.title, sectionData, sec.fields, y, margin, pageW, pageH);
-  }
+  y = renderSection(
+    doc,
+    "1. Generale",
+    buildGeneraleRows(input.payload.generale),
+    y,
+    margin,
+    pageW,
+    pageH,
+  );
+  y = renderSection(
+    doc,
+    "2. Patologica",
+    buildPatologicaRows(input.payload.patologica),
+    y,
+    margin,
+    pageW,
+    pageH,
+  );
+  y = renderSection(
+    doc,
+    "3. Farmacologica",
+    buildFarmacologicaRows(input.payload.farmacologica),
+    y,
+    margin,
+    pageW,
+    pageH,
+  );
+  y = renderSection(
+    doc,
+    "4. Estetica",
+    buildEsteticaRows(input.payload.estetica),
+    y,
+    margin,
+    pageW,
+    pageH,
+  );
 
   if (input.payload.note_libere) {
     if (y > pageH - 80) {
@@ -289,7 +376,6 @@ export async function generaPdfAnamnesi(
     y += 10;
   }
 
-  // 4. SIGNATURE BLOCK (solo paziente: il medico non firma sul tablet l'anamnesi)
   y = renderSignatureBlock(
     doc,
     {
