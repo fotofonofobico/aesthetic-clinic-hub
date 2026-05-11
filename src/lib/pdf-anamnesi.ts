@@ -91,16 +91,6 @@ function hasKey(obj: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-function hasSectionData(obj: Record<string, unknown> | null): boolean {
-  if (!obj) return false;
-  return Object.values(obj).some((v) => {
-    if (!isFilled(v)) return false;
-    if (Array.isArray(v)) return v.length > 0;
-    if (typeof v === "object") return hasSectionData(v as Record<string, unknown>);
-    return true;
-  });
-}
-
 function boolValue(v: unknown): string {
   return v === true ? "Sì" : "No";
 }
