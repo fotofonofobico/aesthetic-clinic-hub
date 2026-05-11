@@ -119,49 +119,49 @@ function addBoolRow(
 
 function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!g) return rows;
-  const forceDefaults = hasSectionData(g);
-  if (hasKey(g, "allergie") || forceDefaults) {
-    rows.push({ label: "Allergie", value: boolValue(g.allergie) });
-    if (g.allergie && isFilled(g.allergie_note)) {
-      rows.push({ label: "  Note allergie", value: String(g.allergie_note) });
+  const data = g ?? {};
+  const forceDefaults = true;
+  if (hasKey(data, "allergie") || forceDefaults) {
+    rows.push({ label: "Allergie", value: boolValue(data.allergie) });
+    if (data.allergie && isFilled(data.allergie_note)) {
+      rows.push({ label: "  Note allergie", value: String(data.allergie_note) });
     }
   }
-  addBoolRow(rows, g, "lidocaina_sensibile", "Sensibilità lidocaina", forceDefaults);
+  addBoolRow(rows, data, "lidocaina_sensibile", "Sensibilità lidocaina", forceDefaults);
   for (const k of ["fumo", "alcol", "caffe"] as const) {
-    if (isFilled(g[k])) {
+    if (isFilled(data[k])) {
       const lbl = k === "caffe" ? "Caffè" : k.charAt(0).toUpperCase() + k.slice(1);
-      rows.push({ label: lbl, value: TERNARY_LABELS[String(g[k])] ?? String(g[k]) });
+      rows.push({ label: lbl, value: TERNARY_LABELS[String(data[k])] ?? String(data[k]) });
     }
   }
-  if (isFilled(g.sport)) {
-    rows.push({ label: "Sport", value: g.sport ? "Sì" : "No" });
-    if (g.sport && isFilled(g.sport_note)) {
-      rows.push({ label: "  Note sport", value: String(g.sport_note) });
+  if (hasKey(data, "sport") || forceDefaults) {
+    rows.push({ label: "Sport", value: boolValue(data.sport) });
+    if (data.sport && isFilled(data.sport_note)) {
+      rows.push({ label: "  Note sport", value: String(data.sport_note) });
     }
   }
-  if (isFilled(g.alimentazione)) {
+  if (isFilled(data.alimentazione)) {
     rows.push({
       label: "Alimentazione",
-      value: ALIMENTAZIONE_LABELS[String(g.alimentazione)] ?? String(g.alimentazione),
+      value: ALIMENTAZIONE_LABELS[String(data.alimentazione)] ?? String(data.alimentazione),
     });
   }
-  if (isFilled(g.acqua_litri)) {
-    rows.push({ label: "Acqua (litri/die)", value: String(g.acqua_litri) });
+  if (isFilled(data.acqua_litri)) {
+    rows.push({ label: "Acqua (litri/die)", value: String(data.acqua_litri) });
   }
-  if (isFilled(g.condizioni_ormonali)) {
+  if (isFilled(data.condizioni_ormonali)) {
     rows.push({
       label: "Condizioni ormonali",
-      value: CONDIZIONI_ORM_LABELS[String(g.condizioni_ormonali)] ?? String(g.condizioni_ormonali),
+      value: CONDIZIONI_ORM_LABELS[String(data.condizioni_ormonali)] ?? String(data.condizioni_ormonali),
     });
   }
-  if (hasKey(g, "vaccino_recente") || forceDefaults) {
+  if (hasKey(data, "vaccino_recente") || forceDefaults) {
     rows.push({
       label: "Vaccinazione ultimi 14 giorni",
-      value: boolValue(g.vaccino_recente),
+      value: boolValue(data.vaccino_recente),
     });
-    if (g.vaccino_recente && isFilled(g.vaccino_note)) {
-      rows.push({ label: "  Note vaccino", value: String(g.vaccino_note) });
+    if (data.vaccino_recente && isFilled(data.vaccino_note)) {
+      rows.push({ label: "  Note vaccino", value: String(data.vaccino_note) });
     }
   }
   return rows;
