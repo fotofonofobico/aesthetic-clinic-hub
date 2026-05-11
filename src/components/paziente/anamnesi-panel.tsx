@@ -475,7 +475,7 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
   async function apriPdfRigenerato() {
     if (!data) return;
     try {
-      const [pazRes, profRes] = await Promise.all([
+      const [pazRes, profRes, anamRes] = await Promise.all([
         supabase
           .from("pazienti")
           .select("nome, cognome, codice_fiscale, data_nascita")
@@ -484,14 +484,33 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
         user?.id
           ? supabase.from("profiles").select("nome, cognome").eq("user_id", user.id).maybeSingle()
           : Promise.resolve({ data: null, error: null } as const),
+        supabase
+          .from("anamnesi")
+          .select("generale, patologica, farmacologica, estetica, note_libere, versione_numero, firmata_il, firma_paziente")
+          .eq("id", data.id)
+          .single(),
       ]);
       if (pazRes.error || !pazRes.data) {
         throw new Error(pazRes.error?.message ?? "Paziente non trovato");
       }
+      if (anamRes.error || !anamRes.data) {
+        throw new Error(anamRes.error?.message ?? "Anamnesi non trovata");
+      }
+      const anam = anamRes.data as unknown as Pick<
+        AnamnesiRow,
+        | "generale"
+        | "patologica"
+        | "farmacologica"
+        | "estetica"
+        | "note_libere"
+        | "versione_numero"
+        | "firmata_il"
+        | "firma_paziente"
+      >;
       const operatoreNome = profRes.data
         ? `${profRes.data.cognome ?? ""} ${profRes.data.nome ?? ""}`.trim() || null
         : null;
-      const firmataIl = data.firmata_il ? new Date(data.firmata_il) : new Date();
+      const firmataIl = anam.firmata_il ? new Date(anam.firmata_il) : new Date();
       const { blob } = await generaPdfAnamnesi({
         paziente: {
           nome: pazRes.data.nome,
@@ -499,16 +518,16 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           codice_fiscale: pazRes.data.codice_fiscale ?? null,
           data_nascita: pazRes.data.data_nascita ?? null,
         },
-        versioneNumero: data.versione_numero ?? 1,
+        versioneNumero: anam.versione_numero ?? 1,
         firmataIl,
         payload: {
-          generale: (data.generale ?? {}) as Record<string, unknown>,
-          patologica: (data.patologica ?? {}) as Record<string, unknown>,
-          farmacologica: (data.farmacologica ?? {}) as Record<string, unknown>,
-          estetica: (data.estetica ?? {}) as Record<string, unknown>,
-          note_libere: data.note_libere,
+          generale: (anam.generale ?? {}) as Record<string, unknown>,
+          patologica: (anam.patologica ?? {}) as Record<string, unknown>,
+          farmacologica: (anam.farmacologica ?? {}) as Record<string, unknown>,
+          estetica: (anam.estetica ?? {}) as Record<string, unknown>,
+          note_libere: anam.note_libere,
         },
-        firmaPazienteDataUrl: data.firma_paziente,
+        firmaPazienteDataUrl: anam.firma_paziente,
         firmaMedicoDataUrl: null,
         operatoreNome,
       });

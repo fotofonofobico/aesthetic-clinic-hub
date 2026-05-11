@@ -211,11 +211,82 @@ function buildAnamnesiRiassunto(row: {
 }): string {
   const parts: string[] = [];
 
+  const labels: Record<string, string> = {
+    allergie: "Allergie",
+    allergie_note: "Note allergie",
+    lidocaina_sensibile: "Sensibilità lidocaina",
+    fumo: "Fumo",
+    alcol: "Alcol",
+    caffe: "Caffè",
+    sport: "Sport",
+    sport_note: "Note sport",
+    alimentazione: "Alimentazione",
+    acqua_litri: "Acqua (litri/die)",
+    condizioni_ormonali: "Condizioni ormonali",
+    vaccino_recente: "Vaccinazione ultimi 14 giorni",
+    vaccino_note: "Note vaccino",
+    presenti: "Presenza",
+    diabete: "Diabete",
+    ipertensione: "Ipertensione",
+    tiroide: "Patologie tiroidee",
+    cardiopatia: "Cardiopatie",
+    varici: "Varici arti inferiori",
+    coagulopatia: "Coagulopatie / patologie ematologiche",
+    asma_bpco: "Asma / BPCO",
+    oncologico_attivo: "Oncologico attivo",
+    neoplasia_pregressa: "Neoplasia pregressa",
+    autoimmune: "Malattie autoimmuni",
+    cheloidi: "Cheloidi",
+    dermatopatie: "Dermatopatie",
+    hsv: "HSV (Herpes simplex)",
+    altro: "Altro",
+    altro_note: "Specifica altro",
+    interventi: "Interventi chirurgici / traumi",
+    interventi_tipi: "Tipologia interventi",
+    interventi_altro_note: "Note interventi",
+    anticoagulanti: "Anticoagulante / antiaggregante",
+    cortisonici: "Cortisonica in corso",
+    isotretinoina: "Isotretinoina ultimi 6 mesi",
+    immunosoppressori: "Immunosoppressiva",
+    integratori: "Integratori / omeopatici",
+    fototipo: "Fototipo",
+    texture: "Texture cutanea",
+    abbronzatura: "Abbronzatura in corso",
+    elastosi: "Elastosi cutanea",
+    spf_uso: "Uso abituale di SPF",
+    trattamenti_pregressi: "Trattamenti pregressi",
+    trattamenti_pregressi_note: "Note trattamenti pregressi",
+    reazioni_pregresse: "Reazioni a trattamenti precedenti",
+    reazioni_pregresse_note: "Note reazioni",
+  };
+
+  const valueLabels: Record<string, string> = {
+    si: "Sì",
+    no: "No",
+    occasionale: "Occasionale",
+    sana: "Sana ed equilibrata",
+    abbastanza: "Abbastanza equilibrata",
+    disequilibrata: "Disequilibrata",
+    nessuna: "Nessuna",
+    gravidanza: "Gravidanza",
+    allattamento: "Allattamento",
+    menopausa: "Menopausa",
+    omogenea: "Omogenea",
+    parziale: "Parziale",
+    disomogenea: "Disomogenea",
+  };
+
   function fmtVal(v: unknown): string | null {
     if (v === null || v === undefined || v === "") return null;
     if (typeof v === "boolean") return v ? "Sì" : "No";
     if (typeof v === "number") return String(v);
-    if (typeof v === "string") return v;
+    if (typeof v === "string") return valueLabels[v] ?? v;
+    if (typeof v === "object") {
+      const selected = Object.entries(v as Record<string, unknown>)
+        .filter(([, value]) => value === true)
+        .map(([key]) => labels[key] ?? key.replace(/_/g, " "));
+      return selected.length > 0 ? selected.join(", ") : null;
+    }
     return null;
   }
 
@@ -225,9 +296,7 @@ function buildAnamnesiRiassunto(row: {
     for (const [k, v] of Object.entries(obj)) {
       const val = fmtVal(v);
       if (val === null) continue;
-      // skip valori "false" booleani per non riempire di "No"
-      if (typeof v === "boolean" && v === false) continue;
-      const label = k.replace(/_/g, " ");
+      const label = labels[k] ?? k.replace(/_/g, " ");
       righe.push(`  • ${label}: ${val}`);
     }
     if (righe.length > 0) {

@@ -87,52 +87,71 @@ function isFilled(v: unknown): boolean {
   return v !== null && v !== undefined && v !== "";
 }
 
+function hasKey(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function boolValue(v: unknown): string {
+  return v === true ? "Sì" : "No";
+}
+
+function addBoolRow(
+  rows: Row[],
+  obj: Record<string, unknown>,
+  key: string,
+  label: string,
+  forceNo: boolean,
+) {
+  if (hasKey(obj, key) || forceNo) {
+    rows.push({ label, value: boolValue(obj[key]) });
+  }
+}
+
 function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!g) return rows;
-  if (isFilled(g.allergie)) {
-    rows.push({ label: "Allergie", value: g.allergie ? "Sì" : "No" });
-    if (g.allergie && isFilled(g.allergie_note)) {
-      rows.push({ label: "  Note allergie", value: String(g.allergie_note) });
+  const data = g ?? {};
+  const forceDefaults = true;
+  if (hasKey(data, "allergie") || forceDefaults) {
+    rows.push({ label: "Allergie", value: boolValue(data.allergie) });
+    if (data.allergie && isFilled(data.allergie_note)) {
+      rows.push({ label: "  Note allergie", value: String(data.allergie_note) });
     }
   }
-  if (isFilled(g.lidocaina_sensibile)) {
-    rows.push({ label: "Sensibilità lidocaina", value: g.lidocaina_sensibile ? "Sì" : "No" });
-  }
+  addBoolRow(rows, data, "lidocaina_sensibile", "Sensibilità lidocaina", forceDefaults);
   for (const k of ["fumo", "alcol", "caffe"] as const) {
-    if (isFilled(g[k])) {
+    if (isFilled(data[k])) {
       const lbl = k === "caffe" ? "Caffè" : k.charAt(0).toUpperCase() + k.slice(1);
-      rows.push({ label: lbl, value: TERNARY_LABELS[String(g[k])] ?? String(g[k]) });
+      rows.push({ label: lbl, value: TERNARY_LABELS[String(data[k])] ?? String(data[k]) });
     }
   }
-  if (isFilled(g.sport)) {
-    rows.push({ label: "Sport", value: g.sport ? "Sì" : "No" });
-    if (g.sport && isFilled(g.sport_note)) {
-      rows.push({ label: "  Note sport", value: String(g.sport_note) });
+  if (hasKey(data, "sport") || forceDefaults) {
+    rows.push({ label: "Sport", value: boolValue(data.sport) });
+    if (data.sport && isFilled(data.sport_note)) {
+      rows.push({ label: "  Note sport", value: String(data.sport_note) });
     }
   }
-  if (isFilled(g.alimentazione)) {
+  if (isFilled(data.alimentazione)) {
     rows.push({
       label: "Alimentazione",
-      value: ALIMENTAZIONE_LABELS[String(g.alimentazione)] ?? String(g.alimentazione),
+      value: ALIMENTAZIONE_LABELS[String(data.alimentazione)] ?? String(data.alimentazione),
     });
   }
-  if (isFilled(g.acqua_litri)) {
-    rows.push({ label: "Acqua (litri/die)", value: String(g.acqua_litri) });
+  if (isFilled(data.acqua_litri)) {
+    rows.push({ label: "Acqua (litri/die)", value: String(data.acqua_litri) });
   }
-  if (isFilled(g.condizioni_ormonali) && g.condizioni_ormonali !== "nessuna") {
+  if (isFilled(data.condizioni_ormonali)) {
     rows.push({
       label: "Condizioni ormonali",
-      value: CONDIZIONI_ORM_LABELS[String(g.condizioni_ormonali)] ?? String(g.condizioni_ormonali),
+      value: CONDIZIONI_ORM_LABELS[String(data.condizioni_ormonali)] ?? String(data.condizioni_ormonali),
     });
   }
-  if (isFilled(g.vaccino_recente)) {
+  if (hasKey(data, "vaccino_recente") || forceDefaults) {
     rows.push({
       label: "Vaccinazione ultimi 14 giorni",
-      value: g.vaccino_recente ? "Sì" : "No",
+      value: boolValue(data.vaccino_recente),
     });
-    if (g.vaccino_recente && isFilled(g.vaccino_note)) {
-      rows.push({ label: "  Note vaccino", value: String(g.vaccino_note) });
+    if (data.vaccino_recente && isFilled(data.vaccino_note)) {
+      rows.push({ label: "  Note vaccino", value: String(data.vaccino_note) });
     }
   }
   return rows;
@@ -140,26 +159,27 @@ function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
 
 function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!p) return rows;
+  const data = p ?? {};
   // Presenza patologie
-  if (isFilled(p.presenti)) {
-    rows.push({ label: "Presenza patologie", value: p.presenti ? "Sì" : "No" });
-    if (p.presenti) {
+  const forceDefaults = true;
+  if (hasKey(data, "presenti") || forceDefaults) {
+    rows.push({ label: "Presenza patologie", value: boolValue(data.presenti) });
+    if (data.presenti) {
       for (const k of Object.keys(PATOLOGIE_LABELS)) {
-        if (p[k] === true) {
+        if (data[k] === true) {
           rows.push({ label: `  ${PATOLOGIE_LABELS[k]}`, value: "Sì" });
         }
       }
-      if (p.altro && isFilled(p.altro_note)) {
-        rows.push({ label: "  Specifica altra patologia", value: String(p.altro_note) });
+      if (data.altro && isFilled(data.altro_note)) {
+        rows.push({ label: "  Specifica altra patologia", value: String(data.altro_note) });
       }
     }
   }
   // Interventi chirurgici
-  if (isFilled(p.interventi)) {
-    rows.push({ label: "Interventi chirurgici / traumi", value: p.interventi ? "Sì" : "No" });
-    if (p.interventi) {
-      const tipi = (p.interventi_tipi ?? {}) as Record<string, unknown>;
+  if (hasKey(data, "interventi") || forceDefaults) {
+    rows.push({ label: "Interventi chirurgici / traumi", value: boolValue(data.interventi) });
+    if (data.interventi) {
+      const tipi = (data.interventi_tipi ?? {}) as Record<string, unknown>;
       const tipiLabels: Record<string, string> = {
         maggiore: "Intervento maggiore",
         traumi: "Traumi",
@@ -170,11 +190,11 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
       for (const [k, l] of Object.entries(tipiLabels)) {
         if (tipi[k] === true) rows.push({ label: `  ${l}`, value: "Sì" });
       }
-      if (isFilled(p.interventi_altro_note)) {
-        rows.push({ label: "  Note interventi", value: String(p.interventi_altro_note) });
-      } else if (isFilled(p.interventi_note)) {
+      if (isFilled(data.interventi_altro_note)) {
+        rows.push({ label: "  Note interventi", value: String(data.interventi_altro_note) });
+      } else if (isFilled(data.interventi_note)) {
         // legacy
-        rows.push({ label: "  Note interventi", value: String(p.interventi_note) });
+        rows.push({ label: "  Note interventi", value: String(data.interventi_note) });
       }
     }
   }
@@ -183,17 +203,18 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
 
 function buildFarmacologicaRows(fa: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!fa) return rows;
-  if (isFilled(fa.presenti)) {
-    rows.push({ label: "Terapie in corso", value: fa.presenti ? "Sì" : "No" });
-    if (fa.presenti) {
+  const data = fa ?? {};
+  const forceDefaults = true;
+  if (hasKey(data, "presenti") || forceDefaults) {
+    rows.push({ label: "Terapie in corso", value: boolValue(data.presenti) });
+    if (data.presenti) {
       for (const k of Object.keys(TERAPIE_LABELS)) {
-        if (fa[k] === true) {
+        if (data[k] === true) {
           rows.push({ label: `  ${TERAPIE_LABELS[k]}`, value: "Sì" });
         }
       }
-      if (fa.altro && isFilled(fa.altro_note)) {
-        rows.push({ label: "  Specifica altra terapia", value: String(fa.altro_note) });
+      if (data.altro && isFilled(data.altro_note)) {
+        rows.push({ label: "  Specifica altra terapia", value: String(data.altro_note) });
       }
     }
   }
@@ -202,44 +223,39 @@ function buildFarmacologicaRows(fa: Record<string, unknown> | null): Row[] {
 
 function buildEsteticaRows(es: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!es) return rows;
-  if (isFilled(es.fototipo)) rows.push({ label: "Fototipo", value: String(es.fototipo) });
-  if (isFilled(es.texture)) {
+  const data = es ?? {};
+  const forceDefaults = true;
+  if (isFilled(data.fototipo)) rows.push({ label: "Fototipo", value: String(data.fototipo) });
+  if (isFilled(data.texture)) {
     rows.push({
       label: "Texture cutanea",
-      value: TEXTURE_LABELS[String(es.texture)] ?? String(es.texture),
+      value: TEXTURE_LABELS[String(data.texture)] ?? String(data.texture),
     });
   }
-  if (isFilled(es.abbronzatura)) {
-    rows.push({ label: "Abbronzatura attiva", value: es.abbronzatura ? "Sì" : "No" });
-  }
-  if (isFilled(es.elastosi)) {
-    rows.push({ label: "Elastosi solare", value: es.elastosi ? "Sì" : "No" });
-  }
-  if (isFilled(es.spf_uso)) {
-    rows.push({ label: "Uso SPF", value: es.spf_uso ? "Sì" : "No" });
-  }
-  if (isFilled(es.trattamenti_pregressi)) {
+  addBoolRow(rows, data, "abbronzatura", "Abbronzatura attiva", forceDefaults);
+  addBoolRow(rows, data, "elastosi", "Elastosi solare", forceDefaults);
+  addBoolRow(rows, data, "spf_uso", "Uso SPF", forceDefaults);
+  if (hasKey(data, "trattamenti_pregressi") || forceDefaults) {
     rows.push({
       label: "Trattamenti estetici pregressi",
-      value: es.trattamenti_pregressi ? "Sì" : "No",
+      value: boolValue(data.trattamenti_pregressi),
     });
-    if (es.trattamenti_pregressi && isFilled(es.trattamenti_pregressi_note)) {
+    if (data.trattamenti_pregressi && isFilled(data.trattamenti_pregressi_note)) {
       rows.push({
         label: "  Note trattamenti pregressi",
-        value: String(es.trattamenti_pregressi_note),
+        value: String(data.trattamenti_pregressi_note),
       });
     }
   }
-  if (isFilled(es.reazioni_pregresse)) {
+  if (hasKey(data, "reazioni_pregresse") || forceDefaults) {
     rows.push({
       label: "Reazioni avverse pregresse",
-      value: es.reazioni_pregresse ? "Sì" : "No",
+      value: boolValue(data.reazioni_pregresse),
     });
-    if (es.reazioni_pregresse && isFilled(es.reazioni_pregresse_note)) {
+    if (data.reazioni_pregresse && isFilled(data.reazioni_pregresse_note)) {
       rows.push({
         label: "  Note reazioni",
-        value: String(es.reazioni_pregresse_note),
+        value: String(data.reazioni_pregresse_note),
       });
     }
   }
