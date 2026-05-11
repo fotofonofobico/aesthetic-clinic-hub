@@ -171,8 +171,9 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
   if (!p) return rows;
   // Presenza patologie
-  if (isFilled(p.presenti)) {
-    rows.push({ label: "Presenza patologie", value: p.presenti ? "Sì" : "No" });
+  const forceDefaults = hasSectionData(p);
+  if (hasKey(p, "presenti") || forceDefaults) {
+    rows.push({ label: "Presenza patologie", value: boolValue(p.presenti) });
     if (p.presenti) {
       for (const k of Object.keys(PATOLOGIE_LABELS)) {
         if (p[k] === true) {
@@ -185,8 +186,8 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
     }
   }
   // Interventi chirurgici
-  if (isFilled(p.interventi)) {
-    rows.push({ label: "Interventi chirurgici / traumi", value: p.interventi ? "Sì" : "No" });
+  if (hasKey(p, "interventi") || forceDefaults) {
+    rows.push({ label: "Interventi chirurgici / traumi", value: boolValue(p.interventi) });
     if (p.interventi) {
       const tipi = (p.interventi_tipi ?? {}) as Record<string, unknown>;
       const tipiLabels: Record<string, string> = {
@@ -213,8 +214,9 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
 function buildFarmacologicaRows(fa: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
   if (!fa) return rows;
-  if (isFilled(fa.presenti)) {
-    rows.push({ label: "Terapie in corso", value: fa.presenti ? "Sì" : "No" });
+  const forceDefaults = hasSectionData(fa);
+  if (hasKey(fa, "presenti") || forceDefaults) {
+    rows.push({ label: "Terapie in corso", value: boolValue(fa.presenti) });
     if (fa.presenti) {
       for (const k of Object.keys(TERAPIE_LABELS)) {
         if (fa[k] === true) {
