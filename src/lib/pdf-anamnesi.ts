@@ -87,18 +87,47 @@ function isFilled(v: unknown): boolean {
   return v !== null && v !== undefined && v !== "";
 }
 
+function hasKey(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function hasSectionData(obj: Record<string, unknown> | null): boolean {
+  if (!obj) return false;
+  return Object.values(obj).some((v) => {
+    if (!isFilled(v)) return false;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === "object") return hasSectionData(v as Record<string, unknown>);
+    return true;
+  });
+}
+
+function boolValue(v: unknown): string {
+  return v === true ? "Sì" : "No";
+}
+
+function addBoolRow(
+  rows: Row[],
+  obj: Record<string, unknown>,
+  key: string,
+  label: string,
+  forceNo: boolean,
+) {
+  if (hasKey(obj, key) || forceNo) {
+    rows.push({ label, value: boolValue(obj[key]) });
+  }
+}
+
 function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
   if (!g) return rows;
-  if (isFilled(g.allergie)) {
-    rows.push({ label: "Allergie", value: g.allergie ? "Sì" : "No" });
+  const forceDefaults = hasSectionData(g);
+  if (hasKey(g, "allergie") || forceDefaults) {
+    rows.push({ label: "Allergie", value: boolValue(g.allergie) });
     if (g.allergie && isFilled(g.allergie_note)) {
       rows.push({ label: "  Note allergie", value: String(g.allergie_note) });
     }
   }
-  if (isFilled(g.lidocaina_sensibile)) {
-    rows.push({ label: "Sensibilità lidocaina", value: g.lidocaina_sensibile ? "Sì" : "No" });
-  }
+  addBoolRow(rows, g, "lidocaina_sensibile", "Sensibilità lidocaina", forceDefaults);
   for (const k of ["fumo", "alcol", "caffe"] as const) {
     if (isFilled(g[k])) {
       const lbl = k === "caffe" ? "Caffè" : k.charAt(0).toUpperCase() + k.slice(1);
@@ -120,16 +149,16 @@ function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
   if (isFilled(g.acqua_litri)) {
     rows.push({ label: "Acqua (litri/die)", value: String(g.acqua_litri) });
   }
-  if (isFilled(g.condizioni_ormonali) && g.condizioni_ormonali !== "nessuna") {
+  if (isFilled(g.condizioni_ormonali)) {
     rows.push({
       label: "Condizioni ormonali",
       value: CONDIZIONI_ORM_LABELS[String(g.condizioni_ormonali)] ?? String(g.condizioni_ormonali),
     });
   }
-  if (isFilled(g.vaccino_recente)) {
+  if (hasKey(g, "vaccino_recente") || forceDefaults) {
     rows.push({
       label: "Vaccinazione ultimi 14 giorni",
-      value: g.vaccino_recente ? "Sì" : "No",
+      value: boolValue(g.vaccino_recente),
     });
     if (g.vaccino_recente && isFilled(g.vaccino_note)) {
       rows.push({ label: "  Note vaccino", value: String(g.vaccino_note) });
