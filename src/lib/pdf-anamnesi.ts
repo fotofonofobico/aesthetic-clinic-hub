@@ -234,6 +234,7 @@ function buildFarmacologicaRows(fa: Record<string, unknown> | null): Row[] {
 function buildEsteticaRows(es: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
   if (!es) return rows;
+  const forceDefaults = hasSectionData(es);
   if (isFilled(es.fototipo)) rows.push({ label: "Fototipo", value: String(es.fototipo) });
   if (isFilled(es.texture)) {
     rows.push({
@@ -241,19 +242,13 @@ function buildEsteticaRows(es: Record<string, unknown> | null): Row[] {
       value: TEXTURE_LABELS[String(es.texture)] ?? String(es.texture),
     });
   }
-  if (isFilled(es.abbronzatura)) {
-    rows.push({ label: "Abbronzatura attiva", value: es.abbronzatura ? "Sì" : "No" });
-  }
-  if (isFilled(es.elastosi)) {
-    rows.push({ label: "Elastosi solare", value: es.elastosi ? "Sì" : "No" });
-  }
-  if (isFilled(es.spf_uso)) {
-    rows.push({ label: "Uso SPF", value: es.spf_uso ? "Sì" : "No" });
-  }
-  if (isFilled(es.trattamenti_pregressi)) {
+  addBoolRow(rows, es, "abbronzatura", "Abbronzatura attiva", forceDefaults);
+  addBoolRow(rows, es, "elastosi", "Elastosi solare", forceDefaults);
+  addBoolRow(rows, es, "spf_uso", "Uso SPF", forceDefaults);
+  if (hasKey(es, "trattamenti_pregressi") || forceDefaults) {
     rows.push({
       label: "Trattamenti estetici pregressi",
-      value: es.trattamenti_pregressi ? "Sì" : "No",
+      value: boolValue(es.trattamenti_pregressi),
     });
     if (es.trattamenti_pregressi && isFilled(es.trattamenti_pregressi_note)) {
       rows.push({
@@ -262,10 +257,10 @@ function buildEsteticaRows(es: Record<string, unknown> | null): Row[] {
       });
     }
   }
-  if (isFilled(es.reazioni_pregresse)) {
+  if (hasKey(es, "reazioni_pregresse") || forceDefaults) {
     rows.push({
       label: "Reazioni avverse pregresse",
-      value: es.reazioni_pregresse ? "Sì" : "No",
+      value: boolValue(es.reazioni_pregresse),
     });
     if (es.reazioni_pregresse && isFilled(es.reazioni_pregresse_note)) {
       rows.push({
