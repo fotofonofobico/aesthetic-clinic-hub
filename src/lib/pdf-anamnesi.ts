@@ -169,27 +169,27 @@ function buildGeneraleRows(g: Record<string, unknown> | null): Row[] {
 
 function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
   const rows: Row[] = [];
-  if (!p) return rows;
+  const data = p ?? {};
   // Presenza patologie
-  const forceDefaults = hasSectionData(p);
-  if (hasKey(p, "presenti") || forceDefaults) {
-    rows.push({ label: "Presenza patologie", value: boolValue(p.presenti) });
-    if (p.presenti) {
+  const forceDefaults = true;
+  if (hasKey(data, "presenti") || forceDefaults) {
+    rows.push({ label: "Presenza patologie", value: boolValue(data.presenti) });
+    if (data.presenti) {
       for (const k of Object.keys(PATOLOGIE_LABELS)) {
-        if (p[k] === true) {
+        if (data[k] === true) {
           rows.push({ label: `  ${PATOLOGIE_LABELS[k]}`, value: "Sì" });
         }
       }
-      if (p.altro && isFilled(p.altro_note)) {
-        rows.push({ label: "  Specifica altra patologia", value: String(p.altro_note) });
+      if (data.altro && isFilled(data.altro_note)) {
+        rows.push({ label: "  Specifica altra patologia", value: String(data.altro_note) });
       }
     }
   }
   // Interventi chirurgici
-  if (hasKey(p, "interventi") || forceDefaults) {
-    rows.push({ label: "Interventi chirurgici / traumi", value: boolValue(p.interventi) });
-    if (p.interventi) {
-      const tipi = (p.interventi_tipi ?? {}) as Record<string, unknown>;
+  if (hasKey(data, "interventi") || forceDefaults) {
+    rows.push({ label: "Interventi chirurgici / traumi", value: boolValue(data.interventi) });
+    if (data.interventi) {
+      const tipi = (data.interventi_tipi ?? {}) as Record<string, unknown>;
       const tipiLabels: Record<string, string> = {
         maggiore: "Intervento maggiore",
         traumi: "Traumi",
@@ -200,11 +200,11 @@ function buildPatologicaRows(p: Record<string, unknown> | null): Row[] {
       for (const [k, l] of Object.entries(tipiLabels)) {
         if (tipi[k] === true) rows.push({ label: `  ${l}`, value: "Sì" });
       }
-      if (isFilled(p.interventi_altro_note)) {
-        rows.push({ label: "  Note interventi", value: String(p.interventi_altro_note) });
-      } else if (isFilled(p.interventi_note)) {
+      if (isFilled(data.interventi_altro_note)) {
+        rows.push({ label: "  Note interventi", value: String(data.interventi_altro_note) });
+      } else if (isFilled(data.interventi_note)) {
         // legacy
-        rows.push({ label: "  Note interventi", value: String(p.interventi_note) });
+        rows.push({ label: "  Note interventi", value: String(data.interventi_note) });
       }
     }
   }
