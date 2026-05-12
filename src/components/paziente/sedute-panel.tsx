@@ -258,7 +258,13 @@ export function SedutePanel({
   }, [righe, pazienteId]);
 
   const programmate = righe
-    .filter((r) => !r.completata)
+    .filter((r) => {
+      if (r.completata) return false;
+      // Nascondi le sedute non erogate se il piano è sospeso o annullato
+      const statoPiano = r.piano?.stato;
+      if (statoPiano === "sospeso" || statoPiano === "annullato") return false;
+      return true;
+    })
     .sort((a, b) => {
       // "Da definire" in fondo
       if (!a.data_seduta && !b.data_seduta) return 0;
