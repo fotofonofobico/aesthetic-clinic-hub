@@ -54,7 +54,7 @@ function ModalitaFirmaPage() {
           <span>Connesso</span>
         </div>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           onClick={async () => {
             await signOut();
@@ -62,7 +62,7 @@ function ModalitaFirmaPage() {
           }}
         >
           <LogOut className="h-4 w-4" />
-          Esci
+          Esci da modalità firma
         </Button>
       </div>
 

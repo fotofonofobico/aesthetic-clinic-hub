@@ -412,6 +412,34 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       toast.error(`Errore salvataggio bozza: ${persistErr.message}`);
       return;
     }
+    // Ricalcola flag rischio automatici sull'ultima versione del payload
+    // (così l'utente non deve cliccare "Salva bozza" perché compaiano gli alert)
+    {
+      const payloadFlags: AnamnesiPayload = {
+        generale: data.generale ?? {},
+        patologica: data.patologica ?? {},
+        farmacologica: data.farmacologica ?? {},
+        estetica: data.estetica ?? {},
+      };
+      const flags = computeAutoFlags(payloadFlags);
+      await supabase
+        .from("anamnesi_flag_rischio")
+        .delete()
+        .eq("paziente_id", pazienteId)
+        .eq("origine", "auto");
+      if (flags.length > 0) {
+        await supabase.from("anamnesi_flag_rischio").insert(
+          flags.map((f) => ({
+            paziente_id: pazienteId,
+            codice: f.codice,
+            etichetta: f.etichetta,
+            severity: f.severity,
+            origine: "auto",
+          })),
+        );
+      }
+      onSaved();
+    }
     // Avvia sessione visita unificata: anamnesi + eventuali consensi GDPR/uso immagini
     const session = await buildVisitaSession(pazienteId);
     if (!session) {
