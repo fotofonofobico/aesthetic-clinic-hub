@@ -150,9 +150,9 @@ function MagazzinoPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="prodotti"><Package className="h-4 w-4" /> Prodotti</TabsTrigger>
-          <TabsTrigger value="lotti"><Clock className="h-4 w-4" /> Lotti</TabsTrigger>
-          <TabsTrigger value="movimenti"><Settings2 className="h-4 w-4" /> Movimenti</TabsTrigger>
+          <TabsTrigger value="prodotti" className="gap-2"><Package className="h-4 w-4" /> Prodotti</TabsTrigger>
+          <TabsTrigger value="lotti" className="gap-2"><Clock className="h-4 w-4" /> Lotti</TabsTrigger>
+          <TabsTrigger value="movimenti" className="gap-2"><Settings2 className="h-4 w-4" /> Movimenti</TabsTrigger>
         </TabsList>
 
         {/* PRODOTTI */}
