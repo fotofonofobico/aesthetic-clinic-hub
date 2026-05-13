@@ -71,6 +71,8 @@ import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
 import { FotoGrid } from "@/components/foto/foto-grid";
 import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
 import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
+import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
+import { MisurazioneDialog } from "@/components/paziente/misurazione-dialog";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
