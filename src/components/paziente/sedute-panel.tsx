@@ -924,6 +924,25 @@ function EseguiSedutaDialog({
   const [note, setNote] = useState(seduta.note_cliniche ?? "");
   const [consumoRighe, setConsumoRighe] = useState<ConsumoRiga[]>([]);
   const [saving, setSaving] = useState(false);
+  const [misuraOpen, setMisuraOpen] = useState(false);
+  const [reminderMisura, setReminderMisura] = useState(false);
+
+  const isCrioPrima =
+    seduta.numero_seduta === 1 && isTrattamentoCriolipolisi(trattamento?.nome);
+
+  useEffect(() => {
+    if (!isCrioPrima) {
+      setReminderMisura(false);
+      return;
+    }
+    void (async () => {
+      const { count } = await supabase
+        .from("paziente_misurazione")
+        .select("id", { count: "exact", head: true })
+        .eq("paziente_id", seduta.paziente_id);
+      setReminderMisura((count ?? 0) === 0);
+    })();
+  }, [isCrioPrima, seduta.paziente_id, misuraOpen]);
 
   function toggleZona(z: string) {
     setZone((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
