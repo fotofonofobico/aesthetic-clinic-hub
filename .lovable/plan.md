@@ -1,87 +1,79 @@
-## Obiettivo
+## 1. Fix bottone "Esci da modalità firma"
 
-1. In ogni flusso "firma" mostrare al paziente **solo l'ultima versione** del template per categoria/trattamento (oggi se restano attive più versioni vengono firmate tutte).
-2. Rimuovere **definitivamente** la colonna "Firma del medico" da **tutti i consensi e le anamnesi** (GDPR, uso immagini, trattamento singolo, ciclo, altro, anamnesi). Il medico non firma sul tablet — firma solo il paziente.
-3. Eliminare lo **spazio bianco enorme** tra una pagina e l'altra del PDF (page break troppo prematuro).
+In `src/routes/firma.tsx` rimuovere `signOut()` e navigare a `/dashboard`. Sessione mantenuta.
 
-Tutto frontend, nessuna migrazione DB.
+## 2. Peso, altezza, BMI nella scheda paziente
 
----
+Le colonne `peso_kg` e `altezza_cm` su `pazienti` esistono già. Niente migration.
 
-## 1. Selezione "ultima versione"
+- In `pazienti.$id.edit.tsx`: due campi opzionali "Peso (kg)" e "Altezza (cm)".
+- In `pazienti.$id.tsx`: riquadro compatto Peso · Altezza · **BMI calcolato** + categoria (sottopeso/normo/sovrappeso/obesità).
+- Sempre disponibili per qualunque paziente, mai obbligatori.
 
-### `src/lib/signature-session.ts` — `buildVisitaSession`
-Oggi: `templates.find((t) => t.categoria === "gdpr")` prende il primo attivo. Se sono attive più versioni (es. GDPR v1.0 e v1.1), può prendere la vecchia o produrne più di una.
+## 3. Pannello "Misurazioni" (circonferenze)
 
-Fix: aggiungere helper `pickLatest` che ordina per `versione` (numeric `localeCompare`) e ritorna **una sola** entry. Usare per GDPR e per Uso immagini.
+Nuova tabella leggera, JSON flessibile, collegata al paziente (e opz. alla seduta).
 
-### `src/lib/signature-session.ts` — `buildTrattamentoSession`
-Oggi: itera **tutti** i template attivi con `trattamento_id ∈ ids` e li include tutti.
-
-Fix: raggruppare per `trattamento_id + categoria` e tenere solo la versione più alta. Le versioni vecchie vengono ignorate dalla sessione di firma.
-
-### `src/components/paziente/consensi-panel.tsx`
-Nelle list di template selezionabili (firma manuale + invio tablet), filtrare con gli stessi criteri: latest per `categoria` globale (gdpr / uso_immagini / altro) e latest per `trattamento_id + categoria`. Le versioni superate restano in DB ma non sono più proposte come "da firmare".
-
-### Helper condiviso
-Aggiungere in `src/lib/consensi-engine.ts`:
-```ts
-export function ultimaVersione<T extends { versione: string; updated_at?: string }>(
-  list: T[],
-): T | null
+```sql
+CREATE TABLE public.paziente_misurazione (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  paziente_id uuid NOT NULL,
+  seduta_id uuid,
+  data_rilevazione date NOT NULL DEFAULT CURRENT_DATE,
+  peso_kg numeric,
+  misure jsonb NOT NULL DEFAULT '{}'::jsonb,
+    -- { vita, fianchi, addome, braccio_dx, braccio_sn, coscia_dx, coscia_sn, ... }
+  note text,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.paziente_misurazione ENABLE ROW LEVEL SECURITY;
+-- RLS: operatori attivi SELECT/INSERT/UPDATE; medico DELETE
+CREATE INDEX ON public.paziente_misurazione (paziente_id, data_rilevazione DESC);
 ```
-Ordinamento: `localeCompare` numeric su `versione`, fallback su `updated_at`.
 
----
+UI: pannello `MisurazioniPanel` nella scheda paziente con lista cronologica + bottone "Nuova rilevazione" (dialog con data, peso opz., griglia campi numerici opzionali, note). Confronto delta prima vs ultima in alto. Niente grafici, niente pagine separate.
 
-## 2. Rimozione firma medico — TUTTI i documenti
+## 4. Criolipolisi — 4 voci preconfigurate
 
-Il medico non firma più sul tablet, mai. Si elimina la colonna "Firma del medico" da ogni PDF.
+Nessun cambio di schema. Inserire in `trattamenti` (categoria `device`, tipo `ciclo`):
 
-### `src/lib/pdf-template.ts`
-- `renderSignatureBlock`: rendere il rendering della colonna medico **opt-in esplicito** invece che opt-out. Cambiare default `mostraFirmaMedico` a `false`.
-- Quando `false`, la colonna paziente occupa tutta la larghezza utile (label, riquadro firma, linea, nome) — già parzialmente implementato, da verificare visivamente.
-- Rimuovere `firmaMedicoDataUrl` e `operatoreLabel` dal rendering quando `mostraFirmaMedico=false` (oggi sono già condizionati, ok).
+- Criolipolisi – 1 manipolo, 1 zona
+- Criolipolisi – 1 manipolo, 2 zone
+- Criolipolisi – 2 manipoli, 1 zona
+- Criolipolisi – 2 manipoli, 2 zone
 
-### `src/lib/pdf-consenso.ts`
-- Rimuovere completamente la logica `noFirmaMedico = categoria === "gdpr" || ...` e l'override per categoria.
-- Passare sempre `mostraFirmaMedico: false` (o omettere il flag, sfruttando il nuovo default).
-- Mantenere comunque il parametro `firmaMedicoDataUrl` nell'input per retrocompatibilità con i caller, ma non usarlo nel PDF.
+Prezzi e durata da impostare poi manualmente in Trattamenti. Per i cicli pluri-seduta si usano i `trattamento_pacchetto` esistenti.
 
-### `src/lib/pdf-anamnesi.ts`
-- Già passa `mostraFirmaMedico: false`. Confermato OK, nessun cambio.
+## 5. Reminder "misurazione baseline mancante" per criolipolisi
 
-### UI firma (tablet / Mac)
-Verificare e rimuovere la richiesta/cattura della firma medico anche nella UI:
-- `src/components/firma/medico-finalize-dialog.tsx` — dialog dedicato alla firma medico: se diventa inutile, lasciare come no-op o ridurlo a sola conferma di archiviazione (decidere in fase di implementazione, possibile eliminazione).
-- `src/components/signature-session-dialog.tsx` — non chiedere firma medico anche per template con `richiede_firma_medico=true`.
-- `src/lib/signature-session-save.ts` — `firma_medico_immagine`, `firmato_da_medico` salvati come `null`.
+**Non bloccante**. Promemoria visibile, l'utente può sempre procedere.
 
-> Nota: il campo DB `firma_medico_immagine` resta nello schema ma non viene più popolato. Nessuna migrazione necessaria.
+Quando si sta per completare la **prima seduta** di un piano criolipolisi e il paziente non ha ancora alcuna riga in `paziente_misurazione`:
 
----
+- Banner ambra nel dialog di completamento seduta:
+  > 🔔 Promemoria: non è stata registrata la misurazione baseline. Vuoi aggiungerla ora?
+- Due bottoni: **"Aggiungi misurazione"** (apre il dialog del punto 3) e **"Procedi comunque"** (chiude il banner e prosegue normalmente, nessuna conferma extra).
+- Stesso reminder (sempre non bloccante) come banner informativo nella scheda paziente quando esiste un piano criolipolisi attivo senza misurazioni.
 
-## 3. Spazio bianco tra pagine PDF
-
-`src/lib/pdf-consenso.ts`: il loop body ha `if (y > pageH - 200) { addPage }`. Con A4 (842pt), ogni pagina riempie solo fino a y≈642 lasciando ~200pt di vuoto in fondo. Stessa soglia per il blocco "Esito".
-
-Fix:
-- Body: soglia `pageH - margin - 20` (≈ 774pt), riempie tutta la pagina lasciando solo il footer.
-- Blocco "Esito + note": soglia `pageH - 80` (basta riga + margine).
-- `renderSignatureBlock` già fa check di 160pt — lasciare intatto, garantisce che il signature block resti atomico sull'ultima pagina.
-
-Risultato: niente più mezza pagina vuota; signature block resta integro a fine documento.
-
----
+Riconoscimento "trattamento criolipolisi" tramite `src/lib/trattamenti-speciali.ts` (match per prefisso "Criolipolisi"). Logica frontend, nessun trigger DB.
 
 ## File toccati
 
-- `src/lib/consensi-engine.ts` — helper `ultimaVersione`
-- `src/lib/signature-session.ts` — pick latest in `buildVisitaSession` / `buildTrattamentoSession`
-- `src/components/paziente/consensi-panel.tsx` — filtro latest sui template proposti
-- `src/lib/pdf-template.ts` — default `mostraFirmaMedico=false`, layout single-column quando assente
-- `src/lib/pdf-consenso.ts` — sempre senza firma medico + soglie page break
-- `src/lib/signature-session-save.ts` — non passare firma medico
-- `src/components/signature-session-dialog.tsx` + `medico-finalize-dialog.tsx` — saltare richiesta firma medico
+- `src/routes/firma.tsx` — fix logout
+- `src/routes/_authenticated/pazienti.$id.edit.tsx` — campi peso/altezza
+- `src/routes/_authenticated/pazienti.$id.tsx` — riquadro BMI + montaggio MisurazioniPanel + banner reminder
+- `src/components/paziente/misurazioni-panel.tsx` — nuovo
+- `src/components/paziente/misurazione-dialog.tsx` — nuovo
+- `src/components/paziente/sedute-panel.tsx` — banner reminder pre-completamento prima seduta criolipolisi
+- `src/lib/bmi.ts` — calcolo + categoria
+- `src/lib/trattamenti-speciali.ts` — riconoscimento criolipolisi
+- Migration: `paziente_misurazione` + RLS
+- Insert: 4 voci criolipolisi in `trattamenti`
 
-Nessuna modifica a DB, RLS, edge functions.
+## Cosa NON faccio
+
+- Misurazioni non sono vincolate al trattamento criolipolisi (sempre disponibili).
+- Nessun campo manipoli/zone sulla voce di piano, nessun prezzo dinamico.
+- Nessun grafico storico, nessuna pagina separata.
+- Nessun blocco/conferma extra: il reminder è solo informativo.
