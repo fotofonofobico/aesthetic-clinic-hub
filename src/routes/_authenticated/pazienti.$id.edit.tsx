@@ -46,6 +46,8 @@ function PazienteEditPage() {
     provincia: "",
     professione: "",
     note: "",
+    peso_kg: null,
+    altezza_cm: null,
   });
 
   useEffect(() => {
@@ -107,6 +109,8 @@ function PazienteEditPage() {
       provincia: form.provincia?.trim().toUpperCase() || null,
       professione: form.professione?.trim() || null,
       note: form.note?.trim() || null,
+      peso_kg: form.peso_kg ?? null,
+      altezza_cm: form.altezza_cm ?? null,
     };
 
     if (isNew) {
@@ -247,6 +251,34 @@ function PazienteEditPage() {
                   onChange={(e) => update("codice_fiscale", e.target.value.toUpperCase())}
                   maxLength={16}
                   className="font-mono uppercase"
+                />
+              </Field>
+              <Field label="Peso (kg)">
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={form.peso_kg ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "peso_kg",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Altezza (cm)">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={form.altezza_cm ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "altezza_cm",
+                      e.target.value === "" ? null : Math.round(Number(e.target.value)),
+                    )
+                  }
                 />
               </Field>
             </div>

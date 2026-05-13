@@ -822,6 +822,42 @@ export type Database = {
           },
         ]
       }
+      paziente_misurazione: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_rilevazione: string
+          id: string
+          misure: Json
+          note: string | null
+          paziente_id: string
+          peso_kg: number | null
+          seduta_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_rilevazione?: string
+          id?: string
+          misure?: Json
+          note?: string | null
+          paziente_id: string
+          peso_kg?: number | null
+          seduta_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_rilevazione?: string
+          id?: string
+          misure?: Json
+          note?: string | null
+          paziente_id?: string
+          peso_kg?: number | null
+          seduta_id?: string | null
+        }
+        Relationships: []
+      }
       paziente_nota: {
         Row: {
           allegati: Json

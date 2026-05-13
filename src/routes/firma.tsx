@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useStudioInfo } from "@/hooks/use-studio-info";
 import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
-import { Stethoscope, LogOut, Tablet, Wifi } from "lucide-react";
+import { ArrowLeft, Stethoscope, Tablet, Wifi } from "lucide-react";
 import { useSessioniInArrivo, type FirmaSessioneRow } from "@/lib/firma-sessione";
 import { TabletPazienteSignDialog } from "@/components/firma/tablet-paziente-sign-dialog";
 
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/firma")({
 });
 
 function ModalitaFirmaPage() {
-  const { user, isAuthenticated, isLoading, signOut } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const { data: profilo } = useProfile();
   const { data: studio } = useStudioInfo();
@@ -56,12 +56,11 @@ function ModalitaFirmaPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            await signOut();
-            void navigate({ to: "/" });
+          onClick={() => {
+            void navigate({ to: "/dashboard" });
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" />
           Esci da modalità firma
         </Button>
       </div>

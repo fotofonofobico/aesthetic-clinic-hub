@@ -71,6 +71,8 @@ import { FotoUploadDialog } from "@/components/foto/foto-upload-dialog";
 import { FotoGrid } from "@/components/foto/foto-grid";
 import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
 import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
+import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
+import { MisurazioneDialog } from "@/components/paziente/misurazione-dialog";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
@@ -922,6 +924,25 @@ function EseguiSedutaDialog({
   const [note, setNote] = useState(seduta.note_cliniche ?? "");
   const [consumoRighe, setConsumoRighe] = useState<ConsumoRiga[]>([]);
   const [saving, setSaving] = useState(false);
+  const [misuraOpen, setMisuraOpen] = useState(false);
+  const [reminderMisura, setReminderMisura] = useState(false);
+
+  const isCrioPrima =
+    seduta.numero_seduta === 1 && isTrattamentoCriolipolisi(trattamento?.nome);
+
+  useEffect(() => {
+    if (!isCrioPrima) {
+      setReminderMisura(false);
+      return;
+    }
+    void (async () => {
+      const { count } = await supabase
+        .from("paziente_misurazione")
+        .select("id", { count: "exact", head: true })
+        .eq("paziente_id", seduta.paziente_id);
+      setReminderMisura((count ?? 0) === 0);
+    })();
+  }, [isCrioPrima, seduta.paziente_id, misuraOpen]);
 
   function toggleZona(z: string) {
     setZone((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
@@ -1017,6 +1038,31 @@ function EseguiSedutaDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {reminderMisura && (
+            <Alert className="border-warning/40 bg-warning/10">
+              <ShieldAlert className="h-4 w-4 text-warning" />
+              <AlertTitle>Promemoria: misurazione baseline mancante</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>
+                  È la prima seduta di criolipolisi e non hai ancora registrato circonferenze
+                  per questo paziente. Vuoi aggiungerle ora?
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" type="button" onClick={() => setMisuraOpen(true)}>
+                    Aggiungi misurazione
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReminderMisura(false)}
+                  >
+                    Procedi comunque
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <Label>Data esecuzione *</Label>
@@ -1181,6 +1227,12 @@ function EseguiSedutaDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <MisurazioneDialog
+        open={misuraOpen}
+        onOpenChange={setMisuraOpen}
+        pazienteId={seduta.paziente_id}
+        sedutaId={seduta.id}
+      />
     </Dialog>
   );
 }
