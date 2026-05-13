@@ -13,7 +13,7 @@ export const Route = createFileRoute("/firma")({
 });
 
 function ModalitaFirmaPage() {
-  const { user, isAuthenticated, isLoading, signOut } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const { data: profilo } = useProfile();
   const { data: studio } = useStudioInfo();
