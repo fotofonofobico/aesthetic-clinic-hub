@@ -1038,6 +1038,31 @@ function EseguiSedutaDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {reminderMisura && (
+            <Alert className="border-warning/40 bg-warning/10">
+              <ShieldAlert className="h-4 w-4 text-warning" />
+              <AlertTitle>Promemoria: misurazione baseline mancante</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>
+                  È la prima seduta di criolipolisi e non hai ancora registrato circonferenze
+                  per questo paziente. Vuoi aggiungerle ora?
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" type="button" onClick={() => setMisuraOpen(true)}>
+                    Aggiungi misurazione
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReminderMisura(false)}
+                  >
+                    Procedi comunque
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <Label>Data esecuzione *</Label>
