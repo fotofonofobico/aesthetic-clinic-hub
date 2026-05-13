@@ -23,11 +23,14 @@ import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
+import { MisurazioniPanel } from "@/components/paziente/misurazioni-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
+import { calcolaBmi } from "@/lib/bmi";
+import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
