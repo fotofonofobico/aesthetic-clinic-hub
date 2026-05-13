@@ -56,12 +56,11 @@ function ModalitaFirmaPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            await signOut();
-            void navigate({ to: "/" });
+          onClick={() => {
+            void navigate({ to: "/dashboard" });
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" />
           Esci da modalità firma
         </Button>
       </div>
