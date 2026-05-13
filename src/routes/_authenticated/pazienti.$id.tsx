@@ -276,11 +276,13 @@ function PazienteDetailPage() {
           <DiarioPanel pazienteId={id} />
         </TabsContent>
 
-        <TabsContent value="anagrafica">
+        <TabsContent value="anagrafica" className="space-y-4">
           <AnagraficaPanel
             paziente={paziente}
             onEdit={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
           />
+          <CriolipolisiBaselineBanner pazienteId={id} />
+          <MisurazioniPanel pazienteId={id} />
         </TabsContent>
 
         <TabsContent value="anamnesi">
