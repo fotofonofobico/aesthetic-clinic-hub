@@ -1227,6 +1227,12 @@ function EseguiSedutaDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <MisurazioneDialog
+        open={misuraOpen}
+        onOpenChange={setMisuraOpen}
+        pazienteId={seduta.paziente_id}
+        sedutaId={seduta.id}
+      />
     </Dialog>
   );
 }
