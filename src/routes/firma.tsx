@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useStudioInfo } from "@/hooks/use-studio-info";
 import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
-import { Stethoscope, LogOut, Tablet, Wifi } from "lucide-react";
+import { ArrowLeft, Stethoscope, Tablet, Wifi } from "lucide-react";
 import { useSessioniInArrivo, type FirmaSessioneRow } from "@/lib/firma-sessione";
 import { TabletPazienteSignDialog } from "@/components/firma/tablet-paziente-sign-dialog";
 
