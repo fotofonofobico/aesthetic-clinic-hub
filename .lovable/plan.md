@@ -1,79 +1,81 @@
-## 1. Fix bottone "Esci da modalità firma"
+## Obiettivo
 
-In `src/routes/firma.tsx` rimuovere `signOut()` e navigare a `/dashboard`. Sessione mantenuta.
+Tre rifiniture allo schema paziente, più la predisposizione minima per il multi-studio.
 
-## 2. Peso, altezza, BMI nella scheda paziente
+---
 
-Le colonne `peso_kg` e `altezza_cm` su `pazienti` esistono già. Niente migration.
+### 1. Spostare Peso / Altezza / BMI e Misurazioni in **Anamnesi**
 
-- In `pazienti.$id.edit.tsx`: due campi opzionali "Peso (kg)" e "Altezza (cm)".
-- In `pazienti.$id.tsx`: riquadro compatto Peso · Altezza · **BMI calcolato** + categoria (sottopeso/normo/sovrappeso/obesità).
-- Sempre disponibili per qualunque paziente, mai obbligatori.
+**Scelta architetturale**: Misurazioni e metriche corporee restano dati indipendenti dall'anamnesi firmata (non vengono congelate). Vivono nella tab "Anamnesi" come due card separate, ma usano le stesse tabelle attuali.
 
-## 3. Pannello "Misurazioni" (circonferenze)
+- **Tab "Anagrafica"** (`pazienti.$id.tsx`): rimuovo le righe Peso, Altezza, BMI dalla card anagrafica. Rimuovo `MisurazioniPanel` e `CriolipolisiBaselineBanner` da qui.
+- **Pagina edit anagrafica** (`pazienti.$id.edit.tsx`): rimuovo i campi Peso/Altezza dal form (i dati restano in DB ma non sono più editabili da qui).
+- **Tab "Anamnesi"**: aggiungo in cima (sopra le 5 card numerate dell'anamnesi clinica) due card non versionate:
+  - Card **"Metriche corporee"**: form inline con Peso (kg) e Altezza (cm), salvataggio diretto su `pazienti`. Mostra BMI calcolato + categoria. Editabile sempre, indipendentemente dallo stato dell'anamnesi.
+  - Card **"Misurazioni"**: il `MisurazioniPanel` già esistente.
+- Visivamente separate dall'anamnesi numerata da un divider + label "Dati di monitoraggio (non firmati)".
 
-Nuova tabella leggera, JSON flessibile, collegata al paziente (e opz. alla seduta).
+### 2. Estendere il reminder criolipolisi
 
-```sql
-CREATE TABLE public.paziente_misurazione (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  paziente_id uuid NOT NULL,
-  seduta_id uuid,
-  data_rilevazione date NOT NULL DEFAULT CURRENT_DATE,
-  peso_kg numeric,
-  misure jsonb NOT NULL DEFAULT '{}'::jsonb,
-    -- { vita, fianchi, addome, braccio_dx, braccio_sn, coscia_dx, coscia_sn, ... }
-  note text,
-  created_by uuid,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.paziente_misurazione ENABLE ROW LEVEL SECURITY;
--- RLS: operatori attivi SELECT/INSERT/UPDATE; medico DELETE
-CREATE INDEX ON public.paziente_misurazione (paziente_id, data_rilevazione DESC);
-```
+Oggi il banner di promemoria scatta solo se mancano misurazioni (rilevazioni in `paziente_misurazione`). Lo estendo:
 
-UI: pannello `MisurazioniPanel` nella scheda paziente con lista cronologica + bottone "Nuova rilevazione" (dialog con data, peso opz., griglia campi numerici opzionali, note). Confronto delta prima vs ultima in alto. Niente grafici, niente pagine separate.
+- Il reminder appare se manca **almeno una** delle seguenti baseline:
+  - peso_kg sul paziente
+  - altezza_cm sul paziente
+  - almeno una rilevazione in `paziente_misurazione`
+- Testo dinamico: "Mancano: peso, altezza, misurazioni di partenza".
+- Pulsanti: "Aggiungi misurazione" (apre dialog) + "Vai a metriche" (porta alla tab Anamnesi) + "Procedi comunque".
+- Stesso comportamento sia nel dialog di completamento seduta, sia nel banner sulla scheda paziente. Resta **non bloccante**.
 
-## 4. Criolipolisi — 4 voci preconfigurate
+### 3. Predisposizione multi-studio (minima)
 
-Nessun cambio di schema. Inserire in `trattamenti` (categoria `device`, tipo `ciclo`):
+**DB** (migration):
+- Nuova tabella `studio` (`nome`, `indirizzo`, `attivo`, `created_at`). RLS: lettura per operatori attivi, modifiche solo medici.
+- Aggiungo `studio_id uuid` nullable su `pazienti` (FK logica, no constraint per ora).
+- Aggiungo `studio_attivo_id uuid` nullable su `profiles` (lo studio scelto dall'utente).
+- Inserisco uno studio di default ("Studio principale") e popolo `studio_id` dei pazienti esistenti con quello.
 
-- Criolipolisi – 1 manipolo, 1 zona
-- Criolipolisi – 1 manipolo, 2 zone
-- Criolipolisi – 2 manipoli, 1 zona
-- Criolipolisi – 2 manipoli, 2 zone
+**UI**:
+- **Impostazioni → Studio** (tab già esistente `impostazioni.studio.tsx`): aggiungo sezione "I miei studi" con lista, "Nuovo studio", e selettore "Studio attivo" (salvato sul profilo).
+- **Anagrafica paziente** (form edit): nuovo campo Select "Studio di riferimento" (visibile solo se esistono ≥2 studi).
+- **Lista pazienti** + **scheda paziente**: badge piccolo accanto al nome con il nome dello studio (visibile solo se esistono ≥2 studi). Nessun filtro automatico, nessuna separazione di permessi.
 
-Prezzi e durata da impostare poi manualmente in Trattamenti. Per i cicli pluri-seduta si usano i `trattamento_pacchetto` esistenti.
+Questo è solo *predisposizione*: niente filtro globale su calendario/agenda/dashboard adesso (su tua richiesta).
 
-## 5. Reminder "misurazione baseline mancante" per criolipolisi
+### 4. Relazione visita → nota clinica del diario
 
-**Non bloccante**. Promemoria visibile, l'utente può sempre procedere.
+Approccio semplice, zero nuove tabelle:
 
-Quando si sta per completare la **prima seduta** di un piano criolipolisi e il paziente non ha ancora alcuna riga in `paziente_misurazione`:
+- Nel `diario-panel.tsx`, sulle note di tipo "clinica" (e solo quelle non auto-generate da seduta), aggiungo un pulsante **"Stampa relazione"**.
+- Genera un PDF su carta intestata dello studio (riuso `pdf-template.ts`) con:
+  - Intestazione studio (nome, indirizzo, medico)
+  - Dati paziente (nome, cognome, data nascita, CF)
+  - Data della nota
+  - Testo della nota
+  - Spazio firma medico in basso
+- Nessun nuovo campo DB. Il medico scrive la relazione come nota clinica e la stampa quando serve.
 
-- Banner ambra nel dialog di completamento seduta:
-  > 🔔 Promemoria: non è stata registrata la misurazione baseline. Vuoi aggiungerla ora?
-- Due bottoni: **"Aggiungi misurazione"** (apre il dialog del punto 3) e **"Procedi comunque"** (chiude il banner e prosegue normalmente, nessuna conferma extra).
-- Stesso reminder (sempre non bloccante) come banner informativo nella scheda paziente quando esiste un piano criolipolisi attivo senza misurazioni.
+---
 
-Riconoscimento "trattamento criolipolisi" tramite `src/lib/trattamenti-speciali.ts` (match per prefisso "Criolipolisi"). Logica frontend, nessun trigger DB.
+### File toccati
 
-## File toccati
+- **Migration**: `studio` table + RLS + colonne `studio_id` su `pazienti` e `studio_attivo_id` su `profiles` + seed studio default.
+- `src/routes/_authenticated/pazienti.$id.tsx`: sposta Misurazioni/Banner in anamnesi tab; rimuove BMI da anagrafica; aggiunge badge studio.
+- `src/routes/_authenticated/pazienti.$id.edit.tsx`: rimuove campi peso/altezza; aggiunge select studio (condizionale).
+- `src/components/paziente/anamnesi-panel.tsx`: aggiunge in testa le due card (Metriche + Misurazioni).
+- Nuovo `src/components/paziente/metriche-corporee-card.tsx`: form inline peso/altezza + BMI.
+- `src/components/paziente/misurazioni-panel.tsx`: nessuna modifica strutturale (riusato).
+- `src/components/paziente/sedute-panel.tsx` + scheda paziente: estende il reminder a peso/altezza mancanti.
+- `src/components/paziente/diario-panel.tsx`: pulsante "Stampa relazione" sulle note cliniche manuali.
+- Nuovo `src/lib/pdf-relazione.ts`: genera il PDF della relazione.
+- `src/routes/_authenticated/impostazioni.studio.tsx`: sezione gestione studi + studio attivo.
+- `src/routes/_authenticated/pazienti.index.tsx`: badge studio nella lista (condizionale).
+- `src/types/clinico.ts`: aggiunge `studio_id` a `Paziente`.
 
-- `src/routes/firma.tsx` — fix logout
-- `src/routes/_authenticated/pazienti.$id.edit.tsx` — campi peso/altezza
-- `src/routes/_authenticated/pazienti.$id.tsx` — riquadro BMI + montaggio MisurazioniPanel + banner reminder
-- `src/components/paziente/misurazioni-panel.tsx` — nuovo
-- `src/components/paziente/misurazione-dialog.tsx` — nuovo
-- `src/components/paziente/sedute-panel.tsx` — banner reminder pre-completamento prima seduta criolipolisi
-- `src/lib/bmi.ts` — calcolo + categoria
-- `src/lib/trattamenti-speciali.ts` — riconoscimento criolipolisi
-- Migration: `paziente_misurazione` + RLS
-- Insert: 4 voci criolipolisi in `trattamenti`
+### Cosa NON faccio
 
-## Cosa NON faccio
-
-- Misurazioni non sono vincolate al trattamento criolipolisi (sempre disponibili).
-- Nessun campo manipoli/zone sulla voce di piano, nessun prezzo dinamico.
-- Nessun grafico storico, nessuna pagina separata.
-- Nessun blocco/conferma extra: il reminder è solo informativo.
+- Nessun congelamento misurazioni con la firma anamnesi.
+- Nessun filtro globale per studio (calendario/agenda/dashboard restano "tutto").
+- Nessuna separazione di permessi tra studi.
+- Nessuna nuova tabella per le relazioni: si usano le note cliniche esistenti.
+- Nessuna modifica al PDF cartella paziente (resta com'è).
