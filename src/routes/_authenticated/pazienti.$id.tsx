@@ -486,7 +486,6 @@ function StudioBadge({ studioId }: { studioId: string | null }) {
     </Badge>
   );
 }
-}
 
 function CriolipolisiBaselineBanner({
   paziente,
