@@ -486,21 +486,25 @@ function StudioBadge({ studioId }: { studioId: string | null }) {
     </Badge>
   );
 }
-      </CardContent>
-    </Card>
-  );
 }
 
-function CriolipolisiBaselineBanner({ pazienteId }: { pazienteId: string }) {
+function CriolipolisiBaselineBanner({
+  paziente,
+  onVaiAdAnamnesi,
+}: {
+  paziente: Paziente;
+  onVaiAdAnamnesi: () => void;
+}) {
   const [show, setShow] = useState(false);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      // Trova piani attivi/in corso del paziente
       const { data: piani } = await supabase
         .from("piano_trattamento")
         .select("id, stato")
-        .eq("paziente_id", pazienteId)
+        .eq("paziente_id", paziente.id)
         .not("stato", "in", "(annullato,sospeso,bozza,non_indicato)");
       const ids = (piani ?? []).map((p) => (p as { id: string }).id);
       if (ids.length === 0) {
@@ -536,21 +540,35 @@ function CriolipolisiBaselineBanner({ pazienteId }: { pazienteId: string }) {
       const { count } = await supabase
         .from("paziente_misurazione")
         .select("id", { count: "exact", head: true })
-        .eq("paziente_id", pazienteId);
-      setShow((count ?? 0) === 0);
+        .eq("paziente_id", paziente.id);
+      const m: string[] = [];
+      if (paziente.peso_kg == null) m.push("peso");
+      if (paziente.altezza_cm == null) m.push("altezza");
+      if ((count ?? 0) === 0) m.push("misurazione baseline");
+      setMissing(m);
+      setShow(m.length > 0);
     })();
-  }, [pazienteId]);
+  }, [paziente.id, paziente.peso_kg, paziente.altezza_cm]);
 
-  if (!show) return null;
+  if (!show || dismissed) return null;
   return (
     <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-      <div>
-        <div className="font-semibold">Misurazione baseline mancante</div>
-        <div className="mt-0.5 text-foreground">
-          C'è un piano di criolipolisi attivo ma non hai ancora registrato alcuna
-          rilevazione. Registra le circonferenze prima della prima seduta per
-          documentare i risultati nel tempo.
+      <div className="flex-1 space-y-2">
+        <div>
+          <div className="font-semibold">Baseline criolipolisi incompleta</div>
+          <div className="mt-0.5 text-foreground">
+            C'è un piano di criolipolisi attivo. Manca: <strong>{missing.join(", ")}</strong>.
+            Registra questi dati per poter confrontare i risultati nel tempo.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" type="button" onClick={onVaiAdAnamnesi}>
+            Vai ad Anamnesi
+          </Button>
+          <Button size="sm" type="button" variant="outline" onClick={() => setDismissed(true)}>
+            Ignora per ora
+          </Button>
         </div>
       </div>
     </div>
