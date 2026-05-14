@@ -981,6 +981,7 @@ export type Database = {
           professione: string | null
           provincia: string | null
           sesso: Database["public"]["Enums"]["sesso"] | null
+          studio_id: string | null
           telefono: string | null
           updated_at: string
         }
@@ -1006,6 +1007,7 @@ export type Database = {
           professione?: string | null
           provincia?: string | null
           sesso?: Database["public"]["Enums"]["sesso"] | null
+          studio_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -1031,10 +1033,19 @@ export type Database = {
           professione?: string | null
           provincia?: string | null
           sesso?: Database["public"]["Enums"]["sesso"] | null
+          studio_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pazienti_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       piano_foto_stato: {
         Row: {
@@ -1433,6 +1444,7 @@ export type Database = {
           nome: string
           numero_albo: string | null
           qualifica: string | null
+          studio_attivo_id: string | null
           telefono: string | null
           updated_at: string
           user_id: string
@@ -1445,6 +1457,7 @@ export type Database = {
           nome?: string
           numero_albo?: string | null
           qualifica?: string | null
+          studio_attivo_id?: string | null
           telefono?: string | null
           updated_at?: string
           user_id: string
@@ -1457,11 +1470,20 @@ export type Database = {
           nome?: string
           numero_albo?: string | null
           qualifica?: string | null
+          studio_attivo_id?: string | null
           telefono?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_studio_attivo_id_fkey"
+            columns: ["studio_attivo_id"]
+            isOneToOne: false
+            referencedRelation: "studio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seduta: {
         Row: {
@@ -1593,6 +1615,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      studio: {
+        Row: {
+          attivo: boolean
+          citta: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          indirizzo: string | null
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          attivo?: boolean
+          citta?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indirizzo?: string | null
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          attivo?: boolean
+          citta?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indirizzo?: string | null
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       studio_info: {
         Row: {
