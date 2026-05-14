@@ -226,9 +226,12 @@ function PazienteDetailPage() {
 
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-            {paziente.cognome} {paziente.nome}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+              {paziente.cognome} {paziente.nome}
+            </h1>
+            <StudioBadge studioId={paziente.studio_id} />
+          </div>
           <p className="text-sm text-muted-foreground">
             {paziente.data_nascita
               ? `${formatDate(paziente.data_nascita)}${eta !== null ? ` · ${eta} anni` : ""}`
