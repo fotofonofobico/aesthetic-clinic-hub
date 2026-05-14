@@ -438,7 +438,6 @@ function CriticalBanner({
 }
 
 function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () => void }) {
-  const bmi = calcolaBmi(paziente.peso_kg, paziente.altezza_cm);
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -466,26 +465,27 @@ function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () 
         <Info label="Luogo di nascita" value={paziente.luogo_nascita} />
         <Info label="Professione" value={paziente.professione} />
         <Info label="Codice fiscale" value={paziente.codice_fiscale} mono />
-        <Info
-          label="Peso"
-          value={paziente.peso_kg != null ? `${paziente.peso_kg} kg` : null}
-        />
-        <Info
-          label="Altezza"
-          value={paziente.altezza_cm != null ? `${paziente.altezza_cm} cm` : null}
-        />
-        {bmi && (
-          <div className="md:col-span-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">BMI</span>
-            <span className="ml-2 font-semibold">{bmi.value}</span>
-            <span className="ml-2 text-muted-foreground">· {bmi.label}</span>
-          </div>
-        )}
         {paziente.note ? (
           <div className="md:col-span-2">
             <Info label="Note" value={paziente.note} />
           </div>
         ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StudioBadge({ studioId }: { studioId: string | null }) {
+  const { data: studi } = useStudi();
+  if (!studi || studi.length < 2) return null;
+  const s = studi.find((x) => x.id === studioId);
+  if (!s) return null;
+  return (
+    <Badge variant="outline" className="text-xs font-normal">
+      {s.nome}
+    </Badge>
+  );
+}
       </CardContent>
     </Card>
   );
