@@ -8,42 +8,45 @@ import { Activity, Save } from "lucide-react";
 import { toast } from "sonner";
 import { calcolaBmi } from "@/lib/bmi";
 
-export function MetricheCorporeeCard({
-  pazienteId,
-  pesoKg,
-  altezzaCm,
-  onSaved,
-}: {
-  pazienteId: string;
-  pesoKg: number | null;
-  altezzaCm: number | null;
-  onSaved?: () => void;
-}) {
-  const [peso, setPeso] = useState<string>(pesoKg != null ? String(pesoKg) : "");
-  const [altezza, setAltezza] = useState<string>(altezzaCm != null ? String(altezzaCm) : "");
+export function MetricheCorporeeCard({ pazienteId }: { pazienteId: string }) {
+  const [peso, setPeso] = useState<string>("");
+  const [altezza, setAltezza] = useState<string>("");
+  const [originalPeso, setOriginalPeso] = useState<number | null>(null);
+  const [originalAltezza, setOriginalAltezza] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("pazienti")
+      .select("peso_kg, altezza_cm")
+      .eq("id", pazienteId)
+      .maybeSingle();
+    const p = (data?.peso_kg as number | null) ?? null;
+    const a = (data?.altezza_cm as number | null) ?? null;
+    setOriginalPeso(p);
+    setOriginalAltezza(a);
+    setPeso(p != null ? String(p) : "");
+    setAltezza(a != null ? String(a) : "");
+    setLoading(false);
+  }
 
   useEffect(() => {
-    setPeso(pesoKg != null ? String(pesoKg) : "");
-    setAltezza(altezzaCm != null ? String(altezzaCm) : "");
-  }, [pesoKg, altezzaCm]);
+    void load();
+  }, [pazienteId]);
 
   const pesoNum = peso.trim() === "" ? null : Number(peso.replace(",", "."));
-  const altezzaNum = altezza.trim() === "" ? null : Math.round(Number(altezza.replace(",", ".")));
+  const altezzaNum =
+    altezza.trim() === "" ? null : Math.round(Number(altezza.replace(",", ".")));
   const bmi = calcolaBmi(pesoNum, altezzaNum);
-
-  const dirty =
-    (pesoNum ?? null) !== (pesoKg ?? null) ||
-    (altezzaNum ?? null) !== (altezzaCm ?? null);
+  const dirty = (pesoNum ?? null) !== originalPeso || (altezzaNum ?? null) !== originalAltezza;
 
   async function salva() {
     setSaving(true);
     const { error } = await supabase
       .from("pazienti")
-      .update({
-        peso_kg: pesoNum,
-        altezza_cm: altezzaNum,
-      })
+      .update({ peso_kg: pesoNum, altezza_cm: altezzaNum })
       .eq("id", pazienteId);
     setSaving(false);
     if (error) {
@@ -51,7 +54,7 @@ export function MetricheCorporeeCard({
       return;
     }
     toast.success("Metriche aggiornate");
-    onSaved?.();
+    void load();
   }
 
   return (
@@ -72,6 +75,7 @@ export function MetricheCorporeeCard({
               min="0"
               value={peso}
               onChange={(e) => setPeso(e.target.value)}
+              disabled={loading}
               placeholder="es. 68.5"
             />
           </div>
@@ -83,6 +87,7 @@ export function MetricheCorporeeCard({
               min="0"
               value={altezza}
               onChange={(e) => setAltezza(e.target.value)}
+              disabled={loading}
               placeholder="es. 170"
             />
           </div>
@@ -101,7 +106,7 @@ export function MetricheCorporeeCard({
           </div>
         </div>
         <div className="flex justify-end">
-          <Button size="sm" onClick={() => void salva()} disabled={saving || !dirty}>
+          <Button size="sm" onClick={() => void salva()} disabled={saving || !dirty || loading}>
             <Save className="h-4 w-4" />
             {saving ? "Salvataggio…" : "Salva metriche"}
           </Button>
