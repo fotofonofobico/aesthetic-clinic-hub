@@ -23,14 +23,14 @@ import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
-import { MisurazioniPanel } from "@/components/paziente/misurazioni-panel";
 import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
-import { calcolaBmi } from "@/lib/bmi";
 import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
+import { useStudi } from "@/hooks/use-studi";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
   component: PazienteDetailPage,
@@ -226,9 +226,12 @@ function PazienteDetailPage() {
 
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-            {paziente.cognome} {paziente.nome}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+              {paziente.cognome} {paziente.nome}
+            </h1>
+            <StudioBadge studioId={paziente.studio_id} />
+          </div>
           <p className="text-sm text-muted-foreground">
             {paziente.data_nascita
               ? `${formatDate(paziente.data_nascita)}${eta !== null ? ` · ${eta} anni` : ""}`
@@ -281,8 +284,7 @@ function PazienteDetailPage() {
             paziente={paziente}
             onEdit={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
           />
-          <CriolipolisiBaselineBanner pazienteId={id} />
-          <MisurazioniPanel pazienteId={id} />
+          <CriolipolisiBaselineBanner paziente={paziente} onVaiAdAnamnesi={() => setTab("anamnesi")} />
         </TabsContent>
 
         <TabsContent value="anamnesi">
@@ -436,7 +438,6 @@ function CriticalBanner({
 }
 
 function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () => void }) {
-  const bmi = calcolaBmi(paziente.peso_kg, paziente.altezza_cm);
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -464,21 +465,6 @@ function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () 
         <Info label="Luogo di nascita" value={paziente.luogo_nascita} />
         <Info label="Professione" value={paziente.professione} />
         <Info label="Codice fiscale" value={paziente.codice_fiscale} mono />
-        <Info
-          label="Peso"
-          value={paziente.peso_kg != null ? `${paziente.peso_kg} kg` : null}
-        />
-        <Info
-          label="Altezza"
-          value={paziente.altezza_cm != null ? `${paziente.altezza_cm} cm` : null}
-        />
-        {bmi && (
-          <div className="md:col-span-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">BMI</span>
-            <span className="ml-2 font-semibold">{bmi.value}</span>
-            <span className="ml-2 text-muted-foreground">· {bmi.label}</span>
-          </div>
-        )}
         {paziente.note ? (
           <div className="md:col-span-2">
             <Info label="Note" value={paziente.note} />
@@ -489,16 +475,35 @@ function AnagraficaPanel({ paziente, onEdit }: { paziente: Paziente; onEdit: () 
   );
 }
 
-function CriolipolisiBaselineBanner({ pazienteId }: { pazienteId: string }) {
+function StudioBadge({ studioId }: { studioId: string | null }) {
+  const { data: studi } = useStudi();
+  if (!studi || studi.length < 2) return null;
+  const s = studi.find((x) => x.id === studioId);
+  if (!s) return null;
+  return (
+    <Badge variant="outline" className="text-xs font-normal">
+      {s.nome}
+    </Badge>
+  );
+}
+
+function CriolipolisiBaselineBanner({
+  paziente,
+  onVaiAdAnamnesi,
+}: {
+  paziente: Paziente;
+  onVaiAdAnamnesi: () => void;
+}) {
   const [show, setShow] = useState(false);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      // Trova piani attivi/in corso del paziente
       const { data: piani } = await supabase
         .from("piano_trattamento")
         .select("id, stato")
-        .eq("paziente_id", pazienteId)
+        .eq("paziente_id", paziente.id)
         .not("stato", "in", "(annullato,sospeso,bozza,non_indicato)");
       const ids = (piani ?? []).map((p) => (p as { id: string }).id);
       if (ids.length === 0) {
@@ -534,21 +539,35 @@ function CriolipolisiBaselineBanner({ pazienteId }: { pazienteId: string }) {
       const { count } = await supabase
         .from("paziente_misurazione")
         .select("id", { count: "exact", head: true })
-        .eq("paziente_id", pazienteId);
-      setShow((count ?? 0) === 0);
+        .eq("paziente_id", paziente.id);
+      const m: string[] = [];
+      if (paziente.peso_kg == null) m.push("peso");
+      if (paziente.altezza_cm == null) m.push("altezza");
+      if ((count ?? 0) === 0) m.push("misurazione baseline");
+      setMissing(m);
+      setShow(m.length > 0);
     })();
-  }, [pazienteId]);
+  }, [paziente.id, paziente.peso_kg, paziente.altezza_cm]);
 
-  if (!show) return null;
+  if (!show || dismissed) return null;
   return (
     <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-      <div>
-        <div className="font-semibold">Misurazione baseline mancante</div>
-        <div className="mt-0.5 text-foreground">
-          C'è un piano di criolipolisi attivo ma non hai ancora registrato alcuna
-          rilevazione. Registra le circonferenze prima della prima seduta per
-          documentare i risultati nel tempo.
+      <div className="flex-1 space-y-2">
+        <div>
+          <div className="font-semibold">Baseline criolipolisi incompleta</div>
+          <div className="mt-0.5 text-foreground">
+            C'è un piano di criolipolisi attivo. Manca: <strong>{missing.join(", ")}</strong>.
+            Registra questi dati per poter confrontare i risultati nel tempo.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" type="button" onClick={onVaiAdAnamnesi}>
+            Vai ad Anamnesi
+          </Button>
+          <Button size="sm" type="button" variant="outline" onClick={() => setDismissed(true)}>
+            Ignora per ora
+          </Button>
         </div>
       </div>
     </div>

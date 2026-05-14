@@ -42,6 +42,8 @@ import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
 import { buildVisitaSession, type SignatureSession } from "@/lib/signature-session";
 import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
+import { MetricheCorporeeCard } from "./metriche-corporee-card";
+import { MisurazioniPanel } from "./misurazioni-panel";
 
 type ReactNode = React.ReactNode;
 
@@ -754,6 +756,17 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           onSaved();
         }}
       />
+
+      {/* === Dati di monitoraggio (non firmati) === */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          Dati di monitoraggio (non firmati)
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <MetricheCorporeeCard pazienteId={pazienteId} />
+        <MisurazioniPanel pazienteId={pazienteId} />
+      </div>
 
       {/* === 1. GENERALE === */}
       <Card>

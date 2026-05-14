@@ -926,6 +926,7 @@ function EseguiSedutaDialog({
   const [saving, setSaving] = useState(false);
   const [misuraOpen, setMisuraOpen] = useState(false);
   const [reminderMisura, setReminderMisura] = useState(false);
+  const [reminderMissing, setReminderMissing] = useState<string[]>([]);
 
   const isCrioPrima =
     seduta.numero_seduta === 1 && isTrattamentoCriolipolisi(trattamento?.nome);
@@ -936,11 +937,23 @@ function EseguiSedutaDialog({
       return;
     }
     void (async () => {
-      const { count } = await supabase
-        .from("paziente_misurazione")
-        .select("id", { count: "exact", head: true })
-        .eq("paziente_id", seduta.paziente_id);
-      setReminderMisura((count ?? 0) === 0);
+      const [{ count }, pazRes] = await Promise.all([
+        supabase
+          .from("paziente_misurazione")
+          .select("id", { count: "exact", head: true })
+          .eq("paziente_id", seduta.paziente_id),
+        supabase
+          .from("pazienti")
+          .select("peso_kg, altezza_cm")
+          .eq("id", seduta.paziente_id)
+          .maybeSingle(),
+      ]);
+      const m: string[] = [];
+      if ((pazRes.data?.peso_kg as number | null) == null) m.push("peso");
+      if ((pazRes.data?.altezza_cm as number | null) == null) m.push("altezza");
+      if ((count ?? 0) === 0) m.push("misurazione baseline");
+      setReminderMissing(m);
+      setReminderMisura(m.length > 0);
     })();
   }, [isCrioPrima, seduta.paziente_id, misuraOpen]);
 

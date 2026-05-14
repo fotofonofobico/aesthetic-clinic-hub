@@ -253,34 +253,6 @@ function PazienteEditPage() {
                   className="font-mono uppercase"
                 />
               </Field>
-              <Field label="Peso (kg)">
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={form.peso_kg ?? ""}
-                  onChange={(e) =>
-                    update(
-                      "peso_kg",
-                      e.target.value === "" ? null : Number(e.target.value),
-                    )
-                  }
-                />
-              </Field>
-              <Field label="Altezza (cm)">
-                <Input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={form.altezza_cm ?? ""}
-                  onChange={(e) =>
-                    update(
-                      "altezza_cm",
-                      e.target.value === "" ? null : Math.round(Number(e.target.value)),
-                    )
-                  }
-                />
-              </Field>
             </div>
           </CardContent>
         </Card>

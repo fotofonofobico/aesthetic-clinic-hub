@@ -18,6 +18,7 @@ export interface Paziente {
   provincia: string | null;
   professione: string | null;
   note: string | null;
+  studio_id: string | null;
   // Campi non più usati nel form attuale ma presenti a DB:
   identita_genere: string | null;
   peso_kg: number | null;
