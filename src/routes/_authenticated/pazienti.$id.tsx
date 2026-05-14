@@ -281,8 +281,7 @@ function PazienteDetailPage() {
             paziente={paziente}
             onEdit={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
           />
-          <CriolipolisiBaselineBanner pazienteId={id} />
-          <MisurazioniPanel pazienteId={id} />
+          <CriolipolisiBaselineBanner paziente={paziente} onVaiAdAnamnesi={() => setTab("anamnesi")} />
         </TabsContent>
 
         <TabsContent value="anamnesi">
