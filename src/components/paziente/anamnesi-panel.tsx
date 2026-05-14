@@ -755,6 +755,17 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
         }}
       />
 
+      {/* === Dati di monitoraggio (non firmati) === */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          Dati di monitoraggio (non firmati)
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <MetricheCorporeeCard pazienteId={pazienteId} />
+        <MisurazioniPanel pazienteId={pazienteId} />
+      </div>
+
       {/* === 1. GENERALE === */}
       <Card>
         <CardHeader>
