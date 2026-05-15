@@ -1,7 +1,8 @@
 // PDF "modulo vuoto" da firmare a mano (workflow cartaceo).
 // NON viene salvato in storage e NON crea record DB: serve solo per stampa.
 import { jsPDF } from "jspdf";
-import { renderHeaderPaziente, type PazienteHeader } from "./pdf-template";
+import { renderHeaderPaziente, renderHeaderStudio, type PazienteHeader } from "./pdf-template";
+import { loadStudioForPdf } from "./pdf-studio-loader";
 
 export interface ModuloVuotoInput {
   /** Se nome/cognome sono stringhe vuote vengono renderizzate come "_______" (modulo generico). */
@@ -23,12 +24,16 @@ function pazienteOrPlaceholder(p: PazienteHeader | null): PazienteHeader {
   };
 }
 
-export function generaPdfModuloVuoto(input: ModuloVuotoInput): Blob {
+export async function generaPdfModuloVuoto(input: ModuloVuotoInput): Promise<Blob> {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 48;
   let y = margin;
+
+  // Carta intestata studio
+  const { studio, logoDataUrl } = await loadStudioForPdf();
+  y = renderHeaderStudio(doc, studio, logoDataUrl, margin, y);
 
   // Titolo principale
   doc.setFont("helvetica", "bold").setFontSize(14);

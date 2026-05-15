@@ -3,7 +3,8 @@
 // Pensato per stampa medico-legale / consegna al paziente.
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
-import { renderHeaderPaziente } from "./pdf-template";
+import { renderHeaderPaziente, renderHeaderStudio } from "./pdf-template";
+import { loadStudioForPdf } from "./pdf-studio-loader";
 
 const MARGIN = 36;
 const LINE_H = 13;
@@ -166,6 +167,10 @@ export async function generaPdfCartellaPaziente(pazienteId: string): Promise<Car
   const b = new PdfBuilder();
 
   // === Header paziente ===
+  // Carta intestata studio
+  const { studio, logoDataUrl } = await loadStudioForPdf();
+  b.y = renderHeaderStudio(b.doc, studio, logoDataUrl, MARGIN, b.y);
+
   b.doc.setFont("helvetica", "bold").setFontSize(16);
   b.doc.text("Cartella clinica paziente", MARGIN, b.y);
   b.y += 22;
