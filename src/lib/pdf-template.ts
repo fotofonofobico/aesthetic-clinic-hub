@@ -1,7 +1,93 @@
-// Template PDF condiviso: header paziente, metadata, sezione firma.
-// Usato sia da generaPdfConsenso sia da generaPdfAnamnesi per garantire
-// la stessa struttura su tutti i documenti.
+// Template PDF condiviso: intestazione studio (carta intestata),
+// header paziente, metadata, sezione firma.
+// Usato da tutti i generatori PDF per garantire la stessa struttura.
 import type { jsPDF } from "jspdf";
+import type { StudioInfo } from "@/hooks/use-studio-info";
+
+/**
+ * Carta intestata: logo a sinistra, ragione sociale + contatti.
+ * Va chiamata in cima al PDF, prima di tutto. Se studio è null ritorna startY invariato.
+ */
+export function renderHeaderStudio(
+  doc: jsPDF,
+  studio: StudioInfo | null,
+  logoDataUrl: string | null,
+  margin: number,
+  startY: number,
+): number {
+  if (!studio) return startY;
+  const pageW = doc.internal.pageSize.getWidth();
+  let y = startY;
+  const logoSize = 56;
+  const textX = logoDataUrl ? margin + logoSize + 14 : margin;
+  const textRight = pageW - margin;
+
+  if (logoDataUrl) {
+    try {
+      // Determina formato dal dataURL (image/jpeg|png|webp)
+      const fmt = /^data:image\/(jpe?g|png|webp);/i.exec(logoDataUrl)?.[1];
+      const jsFmt =
+        fmt && /^jpe?g$/i.test(fmt) ? "JPEG" : fmt && /webp/i.test(fmt) ? "WEBP" : "PNG";
+      doc.addImage(logoDataUrl, jsFmt, margin, y, logoSize, logoSize, undefined, "FAST");
+    } catch {
+      /* logo opzionale */
+    }
+  }
+
+  let ty = y + 4;
+  if (studio.ragione_sociale) {
+    doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(0);
+    doc.text(studio.ragione_sociale, textX, ty);
+    ty += 15;
+  }
+  doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(90);
+
+  const indir = [
+    studio.indirizzo,
+    [studio.cap, studio.citta].filter(Boolean).join(" "),
+    studio.provincia ? `(${studio.provincia})` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  if (indir) {
+    doc.text(indir, textX, ty);
+    ty += 11;
+  }
+  const contatti = [
+    studio.telefono ? `Tel: ${studio.telefono}` : null,
+    studio.email ? `Email: ${studio.email}` : null,
+    studio.pec ? `PEC: ${studio.pec}` : null,
+    studio.sito_web ? studio.sito_web : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  if (contatti) {
+    const lines = doc.splitTextToSize(contatti, pageW - margin - textX) as string[];
+    for (const l of lines) {
+      doc.text(l, textX, ty);
+      ty += 11;
+    }
+  }
+  if (studio.direttore_sanitario) {
+    doc.text(`Direttore sanitario: ${studio.direttore_sanitario}`, textX, ty);
+    ty += 11;
+  }
+  if (studio.partita_iva || studio.codice_fiscale) {
+    const piva = [
+      studio.partita_iva ? `P.IVA ${studio.partita_iva}` : null,
+      studio.codice_fiscale ? `C.F. ${studio.codice_fiscale}` : null,
+    ]
+      .filter(Boolean)
+      .join("  ·  ");
+    doc.text(piva, textX, ty);
+    ty += 11;
+  }
+  doc.setTextColor(0);
+
+  const headerBottom = Math.max(ty, y + (logoDataUrl ? logoSize : 0)) + 8;
+  doc.setDrawColor(180).setLineWidth(0.5).line(margin, headerBottom, textRight, headerBottom);
+  return headerBottom + 14;
+}
 
 export interface PazienteHeader {
   cognome: string;
