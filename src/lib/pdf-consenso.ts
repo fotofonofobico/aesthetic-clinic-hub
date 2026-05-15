@@ -4,9 +4,11 @@ import { sha256Hex } from "./hash";
 import {
   renderFooterPagine,
   renderHeaderPaziente,
+  renderHeaderStudio,
   renderMetadata,
   renderSignatureBlock,
 } from "./pdf-template";
+import { loadStudioForPdf } from "./pdf-studio-loader";
 
 export interface DatiPazientePdf {
   cognome: string;
@@ -53,6 +55,10 @@ export async function generaPdfConsenso(
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 48;
   let y = margin;
+
+  // Carta intestata studio (se configurato)
+  const { studio, logoDataUrl } = await loadStudioForPdf();
+  y = renderHeaderStudio(doc, studio, logoDataUrl, margin, y);
 
   // Titolo principale
   doc.setFont("helvetica", "bold").setFontSize(14);
