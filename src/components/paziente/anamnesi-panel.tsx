@@ -1180,6 +1180,9 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
       </Dialog>
 
       {/* Cronologia */}
+      {/* === Misurazioni e metriche corporee (non firmate, in coda) === */}
+      <MisurazioniMetricheCard pazienteId={pazienteId} />
+
       <AnamnesiCronologia pazienteId={pazienteId} />
     </div>
   );
