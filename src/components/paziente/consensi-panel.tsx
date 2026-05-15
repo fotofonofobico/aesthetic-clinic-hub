@@ -512,7 +512,7 @@ function NuovoConsensoDialog({
           data_nascita: paz.data_nascita ?? null,
         };
       }
-      const blob = generaPdfModuloVuoto({
+      const blob = await generaPdfModuloVuoto({
         paziente: pazHeader,
         titolo: tpl.titolo,
         testo: tpl.testo,
