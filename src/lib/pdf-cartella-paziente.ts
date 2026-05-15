@@ -3,7 +3,8 @@
 // Pensato per stampa medico-legale / consegna al paziente.
 import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
-import { renderHeaderPaziente } from "./pdf-template";
+import { renderHeaderPaziente, renderHeaderStudio } from "./pdf-template";
+import { loadStudioForPdf } from "./pdf-studio-loader";
 
 const MARGIN = 36;
 const LINE_H = 13;

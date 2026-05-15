@@ -4,9 +4,11 @@ import type { DatiPazientePdf } from "./pdf-consenso";
 import {
   renderFooterPagine,
   renderHeaderPaziente,
+  renderHeaderStudio,
   renderMetadata,
   renderSignatureBlock,
 } from "./pdf-template";
+import { loadStudioForPdf } from "./pdf-studio-loader";
 
 export interface AnamnesiPdfInput {
   paziente: DatiPazientePdf;
@@ -315,6 +317,9 @@ export async function generaPdfAnamnesi(
   const margin = 48;
   let y = margin;
   const modalita = input.modalita ?? "tablet";
+
+  const { studio, logoDataUrl } = await loadStudioForPdf();
+  y = renderHeaderStudio(doc, studio, logoDataUrl, margin, y);
 
   doc.setFont("helvetica", "bold").setFontSize(14);
   doc.text("ANAMNESI", margin, y);
