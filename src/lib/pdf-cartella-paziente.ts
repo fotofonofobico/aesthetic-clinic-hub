@@ -167,6 +167,10 @@ export async function generaPdfCartellaPaziente(pazienteId: string): Promise<Car
   const b = new PdfBuilder();
 
   // === Header paziente ===
+  // Carta intestata studio
+  const { studio, logoDataUrl } = await loadStudioForPdf();
+  b.y = renderHeaderStudio(b.doc, studio, logoDataUrl, MARGIN, b.y);
+
   b.doc.setFont("helvetica", "bold").setFontSize(16);
   b.doc.text("Cartella clinica paziente", MARGIN, b.y);
   b.y += 22;
