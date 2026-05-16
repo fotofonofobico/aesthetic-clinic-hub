@@ -135,6 +135,7 @@ function StudioPage() {
 
   return (
     <div className="space-y-6">
+      <SediStudioSection />
       <Card>
         <CardHeader>
           <CardTitle>Dati dello studio</CardTitle>
