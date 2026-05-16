@@ -17,6 +17,7 @@ import {
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { validateCFInput, normalizeCF } from "@/lib/codice-fiscale";
+import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, Sesso } from "@/types/clinico";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id/edit")({
@@ -28,6 +29,9 @@ function PazienteEditPage() {
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
   const isNew = id === "new";
+  const { data: studi } = useStudi();
+  const studiAttivi = (studi ?? []).filter((s) => s.attivo);
+  const mostraSelettoreStudio = (studi ?? []).length >= 2;
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -48,7 +52,22 @@ function PazienteEditPage() {
     note: "",
     peso_kg: null,
     altezza_cm: null,
+    studio_id: null,
   });
+
+  // Per i nuovi pazienti, precompila con lo studio attivo del profilo
+  useEffect(() => {
+    if (!isNew || !user?.id) return;
+    void supabase
+      .from("profiles")
+      .select("studio_attivo_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const sid = (data?.studio_attivo_id as string | null) ?? null;
+        if (sid) setForm((f) => (f.studio_id ? f : { ...f, studio_id: sid }));
+      });
+  }, [isNew, user?.id]);
 
   useEffect(() => {
     if (isNew) return;
@@ -111,6 +130,7 @@ function PazienteEditPage() {
       note: form.note?.trim() || null,
       peso_kg: form.peso_kg ?? null,
       altezza_cm: form.altezza_cm ?? null,
+      studio_id: form.studio_id ?? null,
     };
 
     if (isNew) {
@@ -321,6 +341,27 @@ function PazienteEditPage() {
                 onChange={(e) => update("professione", e.target.value)}
               />
             </Field>
+            {mostraSelettoreStudio ? (
+              <Field label="Studio di riferimento">
+                <Select
+                  value={form.studio_id ?? "none"}
+                  onValueChange={(v) => update("studio_id", v === "none" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nessuno</SelectItem>
+                    {studiAttivi.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nome}
+                        {s.citta ? ` · ${s.citta}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
             <Field label="Note generali">
               <Textarea
                 rows={3}

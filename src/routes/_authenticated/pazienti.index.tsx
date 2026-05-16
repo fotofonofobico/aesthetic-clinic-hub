@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore } from "lucide-react";
+import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, AlertSeverity } from "@/types/clinico";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,9 @@ interface PazienteRow extends Paziente {
 function PazientiListPage() {
   const { hasRole } = useAuth();
   const isMedico = hasRole("medico");
+  const { data: studi } = useStudi();
+  const mostraStudi = (studi ?? []).length >= 2;
+  const studiMap = new Map((studi ?? []).map((s) => [s.id, s]));
   const [pazienti, setPazienti] = useState<PazienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -175,8 +179,14 @@ function PazientiListPage() {
                   }
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium">
-                      {p.cognome} {p.nome}
+                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                      <span>{p.cognome} {p.nome}</span>
+                      {mostraStudi && p.studio_id && studiMap.get(p.studio_id) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wider text-muted-foreground">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {studiMap.get(p.studio_id)!.nome}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {p.data_nascita ? formatDate(p.data_nascita) : "—"}

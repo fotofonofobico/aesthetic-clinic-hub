@@ -25,6 +25,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Printer,
   ShieldAlert,
   StickyNote,
   Stethoscope,
@@ -33,7 +34,11 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { NotaAllegato, NotaTipo, PazienteNota } from "@/types/clinico";
+import type { NotaAllegato, NotaTipo, Paziente, PazienteNota } from "@/types/clinico";
+import { loadStudioForPdf } from "@/lib/pdf-studio-loader";
+import { generaPdfRelazione } from "@/lib/pdf-relazione";
+import { printBlob } from "@/lib/download";
+import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 
 interface TimelineEvent {
   id: string;
@@ -66,8 +71,10 @@ const TIPO_LABEL: Record<NotaTipo, string> = {
 
 export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
   const { user, hasRole } = useAuth();
+  const { data: profilo } = useProfile();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [notes, setNotes] = useState<PazienteNota[]>([]);
+  const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [loading, setLoading] = useState(true);
 
   // form nuova nota
@@ -93,7 +100,7 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     setLoading(true);
     const [pRes, anRes, fRes, alRes, plRes, sdRes, fuRes, cnRes, ntRes, auRes, avRes] =
       await Promise.all([
-        supabase.from("pazienti").select("created_at").eq("id", pazienteId).maybeSingle(),
+        supabase.from("pazienti").select("*").eq("id", pazienteId).maybeSingle(),
         supabase
           .from("anamnesi")
           .select("updated_at, created_at")
@@ -282,7 +289,33 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     ev.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     setEvents(ev);
     setNotes(noteList);
+    setPaziente((pRes.data as Paziente | null) ?? null);
     setLoading(false);
+  }
+
+  async function stampaRelazione(note: PazienteNota) {
+    if (!paziente) {
+      toast.error("Dati paziente non disponibili");
+      return;
+    }
+    try {
+      const { studio } = await loadStudioForPdf();
+      const { blob } = generaPdfRelazione({
+        paziente: {
+          cognome: paziente.cognome,
+          nome: paziente.nome,
+          codice_fiscale: paziente.codice_fiscale,
+          data_nascita: paziente.data_nascita,
+        },
+        studio,
+        dataNota: new Date(note.data_evento),
+        testo: note.testo,
+        medicoNome: nomeVisualizzato(profilo ?? null, ""),
+      });
+      printBlob(blob);
+    } catch (e) {
+      toast.error(`Errore generazione PDF: ${(e as Error).message}`);
+    }
   }
 
   async function aggiungiNota() {
@@ -565,6 +598,17 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
                     </div>
                     <div className="flex items-center gap-2">
                       <time className="text-xs text-muted-foreground">{fmt(e.ts)}</time>
+                      {isNote && note && note.tipo === "clinica" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Stampa relazione su carta intestata"
+                          onClick={() => void stampaRelazione(note)}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : null}
                       {isNote && hasRole("medico") && note ? (
                         <Button
                           variant="ghost"
