@@ -598,6 +598,17 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
                     </div>
                     <div className="flex items-center gap-2">
                       <time className="text-xs text-muted-foreground">{fmt(e.ts)}</time>
+                      {isNote && note && note.tipo === "clinica" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          title="Stampa relazione su carta intestata"
+                          onClick={() => void stampaRelazione(note)}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : null}
                       {isNote && hasRole("medico") && note ? (
                         <Button
                           variant="ghost"
