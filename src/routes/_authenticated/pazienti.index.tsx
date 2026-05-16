@@ -179,8 +179,14 @@ function PazientiListPage() {
                   }
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium">
-                      {p.cognome} {p.nome}
+                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                      <span>{p.cognome} {p.nome}</span>
+                      {mostraStudi && p.studio_id && studiMap.get(p.studio_id) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wider text-muted-foreground">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {studiMap.get(p.studio_id)!.nome}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {p.data_nascita ? formatDate(p.data_nascita) : "—"}
