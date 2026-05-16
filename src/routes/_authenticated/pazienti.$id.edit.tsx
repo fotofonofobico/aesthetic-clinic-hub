@@ -130,6 +130,7 @@ function PazienteEditPage() {
       note: form.note?.trim() || null,
       peso_kg: form.peso_kg ?? null,
       altezza_cm: form.altezza_cm ?? null,
+      studio_id: form.studio_id ?? null,
     };
 
     if (isNew) {
