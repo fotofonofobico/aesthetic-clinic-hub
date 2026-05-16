@@ -209,3 +209,190 @@ function Field({
     </div>
   );
 }
+
+function SediStudioSection() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const { data: studi, isLoading } = useStudi();
+  const [nuovoNome, setNuovoNome] = React.useState("");
+  const [nuovaCitta, setNuovaCitta] = React.useState("");
+  const [studioAttivoId, setStudioAttivoId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    void supabase
+      .from("profiles")
+      .select("studio_attivo_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setStudioAttivoId((data?.studio_attivo_id as string | null) ?? null);
+      });
+  }, [user?.id]);
+
+  const aggiungi = useMutation({
+    mutationFn: async () => {
+      if (!nuovoNome.trim()) throw new Error("Nome obbligatorio");
+      const { error } = await supabase.from("studio" as never).insert({
+        nome: nuovoNome.trim(),
+        citta: nuovaCitta.trim() || null,
+        created_by: user?.id,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setNuovoNome("");
+      setNuovaCitta("");
+      toast.success("Sede aggiunta");
+      void qc.invalidateQueries({ queryKey: ["studi"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleAttiva = useMutation({
+    mutationFn: async (s: Studio) => {
+      const { error } = await supabase
+        .from("studio" as never)
+        .update({ attivo: !s.attivo } as never)
+        .eq("id", s.id);
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["studi"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const elimina = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("studio" as never).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Sede eliminata");
+      void qc.invalidateQueries({ queryKey: ["studi"] });
+    },
+    onError: (e: Error) =>
+      toast.error(
+        e.message.includes("foreign key")
+          ? "Impossibile eliminare: ci sono pazienti associati a questa sede"
+          : e.message,
+      ),
+  });
+
+  const setAttivo = useMutation({
+    mutationFn: async (id: string | null) => {
+      if (!user?.id) throw new Error("Utente non autenticato");
+      const { error } = await supabase
+        .from("profiles")
+        .update({ studio_attivo_id: id })
+        .eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, id) => {
+      setStudioAttivoId(id);
+      toast.success("Sede di lavoro aggiornata");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sedi / Studi</CardTitle>
+        <CardDescription>
+          Gestisci più sedi di lavoro. La sede attiva è quella selezionata per default sui nuovi pazienti.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Caricamento…</p>
+        ) : (studi ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nessuna sede configurata. Aggiungine almeno una se lavori in più di uno studio.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {(studi ?? []).map((s) => {
+              const isAttivo = studioAttivoId === s.id;
+              return (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{s.nome}</span>
+                      {isAttivo ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                          <Check className="h-3 w-3" /> Attiva
+                        </span>
+                      ) : null}
+                      {!s.attivo ? (
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          disattivata
+                        </span>
+                      ) : null}
+                    </div>
+                    {s.citta ? (
+                      <div className="text-xs text-muted-foreground">{s.citta}</div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={s.attivo}
+                        onCheckedChange={() => toggleAttiva.mutate(s)}
+                        aria-label="Attiva/disattiva sede"
+                      />
+                      <span className="text-xs text-muted-foreground">attiva</span>
+                    </div>
+                    {!isAttivo && s.attivo ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAttivo.mutate(s.id)}
+                      >
+                        Imposta come mia sede
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm(`Eliminare la sede "${s.nome}"?`)) elimina.mutate(s.id);
+                      }}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
+          <div className="flex-1 space-y-2">
+            <Label>Nome sede *</Label>
+            <Input
+              value={nuovoNome}
+              onChange={(e) => setNuovoNome(e.target.value)}
+              placeholder="Es. Studio Milano"
+            />
+          </div>
+          <div className="flex-1 space-y-2">
+            <Label>Città</Label>
+            <Input
+              value={nuovaCitta}
+              onChange={(e) => setNuovaCitta(e.target.value)}
+              placeholder="Es. Milano"
+            />
+          </div>
+          <Button onClick={() => aggiungi.mutate()} disabled={!nuovoNome.trim() || aggiungi.isPending}>
+            <Plus className="h-4 w-4" /> Aggiungi sede
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
