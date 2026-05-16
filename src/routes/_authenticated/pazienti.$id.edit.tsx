@@ -29,6 +29,9 @@ function PazienteEditPage() {
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
   const isNew = id === "new";
+  const { data: studi } = useStudi();
+  const studiAttivi = (studi ?? []).filter((s) => s.attivo);
+  const mostraSelettoreStudio = (studi ?? []).length >= 2;
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -49,7 +52,22 @@ function PazienteEditPage() {
     note: "",
     peso_kg: null,
     altezza_cm: null,
+    studio_id: null,
   });
+
+  // Per i nuovi pazienti, precompila con lo studio attivo del profilo
+  useEffect(() => {
+    if (!isNew || !user?.id) return;
+    void supabase
+      .from("profiles")
+      .select("studio_attivo_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const sid = (data?.studio_attivo_id as string | null) ?? null;
+        if (sid) setForm((f) => (f.studio_id ? f : { ...f, studio_id: sid }));
+      });
+  }, [isNew, user?.id]);
 
   useEffect(() => {
     if (isNew) return;
