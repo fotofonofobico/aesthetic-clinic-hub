@@ -71,8 +71,10 @@ const TIPO_LABEL: Record<NotaTipo, string> = {
 
 export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
   const { user, hasRole } = useAuth();
+  const { data: profilo } = useProfile();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [notes, setNotes] = useState<PazienteNota[]>([]);
+  const [paziente, setPaziente] = useState<Paziente | null>(null);
   const [loading, setLoading] = useState(true);
 
   // form nuova nota
