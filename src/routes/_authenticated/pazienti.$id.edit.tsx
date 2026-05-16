@@ -17,6 +17,7 @@ import {
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { validateCFInput, normalizeCF } from "@/lib/codice-fiscale";
+import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, Sesso } from "@/types/clinico";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id/edit")({
