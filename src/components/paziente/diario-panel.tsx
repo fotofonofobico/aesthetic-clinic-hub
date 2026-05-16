@@ -25,6 +25,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Printer,
   ShieldAlert,
   StickyNote,
   Stethoscope,
@@ -33,7 +34,11 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { NotaAllegato, NotaTipo, PazienteNota } from "@/types/clinico";
+import type { NotaAllegato, NotaTipo, Paziente, PazienteNota } from "@/types/clinico";
+import { loadStudioForPdf } from "@/lib/pdf-studio-loader";
+import { generaPdfRelazione } from "@/lib/pdf-relazione";
+import { printBlob } from "@/lib/download";
+import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 
 interface TimelineEvent {
   id: string;
