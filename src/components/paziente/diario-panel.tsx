@@ -100,7 +100,7 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     setLoading(true);
     const [pRes, anRes, fRes, alRes, plRes, sdRes, fuRes, cnRes, ntRes, auRes, avRes] =
       await Promise.all([
-        supabase.from("pazienti").select("created_at").eq("id", pazienteId).maybeSingle(),
+        supabase.from("pazienti").select("*").eq("id", pazienteId).maybeSingle(),
         supabase
           .from("anamnesi")
           .select("updated_at, created_at")
