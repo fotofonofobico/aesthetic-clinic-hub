@@ -24,6 +24,9 @@ interface PazienteRow extends Paziente {
 function PazientiListPage() {
   const { hasRole } = useAuth();
   const isMedico = hasRole("medico");
+  const { data: studi } = useStudi();
+  const mostraStudi = (studi ?? []).length >= 2;
+  const studiMap = new Map((studi ?? []).map((s) => [s.id, s]));
   const [pazienti, setPazienti] = useState<PazienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
