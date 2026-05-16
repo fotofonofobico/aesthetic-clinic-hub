@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore } from "lucide-react";
+import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, AlertSeverity } from "@/types/clinico";
 import { cn } from "@/lib/utils";
 
