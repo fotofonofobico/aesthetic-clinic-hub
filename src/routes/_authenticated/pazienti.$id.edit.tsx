@@ -341,6 +341,27 @@ function PazienteEditPage() {
                 onChange={(e) => update("professione", e.target.value)}
               />
             </Field>
+            {mostraSelettoreStudio ? (
+              <Field label="Studio di riferimento">
+                <Select
+                  value={form.studio_id ?? "none"}
+                  onValueChange={(v) => update("studio_id", v === "none" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nessuno</SelectItem>
+                    {studiAttivi.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nome}
+                        {s.citta ? ` · ${s.citta}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
             <Field label="Note generali">
               <Textarea
                 rows={3}
