@@ -289,7 +289,33 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
     ev.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     setEvents(ev);
     setNotes(noteList);
+    setPaziente((pRes.data as Paziente | null) ?? null);
     setLoading(false);
+  }
+
+  async function stampaRelazione(note: PazienteNota) {
+    if (!paziente) {
+      toast.error("Dati paziente non disponibili");
+      return;
+    }
+    try {
+      const { studio } = await loadStudioForPdf();
+      const { blob } = generaPdfRelazione({
+        paziente: {
+          cognome: paziente.cognome,
+          nome: paziente.nome,
+          codice_fiscale: paziente.codice_fiscale,
+          data_nascita: paziente.data_nascita,
+        },
+        studio,
+        dataNota: new Date(note.data_evento),
+        testo: note.testo,
+        medicoNome: nomeVisualizzato(profilo ?? null, ""),
+      });
+      printBlob(blob);
+    } catch (e) {
+      toast.error(`Errore generazione PDF: ${(e as Error).message}`);
+    }
   }
 
   async function aggiungiNota() {
