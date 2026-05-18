@@ -5,6 +5,7 @@ import type {
   EventoCalendario,
 } from "@/types/calendario";
 import { COLORE_SCADENZA, COLORE_SEDUTA, TIPO_COLORE } from "@/lib/calendario";
+import { logger } from "@/lib/logger";
 
 export interface FiltriCalendario {
   mostraSedute: boolean;
@@ -84,14 +85,25 @@ export function useCalendarioEventi({ from, to, filtri }: Params) {
     void run;
     const queries: Promise<{ data: any[] | null }>[] = [sedutePromise, eventiPromise, scadenzePromise];
 
-    Promise.all(queries)
-      .then(async ([sedRes, evRes, scadRes]) => {
+    // allSettled: un canale rotto non azzera la vista. Per i rejected usiamo
+    // fallback [] (la UI già tollera sezioni vuote).
+    Promise.allSettled(queries)
+      .then(async (results) => {
         if (cancelled) return;
 
-        // Errori parziali tollerati: non bloccare la vista
-        const sedute = (sedRes?.data ?? []) as any[];
-        const eventiCal = (evRes?.data ?? []) as EventoCalendario[];
-        const scadenze = (scadRes?.data ?? []) as any[];
+        const [sedRes, evRes, scadRes] = results;
+        const sedute =
+          sedRes.status === "fulfilled" ? ((sedRes.value?.data ?? []) as any[]) : [];
+        const eventiCal =
+          evRes.status === "fulfilled"
+            ? ((evRes.value?.data ?? []) as EventoCalendario[])
+            : [];
+        const scadenze =
+          scadRes.status === "fulfilled" ? ((scadRes.value?.data ?? []) as any[]) : [];
+
+        if (sedRes.status === "rejected") logger.error("[calendario] sedute", sedRes.reason);
+        if (evRes.status === "rejected") logger.error("[calendario] eventi", evRes.reason);
+        if (scadRes.status === "rejected") logger.error("[calendario] scadenze", scadRes.reason);
 
         // Carica nomi pazienti in batch
         const pazienteIds = new Set<string>();
@@ -163,7 +175,7 @@ export function useCalendarioEventi({ from, to, filtri }: Params) {
       })
       .catch((err) => {
         if (cancelled) return;
-        console.error("[calendario] errore caricamento", err);
+        logger.error("[calendario] errore caricamento", err);
         setError(err.message || "Errore di caricamento");
         setLoading(false);
       });
