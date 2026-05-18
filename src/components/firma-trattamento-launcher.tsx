@@ -45,7 +45,10 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
       .select("id, nome, categoria")
       .eq("attivo", true)
       .order("nome")
-      .then(({ data }) => setTrattamenti((data ?? []) as TrattamentoLite[]));
+      .then(({ data }) => setTrattamenti((data ?? []) as TrattamentoLite[]))
+      .catch((err) => {
+        logger.error("[firmaTrattamentoLauncher]", err);
+      });
   }, [openSel]);
 
   function toggle(id: string) {

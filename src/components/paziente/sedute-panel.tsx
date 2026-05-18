@@ -1517,10 +1517,14 @@ function NuovaSedutaSpotDialog({
       setConsensoOk(null);
       return;
     }
-    void puoEseguireTrattamento(pazienteId, trattamentoId).then((r) => {
-      setConsensoOk(r.ok);
-      setConsensoMotivi(r.motivi);
-    });
+    void puoEseguireTrattamento(pazienteId, trattamentoId)
+      .then((r) => {
+        setConsensoOk(r.ok);
+        setConsensoMotivi(r.motivi);
+      })
+      .catch((err) => {
+        logger.error("[puoEseguireTrattamento]", err);
+      });
   }, [trattamentoId, pazienteId]);
 
   async function salva() {

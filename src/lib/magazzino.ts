@@ -183,7 +183,8 @@ export async function creaProdotto(input: CreaProdottoInput): Promise<Prodotto> 
   };
   const { data, error } = await supabase.from("prodotto").insert(payload).select().single();
   if (error) {
-    console.error("[creaProdotto] error", { code: error.code, message: error.message, details: error.details, payload });
+    // Niente payload nel log per evitare PII.
+    logger.error("[creaProdotto]", { code: error.code, message: error.message, details: error.details });
     throw new Error(error.message || "Errore creazione prodotto");
   }
   return data as Prodotto;
