@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 /**
  * Crea un evento follow-up sul calendario se l'utente ha attivato l'opzione
@@ -45,6 +46,6 @@ export async function creaFollowupSePrevisto(opts: {
       descrizione: `Promemoria automatico generato dopo la seduta del ${opts.data_seduta.toLocaleDateString("it-IT")}.`,
     });
   } catch (err) {
-    console.warn("[calendario] creaFollowupSePrevisto: errore silenzioso", err);
+    logger.warn("[calendario] creaFollowupSePrevisto: errore silenzioso", err);
   }
 }

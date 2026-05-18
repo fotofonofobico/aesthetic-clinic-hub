@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { logger } from "@/lib/logger";
 
 interface PazienteRow {
   id: string;
@@ -38,11 +39,15 @@ export function AttivitaRecente() {
         .not("data_seduta", "is", null)
         .order("data_seduta", { ascending: false })
         .limit(5),
-    ]).then(([pz, sd]) => {
-      if (cancelled) return;
-      setPazienti((pz.data ?? []) as PazienteRow[]);
-      setSedute((sd.data ?? []) as any);
-    });
+    ])
+      .then(([pz, sd]) => {
+        if (cancelled) return;
+        setPazienti((pz.data ?? []) as PazienteRow[]);
+        setSedute((sd.data ?? []) as any);
+      })
+      .catch((err) => {
+        logger.error("[attivitaRecente]", err);
+      });
     return () => {
       cancelled = true;
     };

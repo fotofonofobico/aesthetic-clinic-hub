@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1517,10 +1518,14 @@ function NuovaSedutaSpotDialog({
       setConsensoOk(null);
       return;
     }
-    void puoEseguireTrattamento(pazienteId, trattamentoId).then((r) => {
-      setConsensoOk(r.ok);
-      setConsensoMotivi(r.motivi);
-    });
+    void puoEseguireTrattamento(pazienteId, trattamentoId)
+      .then((r) => {
+        setConsensoOk(r.ok);
+        setConsensoMotivi(r.motivi);
+      })
+      .catch((err) => {
+        logger.error("[puoEseguireTrattamento]", err);
+      });
   }, [trattamentoId, pazienteId]);
 
   async function salva() {

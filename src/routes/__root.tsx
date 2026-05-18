@@ -1,8 +1,9 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouter } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
 
@@ -75,6 +76,24 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const [queryClient] = useState(() => new QueryClient());
+  const router = useRouter();
+
+  // Invalida cache al cambio di sessione (login/logout/utente cambiato).
+  // Usa clear() invece di invalidateQueries() per evitare tempeste di refetch
+  // (realtime + dashboard + tabs). TOKEN_REFRESHED è solo rinnovo bearer per
+  // lo stesso utente: non invalidiamo nulla.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        queryClient.clear();
+        void router.invalidate();
+      }
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [queryClient, router]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

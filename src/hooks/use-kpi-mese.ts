@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export interface KpiMese {
   nuoviPazienti: number | null;
@@ -24,7 +25,9 @@ export function useKpiMese() {
     inizioMese.setHours(0, 0, 0, 0);
     const iso = inizioMese.toISOString();
 
-    Promise.all([
+    // allSettled: un KPI rotto non oscura l'altro. Per i fallimenti il valore
+    // resta null (UI mostra "–"), non lo forziamo a 0 per non simulare dati reali.
+    Promise.allSettled([
       supabase
         .from("pazienti")
         .select("id", { count: "exact", head: true })
@@ -36,16 +39,27 @@ export function useKpiMese() {
         .gte("data_seduta", iso)
         .eq("completata", true),
     ])
-      .then(([pz, sd]) => {
+      .then((results) => {
         if (cancelled) return;
-        setData((d) => ({
-          ...d,
-          nuoviPazienti: pz.count ?? 0,
-          trattamentiCompletati: sd.count ?? 0,
-        }));
+        const [pzRes, sdRes] = results;
+        const nuoviPazienti =
+          pzRes.status === "fulfilled" ? (pzRes.value.count ?? 0) : null;
+        const trattamentiCompletati =
+          sdRes.status === "fulfilled" ? (sdRes.value.count ?? 0) : null;
+        if (pzRes.status === "rejected") {
+          logger.error("[useKpiMese] pazienti", pzRes.reason);
+        }
+        if (sdRes.status === "rejected") {
+          logger.error("[useKpiMese] sedute", sdRes.reason);
+        }
+        setData((d) => ({ ...d, nuoviPazienti, trattamentiCompletati }));
         setLoading(false);
       })
-      .catch(() => !cancelled && setLoading(false));
+      .catch((err) => {
+        if (cancelled) return;
+        logger.error("[useKpiMese]", err);
+        setLoading(false);
+      });
 
     return () => {
       cancelled = true;
