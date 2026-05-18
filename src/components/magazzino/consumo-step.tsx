@@ -1,4 +1,5 @@
 import * as React from "react";
+import { logger } from "@/lib/logger";
 import { Plus, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
       setProdotti(d);
     } catch (e) {
       // non fatale: la lista resta vuota, l'utente può comunque creare prodotti
-      console.warn("listProdotti failed", e);
+      logger.warn("listProdotti failed", e);
     } finally {
       setLoadingProdotti(false);
     }
@@ -81,7 +82,7 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
       try {
         lotti = await listLotti({ prodotto_id: id });
       } catch (e) {
-        console.warn("listLotti failed", e);
+        logger.warn("listLotti failed", e);
         toast.error("Impossibile caricare i lotti del prodotto");
         lotti = [];
       }
