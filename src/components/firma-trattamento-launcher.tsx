@@ -16,6 +16,7 @@ import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { SendToTabletButton } from "@/components/firma/send-to-tablet-button";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
+import { logger } from "@/lib/logger";
 
 interface TrattamentoLite {
   id: string;
@@ -40,15 +41,22 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
 
   useEffect(() => {
     if (!openSel) return;
-    void supabase
-      .from("trattamenti")
-      .select("id, nome, categoria")
-      .eq("attivo", true)
-      .order("nome")
-      .then(({ data }) => setTrattamenti((data ?? []) as TrattamentoLite[]))
-      .catch((err) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("trattamenti")
+          .select("id, nome, categoria")
+          .eq("attivo", true)
+          .order("nome");
+        if (!cancelled) setTrattamenti((data ?? []) as TrattamentoLite[]);
+      } catch (err) {
         logger.error("[firmaTrattamentoLauncher]", err);
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [openSel]);
 
   function toggle(id: string) {
