@@ -1,4 +1,5 @@
 import * as React from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

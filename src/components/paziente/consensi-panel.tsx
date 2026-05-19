@@ -1,4 +1,5 @@
 import * as React from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";

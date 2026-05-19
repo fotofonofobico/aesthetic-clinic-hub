@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { getSignedUrl, deleteFoto } from "@/lib/foto-clinica";
 import type { FotoClinica } from "@/types/foto-clinica";
 import { Badge } from "@/components/ui/badge";
