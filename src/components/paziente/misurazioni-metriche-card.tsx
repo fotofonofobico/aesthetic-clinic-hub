@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -114,7 +115,12 @@ export function MisurazioniMetricheCard({ pazienteId }: { pazienteId: string }) 
 
   async function elimina(id: string) {
     if (!hasRole("medico")) return;
-    if (!confirm("Eliminare questa rilevazione?")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare rilevazione",
+      description: "Eliminare questa rilevazione?",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("paziente_misurazione").delete().eq("id", id);
     if (error) {
       toast.error(`Errore: ${error.message}`);

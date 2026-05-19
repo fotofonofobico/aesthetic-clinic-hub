@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { getSignedUrl, deleteFoto } from "@/lib/foto-clinica";
 import type { FotoClinica } from "@/types/foto-clinica";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +100,12 @@ export function FotoGrid({ foto, onDeleted, canDelete, emptyHint }: Props) {
 
   async function handleDelete() {
     if (!openFoto) return;
-    if (!confirm("Eliminare questa foto?")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare foto",
+      description: "Eliminare questa foto?",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await deleteFoto(openFoto);

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -113,7 +114,12 @@ export function ConsensiPanel({
 
   async function revoca(c: ConsensoFirmato) {
     if (!isMedico) return;
-    if (!confirm(`Revocare il consenso "${c.titolo_snapshot}"?`)) return;
+    const ok = await confirmDialog({
+      title: "Revocare consenso",
+      description: `Revocare il consenso "${c.titolo_snapshot}"?`,
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("consenso_firmato")
       .update({ revocato_il: new Date().toISOString(), revocato_da: user?.id })

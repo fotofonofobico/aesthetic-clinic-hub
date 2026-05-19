@@ -1,4 +1,5 @@
 import * as React from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -151,12 +152,12 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
 
   async function annullaModifiche() {
     if (!data || data.stato !== "draft" || !lastSigned) return;
-    if (
-      !confirm(
-        `Eliminare le modifiche correnti e ripristinare l'ultima versione firmata (v${lastSigned.versione_numero})?`,
-      )
-    )
-      return;
+    const ok = await confirmDialog({
+      title: "Annullare modifiche",
+      description: `Eliminare le modifiche correnti e ripristinare l'ultima versione firmata (v${lastSigned.versione_numero})?`,
+      destructive: true,
+    });
+    if (!ok) return;
     setAnnullando(true);
     const { error } = await supabase.from("anamnesi").delete().eq("id", data.id);
     if (error) {

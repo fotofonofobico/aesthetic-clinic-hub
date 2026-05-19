@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -410,7 +411,12 @@ export function DiarioPanel({ pazienteId }: { pazienteId: string }) {
       toast.error("Solo i medici possono eliminare note");
       return;
     }
-    if (!confirm("Eliminare questa nota dal diario?")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare nota",
+      description: "Eliminare questa nota dal diario?",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("paziente_nota").delete().eq("id", id);
     if (error) {
       toast.error(`Errore: ${error.message}`);
