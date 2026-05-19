@@ -171,7 +171,12 @@ function PazienteEditPage() {
       toast.error("Solo i medici possono eliminare pazienti");
       return;
     }
-    if (!confirm("Confermi la cancellazione del paziente? La cartella resta archiviata.")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare paziente",
+      description: "Confermi la cancellazione del paziente? La cartella resta archiviata.",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("pazienti")
       .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id })

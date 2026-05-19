@@ -75,7 +75,11 @@ export function FotoPianoPanel({ paziente_id, piano_id, piano_titolo }: Props) {
   }
 
   async function handleRiapri() {
-    if (!confirm('Riaprire questo piano? Lo stato tornerà "Foto PRIMA mancante".')) return;
+    const ok = await confirmDialog({
+      title: "Riaprire piano",
+      description: 'Riaprire questo piano? Lo stato tornerà "Foto PRIMA mancante".',
+    });
+    if (!ok) return;
     try {
       await riapriPiano(piano_id);
       toast.success("Piano riaperto");

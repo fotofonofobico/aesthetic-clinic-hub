@@ -209,7 +209,12 @@ export function EventoEditDialog({
 
   const handleDelete = async () => {
     if (!evento) return;
-    if (!confirm("Eliminare questo evento?")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare evento",
+      description: "Eliminare questo evento?",
+      destructive: true,
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       if (evento.nota_diario_id) {

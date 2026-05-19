@@ -99,7 +99,12 @@ export function FotoGrid({ foto, onDeleted, canDelete, emptyHint }: Props) {
 
   async function handleDelete() {
     if (!openFoto) return;
-    if (!confirm("Eliminare questa foto?")) return;
+    const ok = await confirmDialog({
+      title: "Eliminare foto",
+      description: "Eliminare questa foto?",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await deleteFoto(openFoto);

@@ -656,7 +656,12 @@ function SedutaCard({
   const [reschedOpen, setReschedOpen] = useState(false);
 
   async function annulla() {
-    if (!confirm("Annullare questa seduta programmata?")) return;
+    const ok = await confirmDialog({
+      title: "Annullare seduta",
+      description: "Annullare questa seduta programmata?",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("seduta").delete().eq("id", seduta.id);
     if (error) {
       toast.error(`Errore: ${error.message}`);

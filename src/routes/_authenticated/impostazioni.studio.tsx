@@ -358,7 +358,13 @@ function SediStudioSection() {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        if (confirm(`Eliminare la sede "${s.nome}"?`)) elimina.mutate(s.id);
+                        void confirmDialog({
+                          title: "Eliminare sede",
+                          description: `Eliminare la sede "${s.nome}"?`,
+                          destructive: true,
+                        }).then((ok) => {
+                          if (ok) elimina.mutate(s.id);
+                        });
                       }}
                       className="text-destructive hover:text-destructive"
                     >
