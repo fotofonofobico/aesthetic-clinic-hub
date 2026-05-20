@@ -99,6 +99,7 @@ export function MisurazioneDialog({
       seduta_id: sedutaId ?? null,
       data_rilevazione: data,
       peso_kg: peso.trim() ? Number(peso.replace(",", ".")) : null,
+      altezza_cm: altezza.trim() ? Math.round(Number(altezza.replace(",", "."))) : null,
       misure: misureClean as never,
       note: note.trim() || null,
       created_by: user.id,
