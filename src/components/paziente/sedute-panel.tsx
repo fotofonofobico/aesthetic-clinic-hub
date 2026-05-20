@@ -1059,7 +1059,7 @@ function EseguiSedutaDialog({
                     size="sm"
                     type="button"
                     variant="outline"
-                    onClick={() => setReminderMisura(false)}
+                    onClick={() => setReminderDismissed(true)}
                   >
                     Procedi comunque
                   </Button>
