@@ -125,7 +125,7 @@ export function MisurazioneDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
               <Label>Data *</Label>
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
@@ -138,6 +138,16 @@ export function MisurazioneDialog({
                 min="0"
                 value={peso}
                 onChange={(e) => setPeso(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Altezza (cm)</Label>
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                value={altezza}
+                onChange={(e) => setAltezza(e.target.value)}
               />
             </div>
           </div>
