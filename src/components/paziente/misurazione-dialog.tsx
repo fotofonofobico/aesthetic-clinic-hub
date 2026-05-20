@@ -52,18 +52,32 @@ export function MisurazioneDialog({
   const { user } = useAuth();
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
   const [peso, setPeso] = useState("");
+  const [altezza, setAltezza] = useState("");
   const [misure, setMisure] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Precompila altezza con l'ultima nota a DB (è un parametro stabile)
   useEffect(() => {
-    if (open) {
-      setData(new Date().toISOString().slice(0, 10));
-      setPeso("");
-      setMisure({});
-      setNote("");
-    }
-  }, [open]);
+    if (!open) return;
+    setData(new Date().toISOString().slice(0, 10));
+    setPeso("");
+    setAltezza("");
+    setMisure({});
+    setNote("");
+    void supabase
+      .from("paziente_misurazione")
+      .select("altezza_cm")
+      .eq("paziente_id", pazienteId)
+      .not("altezza_cm", "is", null)
+      .order("data_rilevazione", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: row }) => {
+        const a = (row?.altezza_cm as number | null) ?? null;
+        if (a != null) setAltezza(String(a));
+      });
+  }, [open, pazienteId]);
 
   function setField(k: string, v: string) {
     setMisure((m) => ({ ...m, [k]: v }));
@@ -85,6 +99,7 @@ export function MisurazioneDialog({
       seduta_id: sedutaId ?? null,
       data_rilevazione: data,
       peso_kg: peso.trim() ? Number(peso.replace(",", ".")) : null,
+      altezza_cm: altezza.trim() ? Math.round(Number(altezza.replace(",", "."))) : null,
       misure: misureClean as never,
       note: note.trim() || null,
       created_by: user.id,
@@ -110,7 +125,7 @@ export function MisurazioneDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
               <Label>Data *</Label>
               <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
@@ -123,6 +138,16 @@ export function MisurazioneDialog({
                 min="0"
                 value={peso}
                 onChange={(e) => setPeso(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Altezza (cm)</Label>
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                value={altezza}
+                onChange={(e) => setAltezza(e.target.value)}
               />
             </div>
           </div>
@@ -175,6 +200,7 @@ export interface MisurazioneRow {
   seduta_id: string | null;
   data_rilevazione: string;
   peso_kg: number | null;
+  altezza_cm: number | null;
   misure: MisureCircon;
   note: string | null;
   created_at: string;

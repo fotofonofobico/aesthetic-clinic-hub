@@ -75,6 +75,7 @@ import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
 import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
 import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
 import { MisurazioneDialog } from "@/components/paziente/misurazione-dialog";
+import { useCriolipolisiBaseline } from "@/hooks/use-criolipolisi-baseline";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
@@ -932,37 +933,20 @@ function EseguiSedutaDialog({
   const [consumoRighe, setConsumoRighe] = useState<ConsumoRiga[]>([]);
   const [saving, setSaving] = useState(false);
   const [misuraOpen, setMisuraOpen] = useState(false);
-  const [reminderMisura, setReminderMisura] = useState(false);
-  const [reminderMissing, setReminderMissing] = useState<string[]>([]);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
 
   const isCrioPrima =
     seduta.numero_seduta === 1 && isTrattamentoCriolipolisi(trattamento?.nome);
 
+  const baseline = useCriolipolisiBaseline(isCrioPrima ? seduta.paziente_id : null);
+  const reminderMisura = isCrioPrima && baseline.showAlert && !reminderDismissed;
+  const reminderMissing = baseline.missing;
+
+  // Ricarica baseline quando si chiude il dialog di misurazione
   useEffect(() => {
-    if (!isCrioPrima) {
-      setReminderMisura(false);
-      return;
-    }
-    void (async () => {
-      const [{ count }, pazRes] = await Promise.all([
-        supabase
-          .from("paziente_misurazione")
-          .select("id", { count: "exact", head: true })
-          .eq("paziente_id", seduta.paziente_id),
-        supabase
-          .from("pazienti")
-          .select("peso_kg, altezza_cm")
-          .eq("id", seduta.paziente_id)
-          .maybeSingle(),
-      ]);
-      const m: string[] = [];
-      if ((pazRes.data?.peso_kg as number | null) == null) m.push("peso");
-      if ((pazRes.data?.altezza_cm as number | null) == null) m.push("altezza");
-      if ((count ?? 0) === 0) m.push("misurazione baseline");
-      setReminderMissing(m);
-      setReminderMisura(m.length > 0);
-    })();
-  }, [isCrioPrima, seduta.paziente_id, misuraOpen]);
+    if (!misuraOpen && isCrioPrima) baseline.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [misuraOpen]);
 
   function toggleZona(z: string) {
     setZone((prev) => (prev.includes(z) ? prev.filter((x) => x !== z) : [...prev, z]));
@@ -1075,7 +1059,7 @@ function EseguiSedutaDialog({
                     size="sm"
                     type="button"
                     variant="outline"
-                    onClick={() => setReminderMisura(false)}
+                    onClick={() => setReminderDismissed(true)}
                   >
                     Procedi comunque
                   </Button>

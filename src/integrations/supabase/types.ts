@@ -824,6 +824,7 @@ export type Database = {
       }
       paziente_misurazione: {
         Row: {
+          altezza_cm: number | null
           created_at: string
           created_by: string | null
           data_rilevazione: string
@@ -835,6 +836,7 @@ export type Database = {
           seduta_id: string | null
         }
         Insert: {
+          altezza_cm?: number | null
           created_at?: string
           created_by?: string | null
           data_rilevazione?: string
@@ -846,6 +848,7 @@ export type Database = {
           seduta_id?: string | null
         }
         Update: {
+          altezza_cm?: number | null
           created_at?: string
           created_by?: string | null
           data_rilevazione?: string

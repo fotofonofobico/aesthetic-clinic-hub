@@ -28,7 +28,7 @@ import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
-import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
+import { useCriolipolisiBaseline } from "@/hooks/use-criolipolisi-baseline";
 import { useStudi } from "@/hooks/use-studi";
 import { Badge } from "@/components/ui/badge";
 
@@ -494,62 +494,10 @@ function CriolipolisiBaselineBanner({
   paziente: Paziente;
   onVaiAdAnamnesi: () => void;
 }) {
-  const [show, setShow] = useState(false);
-  const [missing, setMissing] = useState<string[]>([]);
+  const { showAlert, missing } = useCriolipolisiBaseline(paziente.id);
   const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    void (async () => {
-      const { data: piani } = await supabase
-        .from("piano_trattamento")
-        .select("id, stato")
-        .eq("paziente_id", paziente.id)
-        .not("stato", "in", "(annullato,sospeso,bozza,non_indicato)");
-      const ids = (piani ?? []).map((p) => (p as { id: string }).id);
-      if (ids.length === 0) {
-        setShow(false);
-        return;
-      }
-      const { data: voci } = await supabase
-        .from("piano_trattamento_voce")
-        .select("trattamento_id")
-        .in("piano_id", ids);
-      const trattIds = Array.from(
-        new Set(
-          (voci ?? [])
-            .map((v) => (v as { trattamento_id: string | null }).trattamento_id)
-            .filter((x): x is string => !!x),
-        ),
-      );
-      if (trattIds.length === 0) {
-        setShow(false);
-        return;
-      }
-      const { data: tratt } = await supabase
-        .from("trattamenti")
-        .select("id, nome")
-        .in("id", trattIds);
-      const haCrio = (tratt ?? []).some((t) =>
-        isTrattamentoCriolipolisi((t as { nome: string }).nome),
-      );
-      if (!haCrio) {
-        setShow(false);
-        return;
-      }
-      const { count } = await supabase
-        .from("paziente_misurazione")
-        .select("id", { count: "exact", head: true })
-        .eq("paziente_id", paziente.id);
-      const m: string[] = [];
-      if (paziente.peso_kg == null) m.push("peso");
-      if (paziente.altezza_cm == null) m.push("altezza");
-      if ((count ?? 0) === 0) m.push("misurazione baseline");
-      setMissing(m);
-      setShow(m.length > 0);
-    })();
-  }, [paziente.id, paziente.peso_kg, paziente.altezza_cm]);
-
-  if (!show || dismissed) return null;
+  if (!showAlert || dismissed) return null;
   return (
     <div className="flex items-start gap-3 rounded-lg border-2 border-warning/40 bg-warning/10 p-4 text-sm shadow-sm">
       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
