@@ -75,6 +75,7 @@ import { getStatoPiano, listFotoByPiano } from "@/lib/foto-clinica";
 import type { FotoClinica, FotoMomento } from "@/types/foto-clinica";
 import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
 import { MisurazioneDialog } from "@/components/paziente/misurazione-dialog";
+import { useCriolipolisiBaseline } from "@/hooks/use-criolipolisi-baseline";
 
 // ───────────────────────────── Helpers locali ─────────────────────────────
 
