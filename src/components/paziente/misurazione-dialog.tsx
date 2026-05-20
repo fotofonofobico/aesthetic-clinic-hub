@@ -200,6 +200,7 @@ export interface MisurazioneRow {
   seduta_id: string | null;
   data_rilevazione: string;
   peso_kg: number | null;
+  altezza_cm: number | null;
   misure: MisureCircon;
   note: string | null;
   created_at: string;
