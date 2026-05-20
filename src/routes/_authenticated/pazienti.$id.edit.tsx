@@ -51,8 +51,6 @@ function PazienteEditPage() {
     provincia: "",
     professione: "",
     note: "",
-    peso_kg: null,
-    altezza_cm: null,
     studio_id: null,
   });
 
