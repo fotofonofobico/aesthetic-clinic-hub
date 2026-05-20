@@ -933,12 +933,13 @@ function EseguiSedutaDialog({
   const [consumoRighe, setConsumoRighe] = useState<ConsumoRiga[]>([]);
   const [saving, setSaving] = useState(false);
   const [misuraOpen, setMisuraOpen] = useState(false);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
 
   const isCrioPrima =
     seduta.numero_seduta === 1 && isTrattamentoCriolipolisi(trattamento?.nome);
 
   const baseline = useCriolipolisiBaseline(isCrioPrima ? seduta.paziente_id : null);
-  const reminderMisura = isCrioPrima && baseline.showAlert;
+  const reminderMisura = isCrioPrima && baseline.showAlert && !reminderDismissed;
   const reminderMissing = baseline.missing;
 
   // Ricarica baseline quando si chiude il dialog di misurazione
