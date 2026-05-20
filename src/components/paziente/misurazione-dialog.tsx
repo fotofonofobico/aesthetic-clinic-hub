@@ -52,18 +52,32 @@ export function MisurazioneDialog({
   const { user } = useAuth();
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
   const [peso, setPeso] = useState("");
+  const [altezza, setAltezza] = useState("");
   const [misure, setMisure] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Precompila altezza con l'ultima nota a DB (è un parametro stabile)
   useEffect(() => {
-    if (open) {
-      setData(new Date().toISOString().slice(0, 10));
-      setPeso("");
-      setMisure({});
-      setNote("");
-    }
-  }, [open]);
+    if (!open) return;
+    setData(new Date().toISOString().slice(0, 10));
+    setPeso("");
+    setAltezza("");
+    setMisure({});
+    setNote("");
+    void supabase
+      .from("paziente_misurazione")
+      .select("altezza_cm")
+      .eq("paziente_id", pazienteId)
+      .not("altezza_cm", "is", null)
+      .order("data_rilevazione", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: row }) => {
+        const a = (row?.altezza_cm as number | null) ?? null;
+        if (a != null) setAltezza(String(a));
+      });
+  }, [open, pazienteId]);
 
   function setField(k: string, v: string) {
     setMisure((m) => ({ ...m, [k]: v }));
