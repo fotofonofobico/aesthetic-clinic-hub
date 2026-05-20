@@ -28,7 +28,7 @@ import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
-import { isTrattamentoCriolipolisi } from "@/lib/trattamenti-speciali";
+import { useCriolipolisiBaseline } from "@/hooks/use-criolipolisi-baseline";
 import { useStudi } from "@/hooks/use-studi";
 import { Badge } from "@/components/ui/badge";
 
