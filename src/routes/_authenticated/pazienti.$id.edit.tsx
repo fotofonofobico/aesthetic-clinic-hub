@@ -127,9 +127,8 @@ function PazienteEditPage() {
       provincia: form.provincia?.trim().toUpperCase() || null,
       professione: form.professione?.trim() || null,
       note: form.note?.trim() || null,
-      peso_kg: form.peso_kg ?? null,
-      altezza_cm: form.altezza_cm ?? null,
       studio_id: form.studio_id ?? null,
+      // peso_kg/altezza_cm gestiti esclusivamente dalla card Misurazioni in Anamnesi (sync via trigger DB)
     };
 
     if (isNew) {
