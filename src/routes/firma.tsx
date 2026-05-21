@@ -18,6 +18,8 @@ function ModalitaFirmaPage() {
   const navigate = useNavigate();
   const { data: profilo } = useProfile();
   const { data: studio } = useStudioInfo();
+  const { data: logoUrl } = useStudioLogoUrl(studio?.logo_url);
+
 
   const [activeRow, setActiveRow] = useState<FirmaSessioneRow | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set());
