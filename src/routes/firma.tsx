@@ -70,14 +70,14 @@ function ModalitaFirmaPage() {
 
       {/* Schermo attesa */}
       <div className="flex flex-col items-center px-6 text-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          {studio?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={studio.logo_url} alt="Logo studio" className="h-full w-full rounded-2xl object-contain" />
+        <div className="mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo studio" className="h-full w-full object-contain" />
           ) : (
             <Stethoscope className="h-10 w-10" />
           )}
         </div>
+
 
         <h1 className="font-display text-4xl font-semibold tracking-tight">
           {studio?.ragione_sociale ?? "Modalità firma"}
