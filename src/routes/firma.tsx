@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useStudioInfo } from "@/hooks/use-studio-info";
+import { useStudioLogoUrl } from "@/hooks/use-studio-logo-url";
 import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Stethoscope, Tablet, Wifi } from "lucide-react";
