@@ -239,7 +239,12 @@ export function ProdottoFormDialog({
                         value={tipologia}
                         onValueChange={setTipologia}
                       />
-                      <CommandList className="max-h-64 overflow-y-auto">
+                      <CommandList
+                        className="max-h-72 overflow-y-auto overscroll-contain"
+                        onWheel={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                      >
+
                         <CommandEmpty>
                           {tipologia.trim() ? (
                             <button
