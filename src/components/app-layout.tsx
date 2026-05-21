@@ -28,6 +28,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+  { to: "/insights", label: "Insights", icon: <BarChart3 className="h-4 w-4" /> },
   { to: "/calendario", label: "Calendario", icon: <CalendarDays className="h-4 w-4" /> },
   { to: "/pazienti", label: "Pazienti", icon: <Users className="h-4 w-4" /> },
   { to: "/trattamenti", label: "Trattamenti", icon: <Syringe className="h-4 w-4" /> },
