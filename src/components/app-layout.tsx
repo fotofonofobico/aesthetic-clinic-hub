@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Tablet,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
