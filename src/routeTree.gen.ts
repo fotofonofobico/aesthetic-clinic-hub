@@ -14,6 +14,7 @@ import { Route as FirmaRouteImport } from './routes/firma'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPdfViewerRouteImport } from './routes/_authenticated/pdf-viewer'
+import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedImpostazioniRouteImport } from './routes/_authenticated/impostazioni'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCalendarioRouteImport } from './routes/_authenticated/calendario'
@@ -52,6 +53,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedPdfViewerRoute = AuthenticatedPdfViewerRouteImport.update({
   id: '/pdf-viewer',
   path: '/pdf-viewer',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedImpostazioniRoute =
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
+  '/insights': typeof AuthenticatedInsightsRoute
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
   '/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/calendario': typeof AuthenticatedCalendarioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
+  '/insights': typeof AuthenticatedInsightsRoute
   '/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
   '/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/_authenticated/calendario': typeof AuthenticatedCalendarioRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/impostazioni': typeof AuthenticatedImpostazioniRouteWithChildren
+  '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/pdf-viewer': typeof AuthenticatedPdfViewerRoute
   '/_authenticated/impostazioni/backup': typeof AuthenticatedImpostazioniBackupRoute
   '/_authenticated/impostazioni/preferenze': typeof AuthenticatedImpostazioniPreferenzeRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/dashboard'
     | '/impostazioni'
+    | '/insights'
     | '/pdf-viewer'
     | '/impostazioni/backup'
     | '/impostazioni/preferenze'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/dashboard'
     | '/impostazioni'
+    | '/insights'
     | '/pdf-viewer'
     | '/impostazioni/backup'
     | '/impostazioni/preferenze'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/_authenticated/calendario'
     | '/_authenticated/dashboard'
     | '/_authenticated/impostazioni'
+    | '/_authenticated/insights'
     | '/_authenticated/pdf-viewer'
     | '/_authenticated/impostazioni/backup'
     | '/_authenticated/impostazioni/preferenze'
@@ -316,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/pdf-viewer'
       fullPath: '/pdf-viewer'
       preLoaderRoute: typeof AuthenticatedPdfViewerRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/insights': {
+      id: '/_authenticated/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/impostazioni': {
@@ -468,6 +487,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCalendarioRoute: typeof AuthenticatedCalendarioRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedImpostazioniRoute: typeof AuthenticatedImpostazioniRouteWithChildren
+  AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedPdfViewerRoute: typeof AuthenticatedPdfViewerRoute
   AuthenticatedPazientiIdRoute: typeof AuthenticatedPazientiIdRouteWithChildren
   AuthenticatedConsensiIndexRoute: typeof AuthenticatedConsensiIndexRoute
@@ -480,6 +500,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCalendarioRoute: AuthenticatedCalendarioRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedImpostazioniRoute: AuthenticatedImpostazioniRouteWithChildren,
+  AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedPdfViewerRoute: AuthenticatedPdfViewerRoute,
   AuthenticatedPazientiIdRoute: AuthenticatedPazientiIdRouteWithChildren,
   AuthenticatedConsensiIndexRoute: AuthenticatedConsensiIndexRoute,
@@ -502,3 +523,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
