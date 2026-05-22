@@ -385,7 +385,7 @@ function InsightsPage() {
                 contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
                 formatter={(v: number) => eur(v)}
               />
-              <Bar dataKey="costi" fill="var(--muted-foreground)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="costi" fill="var(--chart-cost)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
