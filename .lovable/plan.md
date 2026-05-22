@@ -1,155 +1,119 @@
-# Piano fix conservativi — STEP 1 + STEP 2 (rev. 2)
-
-Recepite le 4 prudenze: clear+invalidate al posto di invalidateQueries massivo, allSettled solo dove UI tollera assenza dati, logger.error senza PII, attenzione al nesting AlertDialog/Dialog.
+Diviso in due step indipendenti. Lo STEP A è pronto da implementare. Lo STEP B richiede la tua conferma sui dettagli. La "prima visita / visita di controllo" la lasciamo apposta fuori: la affrontiamo dopo in una mini-discussione dedicata (vedi in fondo).
 
 ---
 
-## STEP 1 — Fix ultra-sicuri (nessun cambio UI/UX)
+## STEP A — Fix UI e bug rapidi
 
-### 1A. Invalidazione cache al cambio sessione (#1)
-**File:** `src/routes/__root.tsx`
+### A1. Bug "input Sedute" nel nuovo piano
 
-Dentro `RootComponent`:
-- importare `useRouter` da `@tanstack/react-router` e `useEffect` da react
-- aggiungere un `useEffect` (deps: `[router, queryClient]`) che sottoscrive `supabase.auth.onAuthStateChange` e, su `SIGNED_IN` / `SIGNED_OUT` / `USER_UPDATED`, esegue:
+Oggi `value={r.numero_sedute}` è un number controllato che ad ogni keystroke fa `Math.max(1, Math.floor(n||1))`. Quando cancelli "1" la stringa diventa vuota, `Number("") = 0`, viene risostituito da `1` e l'8 si attacca dopo → "18".
 
-```ts
-queryClient.clear();      // svuota cache senza scatenare refetch a tappeto
-router.invalidate();      // riesegue solo i loader delle route attive
-```
+Fix:
 
-NON usare `queryClient.invalidateQueries()`: rischia tempeste di fetch con realtime + dashboard. Su `TOKEN_REFRESHED` non fare nulla (è solo rinnovo bearer, stesso utente).
+- Nuovo componente `NumberInputSedute` (interno a `piani-panel.tsx`) con state stringa locale.
+- Durante digitazione lo state è libero (anche vuoto). Su `onBlur` (o Invio) committa: clamp tra `min` e valore valido, fallback al min se vuoto/non valido.
+- Stesso pattern riusato nei posti in cui c'è `type="number"` con clamp aggressivo (verifica anche `magazzino` e `lotto-form-dialog`, se applicabile).
 
-Cleanup: `subscription.unsubscribe()` nel return dell'effect. Il listener esistente in `auth-context.tsx` resta intatto: gestisce solo stato auth locale, il nuovo è additivo.
+### A2. Sfarfallio "Something went wrong" durante navigazione
 
-### 1B. Floating promises senza `.catch` (#8)
-Aggiunta minima di `.catch((e) => logger.error("[<contesto>]", e))` (vedi 1C per il logger). Nessuna modifica di tipo, firma o comportamento positivo.
+Il `defaultErrorComponent` in `src/router.tsx` mostra subito il full-screen rosso. Tra una rotta e l'altra capita un breve errore transitorio (es. query cancellata, Suspense che ricarica) → flash.
 
-File toccati:
-- `src/components/dashboard/alerts-section.tsx` — `.then(([pz, sd]) => ...)`
-- `src/routes/_authenticated/pazienti.$id.tsx` (riga 41) — `Promise.all(...).then(...)` — NB: qui resta `Promise.all` (vedi 1D), aggiungo solo `.catch`
-- `src/components/paziente/sedute-panel.tsx` (riga ~1520) — `void puoEseguireTrattamento(...).then(...)`
-- `src/components/calendario/evento-edit-dialog.tsx` — `.then(({ data }) => ...)`
-- `src/components/pdf-canvas-viewer.tsx` — `.then((db) => ...)`
-- `src/components/paziente/anamnesi-panel.tsx` — `.then(({ data }) => setTrattamenti(...))`
-- `src/components/calendario/calendario-vista.tsx` — eventuali `.then` senza catch
+Fix:
 
-### 1C. Logger dev-only (#10)
-Nuovo file `src/lib/logger.ts`:
+- Mostrare la UI di errore solo dopo un delay (es. 250 ms): se nel frattempo arriva un nuovo render (errore sparito) non si vede nulla.
+- Sopprimere completamente errori "innocui": `AbortError`, `CancelledError`, `Failed to fetch dynamically imported module` (già gestito a parte con reload).
+- Aggiungere `key={location.pathname}` al boundary in `__root.tsx` se necessario per resettarlo al cambio rotta.
 
-```ts
-const isDev = import.meta.env.DEV;
-export const logger = {
-  warn: (...a: unknown[]) => { if (isDev) console.warn(...a); },
-  error: (...a: unknown[]) => console.error(...a), // sempre attivo
-  debug: (...a: unknown[]) => { if (isDev) console.debug(...a); },
-};
-```
+### A3. Grafici Insights — niente "nero"
 
-**Regola d'uso (vincolante):** `logger.error` riceve SOLO `(label: string, err: Error|unknown)` o messaggi sintetici. **Mai** payload completi, mai oggetti `paziente`, `consenso`, `seduta`, `anamnesi` o body insert. Su errori Supabase passare solo `{ code, message, details }`, niente `payload`.
+In `src/routes/_authenticated/insights.tsx`:
 
-Sostituzioni mirate (solo `console.warn` / log informativi; tutti gli `console.error` di vero errore restano):
-- `src/lib/magazzino.ts:49,84` `console.warn(...)` → `logger.warn(...)`
-- `src/lib/magazzino.ts:186` — rimuovere `payload` dal log: oggi è `console.error("[creaProdotto] error", { code, message, details, payload })`; diventa `logger.error("[creaProdotto]", { code, message, details })`. **Fix di PII.**
-- `src/lib/calendario-followup.ts:48` `console.warn(...)` → `logger.warn(...)`
-- `src/components/foto/foto-baseline-banner.tsx:49` `console.warn(e)` (in catch di `window.print`) → `logger.warn(e)`
+- `BarChart` "Costi magazzino" usa `fill="hsl(var(--muted-foreground))"` → cambio a un accent più morbido (definisco token semantico `--chart-cost` in `src/styles.css` con `oklch` neutro/ambra).
+- Aggiungo nei tokens 2–3 colori chart coerenti (`--chart-1` primary, `--chart-2` teal, `--chart-3` ambra, `--chart-4` viola tenue), riusati in tutti i `Bar/Line/Pie`.
+- Verifico anche tick assi: tengo `muted-foreground` per testo (è grigio non nero).
 
-Lasciati invariati: tutti gli `console.error` in `auth-context.tsx`, `audit.ts`, `pdf-*`, `calendario.tsx`, `pazienti.$id.tsx`, `pdf-canvas-viewer.tsx`, `consensi-panel.tsx`, `anamnesi-panel.tsx`. Già loggano solo messaggi/oggetti error.
+### A4. Consensi obsoleti — apertura filtrata
 
-### 1D. `Promise.allSettled` — applicato in modo selettivo (#14)
-**SOLO** dove la UI già tollera assenza dati e dove il fallback non maschera errori critici:
-
-- **APPLICATO** in `src/hooks/use-kpi-mese.ts` (KPI dashboard): `Promise.all` → `Promise.allSettled`. Per ciascun risultato `rejected`: il KPI relativo resta `null` (stato già gestito dalla UI come "–" / non disponibile). NON sostituire `null` con `0` (sarebbe "fake data"). `.catch` finale aggiunto.
-- **APPLICATO** in `src/hooks/use-calendario-eventi.ts`: `Promise.all([sedutePromise, eventiPromise, scadenzePromise])` → `Promise.allSettled`, con fallback `[]` per ciascuna fonte fallita. Già oggi la UI gestisce array vuoti per sezione; un guasto del singolo canale non deve impedire la visualizzazione degli altri.
-
-- **NON APPLICATO** in `src/routes/_authenticated/pazienti.$id.tsx:41` (`Promise.all([pz, sd])`): se il paziente non si carica la pagina DEVE mostrare errore, non un guscio vuoto. Lascio `Promise.all`, aggiungo solo `.catch` che logga (l'errore si propaga all'`errorComponent` esistente).
-- **NON APPLICATO** in qualunque `Promise.all` su consensi/sedute/anamnesi dove un fallback `[]` rischierebbe di nascondere documenti firmati / piani attivi.
-
-### Verifica STEP 1
-- `bun run lint` pulito, TypeScript strict ok.
-- Build dev + prod ok (file `logger.ts` creato in prima pos.).
-- Smoke test: login → dashboard → logout → re-login con altro utente: cache pulita, niente dati del precedente utente.
-- Console produzione: solo `console.error` reali, niente warn rumorosi né PII.
+- Cambio il link dell'alert dashboard da `/consensi` a `/consensi?filtro=obsoleti`.
+- In `src/routes/_authenticated/consensi.index.tsx` leggo il search param e applico filtro pre-impostato (badge "Obsoleti" attivo). La sezione mostra elenco: paziente · template · versione firmata → versione attuale · azione "Rifirma" già esistente.
+- Nessuna nuova entità.
 
 ---
 
-## STEP 2 — Sostituzione `window.confirm` con `AlertDialog`
+## STEP B — Protocolli e parametri clinici (richiede tua conferma)
 
-Eseguito **solo dopo** verifica STEP 1.
+Aderisce esattamente alla tua specifica: **niente nuova entità "Pacchetto"**, le righe del piano restano la base, i "protocolli" sono solo template che generano righe standard.
 
-**Componente target:** `src/components/ui/alert-dialog.tsx` (Radix, già nel progetto). Radix gestisce nativamente focus trap, scroll lock, escape, portal su `document.body`.
+### B1. Protocolli preimpostati (template righe piano)
 
-### File da convertire (10 occorrenze)
+Schema:
 
-| # | File | Riga | Contesto |
-|---|------|------|----------|
-| 1 | `calendario/evento-edit-dialog.tsx` | 212 | **DENTRO Dialog** ⚠ |
-| 2 | `foto/foto-piano-panel.tsx` | 78 | pagina |
-| 3 | `foto/foto-grid.tsx` | 102 | pagina |
-| 4 | `paziente/sedute-panel.tsx` | 658 | pagina (può aprire dialog) ⚠ |
-| 5 | `paziente/misurazione-dialog.tsx` | 117 | **DENTRO Dialog** ⚠ |
-| 6 | `paziente/diario-panel.tsx` | 413 | pagina |
-| 7 | `paziente/consensi-panel.tsx` | 116 | pagina |
-| 8 | `paziente/consensi-panel.tsx` | 155 | pagina (può essere in dialog) ⚠ |
-| 9 | `impostazioni.studio.tsx` | 361 | pagina |
-| 10 | `pazienti.$id.edit.tsx` | 174 | pagina |
+- `protocollo_template` ( id, nome, descrizione, attivo, created_by, ... )
+- `protocollo_template_riga` ( id, protocollo_id, trattamento_id, numero_sedute, ordine, note )
 
-### Pattern standard
+Nessuna scrittura su `piano_trattamento`: il protocollo serve solo a precompilare il dialog "Nuovo piano".
 
-```tsx
-const [confirmId, setConfirmId] = useState<string|null>(null);
+UI:
 
-// vecchio: if (!confirm("Testo?")) return; doStuff(id);
-// nuovo:   setConfirmId(id);
+- In `piani-panel.tsx`, nel dialog di creazione, in alto un selettore "Applica protocollo…" (combobox). Selezionandolo, vengono aggiunte le righe del template ai dati già presenti (non sostituisce: si appende, con possibilità di rimuovere). Resta tutto modificabile.
+- In "Impostazioni → Trattamenti" nuova tab "Protocolli" per CRUD.
 
-<AlertDialog open={confirmId !== null} onOpenChange={(o) => !o && setConfirmId(null)}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>{/* testo identico al vecchio confirm */}</AlertDialogTitle>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Annulla</AlertDialogCancel>
-      <AlertDialogAction onClick={() => { doStuff(confirmId!); setConfirmId(null); }}>
-        {/* "Elimina" o "Conferma" o "Revoca" o "Annulla seduta" coerente col contesto */}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-```
+Esempio "Body shaping" = 1 criolipolisi + 8 onde d'urto + 4 carbossi → genera 3 righe piano standard.
 
-### Regole rigorose
-- Testo del titolo **identico** al testo del vecchio `confirm`.
-- Etichette pulsanti coerenti con la convenzione dell'app (`Annulla` + verbo dell'azione).
-- Nessun cambio di flusso, nessuna nuova validazione, nessun toast aggiuntivo.
+### B2. Parametri clinici dinamici per trattamento
 
-### Prudenze su nesting Dialog/AlertDialog (file con ⚠)
-Per i 4 file marcati ⚠ (1, 4, 5, 8):
-- Radix consente `AlertDialog` nidificato in `Dialog`: entrambi usano `Portal` su `document.body`, quindi z-index non confligge. **Ma** focus trap e scroll lock si stackano: alla chiusura dell'AlertDialog il focus deve tornare al Dialog padre (Radix lo fa di default, ma va verificato).
-- **Test manuale obbligatorio per file ⚠:**
-  1. aprire il Dialog padre
-  2. triggerare l'AlertDialog
-  3. premere `Esc` → solo l'AlertDialog si chiude, il Dialog padre resta aperto
-  4. premere `Annulla` → idem
-  5. premere `Conferma` → AlertDialog si chiude, azione eseguita, Dialog padre eventualmente si chiude da solo se la logica esistente lo prevedeva
-  6. verificare niente overlay residui, scroll body sbloccato correttamente.
-- Se in un file ⚠ il `confirm` veniva chiamato in un handler che chiudeva subito il Dialog padre, **mantenere lo stesso ordine**: prima azione, poi (eventuale) chiusura Dialog padre, esattamente come oggi.
+Schema:
 
-### Procedura per file
-1. modifica un solo file
-2. `bun run lint` + verifica TS
-3. smoke test del flusso modificato
-4. solo allora passare al file successivo
+- `trattamenti` → nuova colonna `schema_parametri jsonb` (array di campi: `{ key, label, tipo: 'number'|'text'|'select'|'bool', unita?, options?, obbligatorio? }`).
+- `seduta` ha già `parametri_tecnici jsonb` — lo usiamo come storage senza modifiche.
+- Storico per paziente: query già fattibile join `seduta.parametri_tecnici` per trattamento (no nuova tabella).
 
-### Esclusioni esplicite
-- File toccati in STEP 1 non vengono rivisitati.
-- Nuovi `confirm` scoperti durante l'esecuzione → segnalati al termine, non convertiti senza approvazione.
+UI:
+
+- In "Impostazioni → Trattamenti" editor schema parametri (lista campi drag-friendly, semplice).
+- Nel dialog di completamento seduta (`sedute-panel.tsx` → completa): se il trattamento ha `schema_parametri`, mostra una mini-form generata; salva in `parametri_tecnici`.
+- Sulla scheda paziente, sotto "Storico parametri" (collapsible) per ciascun trattamento: tabella semplice (data · valori). Niente grafici qui per non gonfiare.
+
+> Importante: peso/altezza/BMI/circonferenze restano dove sono (Anamnesi → Misurazioni). Il sistema di parametri NON li duplica; sono concettualmente dati paziente, non di seduta.
+
+### B3. Sedute combinate nello stesso appuntamento
+
+La struttura attuale già lo consente: più sedute (di righe piano diverse) possono condividere lo stesso `evento_calendario` o avere stesso `data_seduta`. Non servono modifiche di schema.
+
+- Piccolo miglioramento UX: nel calendario raggruppo le sedute con stessa data/ora/paziente in un'unica card con badge "+N trattamenti". Solo presentazione.
 
 ---
 
-## Cosa NON viene toccato (riconfermato)
-- Logica peso/altezza in `pazienti.$id.tsx` (#12).
-- Query `select('*')` / paginazione (#5).
-- Componenti monolitici (#4).
-- `eslint-disable exhaustive-deps` (#7).
-- Edge function `share-consenso` (#2).
-- Pattern `createServerFn` (#3).
+## Tabella riassuntiva tecnica (per chi conosce il codice)
+
+
+| Fix                 | File principali                                                                               | Tipo  |
+| ------------------- | --------------------------------------------------------------------------------------------- | ----- |
+| A1 numero sedute    | `src/components/paziente/piani-panel.tsx`                                                     | UI    |
+| A2 flash errore     | `src/router.tsx`, `src/routes/__root.tsx`                                                     | UI    |
+| A3 colori grafici   | `src/routes/_authenticated/insights.tsx`, `src/styles.css`                                    | UI    |
+| A4 filtro consensi  | `src/components/dashboard/alerts-section.tsx`, `src/routes/_authenticated/consensi.index.tsx` | UI    |
+| B1 protocolli       | nuova migration + tab impostazioni + dialog piano                                             | DB+UI |
+| B2 parametri        | migration `trattamenti.schema_parametri` + editor + form seduta                               | DB+UI |
+| B3 sedute combinate | `src/components/calendario/calendario-vista.tsx` (raggruppamento)                             | UI    |
+
+
+---
+
+## Prima visita / Visita di controllo — lasciata FUORI dal piano
+
+Hai chiesto esplicitamente di ragionarci prima. Riassunto delle opzioni che valuteremo dopo la tua approvazione di A/B:
+
+1. **Prestazione collegata all'appuntamento** (semplice ma slegata da piano e KPI economici).
+2. **Voce nel piano** (coerente con incassi, ma rigida se non c'è piano).
+3. **Entità "incontro" leggera** (anamnesi/visita/controllo) con prezzo, slegata dalle sedute, che alimenta KPI e si può "scontare" su un piano futuro.
+4. **Suggerimento contestuale**: alla creazione del piano si chiede "questo paziente ha fatto una prima visita non ancora scalata? → applica sconto".
+
+La discussione la apro dopo, con pro/contro dettagliati e flussi.
+
+---
+
+## Cosa ti chiedo prima di passare in build
+
+- Confermi STEP A intero? (lo posso fare subito, basso rischio) sì
+- Confermi STEP B così com'è (protocolli + parametri dinamici + raggruppamento calendario)? Posso anche fare solo B1 prima e B2/B3 in un secondo round se preferisci procedere a piccoli passi. facciamo tutto dopo step by step. magari ci stiamo perdendo la soluzione più semplice
