@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface AlertItem {
   key: string;
@@ -11,10 +18,22 @@ interface AlertItem {
   count: number;
   severity: "warning" | "critical";
   to: string;
+  detail?: "consensi_obsoleti";
+}
+
+interface ConsensoObsoletoRow {
+  id: string;
+  paziente_id: string;
+  paziente_nome: string;
+  template_titolo: string;
+  versione_firmata: string;
+  versione_attuale: string;
+  firmato_il: string;
 }
 
 export function AlertsSection() {
   const [items, setItems] = useState<AlertItem[] | null>(null);
+  const [openObsoleti, setOpenObsoleti] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +99,7 @@ export function AlertsSection() {
             if (d > ora && d < tra30) inScad++;
           }
         });
-        if (obsoleti > 0) out.push({ key: "obsoleti", label: "Consensi con versione obsoleta", count: obsoleti, severity: "warning", to: "/consensi" });
+        if (obsoleti > 0) out.push({ key: "obsoleti", label: "Consensi con versione obsoleta", count: obsoleti, severity: "warning", to: "#", detail: "consensi_obsoleti" });
         if (inScad > 0) out.push({ key: "cscad", label: "Consensi in scadenza < 30gg", count: inScad, severity: "warning", to: "/consensi" });
       } catch {}
 
@@ -112,56 +131,190 @@ export function AlertsSection() {
     return () => { cancelled = true; };
   }, []);
 
+  function renderItem(a: AlertItem) {
+    const content = (
+      <>
+        <span className="flex items-center gap-2 truncate">
+          <span
+            className={cn(
+              "inline-block h-2 w-2 shrink-0 rounded-full",
+              a.severity === "critical" ? "bg-destructive" : "bg-warning",
+            )}
+          />
+          <span className="truncate">{a.label}</span>
+        </span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
+          {a.count}
+        </span>
+      </>
+    );
+
+    if (a.detail === "consensi_obsoleti") {
+      return (
+        <button
+          key={a.key}
+          type="button"
+          onClick={() => setOpenObsoleti(true)}
+          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/50"
+        >
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <Link
+        key={a.key}
+        to={a.to}
+        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/50"
+      >
+        {content}
+      </Link>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4" /> Alert
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5">
-        {items === null ? (
-          <p className="text-xs text-muted-foreground">Caricamento…</p>
-        ) : items.length === 0 ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm text-success">
-              <span className="inline-block h-2 w-2 rounded-full bg-success" />
-              Tutto in regola
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4" /> Alert
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1.5">
+          {items === null ? (
+            <p className="text-xs text-muted-foreground">Caricamento…</p>
+          ) : items.length === 0 ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-success">
+                <span className="inline-block h-2 w-2 rounded-full bg-success" />
+                Tutto in regola
+              </div>
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Nessuna anamnesi vecchia, nessun lotto scaduto/in scadenza, nessuno scorte basse,
+                nessun consenso obsoleto/in scadenza, nessun consenso mancante per sedute imminenti.
+              </p>
             </div>
-            <p className="text-[10px] leading-snug text-muted-foreground">
-              Nessuna anamnesi vecchia, nessun lotto scaduto/in scadenza, nessuno scorte basse,
-              nessun consenso obsoleto/in scadenza, nessun consenso mancante per sedute imminenti.
-            </p>
+          ) : (
+            items.map(renderItem)
+          )}
+          {items !== null && items.length > 0 && (
+            <div className="pt-1 text-[10px] text-muted-foreground">
+              <CheckCircle2 className="mr-1 inline h-3 w-3" />
+              Click per aprire la sezione
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ConsensiObsoletiDialog open={openObsoleti} onOpenChange={setOpenObsoleti} />
+    </>
+  );
+}
+
+function ConsensiObsoletiDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [rows, setRows] = useState<ConsensoObsoletoRow[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setRows(null);
+    void (async () => {
+      const { data } = await supabase
+        .from("consenso_firmato")
+        .select(
+          "id, paziente_id, versione_snapshot, firmato_il, titolo_snapshot, template_id, template:template_id(versione, attivo, titolo), paziente:paziente_id(nome, cognome)"
+        )
+        .is("revocato_il", null)
+        .eq("rifiutato", false)
+        .order("firmato_il", { ascending: false })
+        .limit(500);
+
+      const out: ConsensoObsoletoRow[] = [];
+      (data ?? []).forEach((c: any) => {
+        const tpl = c.template;
+        if (!tpl || !tpl.attivo) return;
+        if (tpl.versione === c.versione_snapshot) return;
+        out.push({
+          id: c.id,
+          paziente_id: c.paziente_id,
+          paziente_nome: c.paziente
+            ? `${c.paziente.cognome ?? ""} ${c.paziente.nome ?? ""}`.trim() || "—"
+            : "—",
+          template_titolo: tpl.titolo ?? c.titolo_snapshot ?? "—",
+          versione_firmata: c.versione_snapshot,
+          versione_attuale: tpl.versione,
+          firmato_il: c.firmato_il,
+        });
+      });
+      if (!cancelled) setRows(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Consensi con versione obsoleta</DialogTitle>
+          <DialogDescription>
+            Il modello è stato aggiornato dopo la firma. Apri la scheda paziente per rifirmare.
+          </DialogDescription>
+        </DialogHeader>
+        {rows === null ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Caricamento…
           </div>
+        ) : rows.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Nessun consenso obsoleto.
+          </p>
         ) : (
-          items.map((a) => (
-            <Link
-              key={a.key}
-              to={a.to}
-              className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/50"
-            >
-              <span className="flex items-center gap-2 truncate">
-                <span
-                  className={cn(
-                    "inline-block h-2 w-2 shrink-0 rounded-full",
-                    a.severity === "critical" ? "bg-destructive" : "bg-warning",
-                  )}
-                />
-                <span className="truncate">{a.label}</span>
-              </span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
-                {a.count}
-              </span>
-            </Link>
-          ))
-        )}
-        {items !== null && items.length > 0 && (
-          <div className="pt-1 text-[10px] text-muted-foreground">
-            <CheckCircle2 className="mr-1 inline h-3 w-3" />
-            Click per aprire la sezione
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Paziente</th>
+                  <th className="px-3 py-2 text-left">Consenso</th>
+                  <th className="px-3 py-2 text-left">Versione</th>
+                  <th className="px-3 py-2 text-right">Azione</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="px-3 py-2">{r.paziente_nome}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.template_titolo}</td>
+                    <td className="px-3 py-2">
+                      <span className="rounded bg-warning/15 px-1.5 py-0.5 text-xs">
+                        v{r.versione_firmata} → v{r.versione_attuale}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Link
+                        to="/pazienti/$id"
+                        params={{ id: r.paziente_id }}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        onClick={() => onOpenChange(false)}
+                      >
+                        Apri scheda <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
