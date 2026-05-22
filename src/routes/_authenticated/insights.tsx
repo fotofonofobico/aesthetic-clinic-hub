@@ -72,12 +72,12 @@ function lastNMonths(n: number): string[] {
 }
 
 const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--chart-2, 173 58% 39%))",
-  "hsl(var(--chart-3, 12 76% 61%))",
-  "hsl(var(--chart-4, 43 74% 66%))",
-  "hsl(var(--chart-5, 280 65% 60%))",
-  "hsl(var(--muted-foreground))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--primary)",
 ];
 
 function InsightsPage() {
