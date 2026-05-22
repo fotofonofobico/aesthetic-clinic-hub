@@ -1,5 +1,5 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { routeTree } from "./routeTree.gen";
 
 const CHUNK_RELOAD_KEY = "__chunk_reload_attempt__";
@@ -16,25 +16,51 @@ function isChunkLoadError(err: Error): boolean {
   );
 }
 
+/** Errori transitori che non devono mostrare la UI di errore. */
+function isTransientError(err: Error): boolean {
+  const msg = (err?.message || "").toLowerCase();
+  const name = (err?.name || "").toLowerCase();
+  return (
+    name === "aborterror" ||
+    name === "cancellederror" ||
+    msg.includes("aborted") ||
+    msg.includes("cancelled") ||
+    msg.includes("the user aborted")
+  );
+}
+
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  // Mostra la UI solo dopo un breve delay: se l'errore è transitorio
+  // (race tra navigazioni / Suspense) il componente viene smontato prima
+  // e l'utente non vede il flash rosso.
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!isChunkLoadError(error)) return;
-    const already = sessionStorage.getItem(CHUNK_RELOAD_KEY);
-    if (already) return;
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
-    window.location.reload();
-  }, [error]);
-
-  // Reset il flag se l'errore non è chunk-load (utente ha navigato OK dopo)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!isChunkLoadError(error)) {
-      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    // Chunk-load errors → reload silenzioso
+    if (isChunkLoadError(error)) {
+      const already = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      if (!already) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+      }
+      return;
     }
-  }, [error]);
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+
+    // Errori innocui (abort/cancel): non mostriamo nulla, tentiamo reset.
+    if (isTransientError(error)) {
+      reset();
+      return;
+    }
+
+    // Errori reali: mostra dopo 300ms per evitare flash su navigazioni rapide.
+    const t = window.setTimeout(() => setShow(true), 300);
+    return () => window.clearTimeout(t);
+  }, [error, reset]);
+
+  if (!show) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -55,9 +81,9 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Something went wrong</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Qualcosa è andato storto</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          An unexpected error occurred. Please try again.
+          Si è verificato un errore. Riprova oppure torna alla home.
         </p>
         {import.meta.env.DEV && error.message && (
           <pre className="mt-4 max-h-40 overflow-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-destructive">
@@ -72,13 +98,13 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            Riprova
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Vai alla home
           </a>
         </div>
       </div>

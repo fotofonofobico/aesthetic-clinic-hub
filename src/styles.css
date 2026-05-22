@@ -100,6 +100,14 @@
   --sidebar-accent-foreground: oklch(0.28 0.02 240);
   --sidebar-border: oklch(0.9 0.008 85);
   --sidebar-ring: oklch(0.45 0.07 200);
+
+  /* Palette grafici — coerente, niente nero */
+  --chart-1: oklch(0.55 0.09 200);
+  --chart-2: oklch(0.65 0.11 165);
+  --chart-3: oklch(0.72 0.13 60);
+  --chart-4: oklch(0.55 0.13 290);
+  --chart-5: oklch(0.68 0.12 25);
+  --chart-cost: oklch(0.7 0.1 55);
 }
 
 .dark {
@@ -134,6 +142,13 @@
   --sidebar-accent-foreground: oklch(0.96 0.005 85);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.7 0.09 195);
+
+  --chart-1: oklch(0.7 0.09 195);
+  --chart-2: oklch(0.72 0.11 165);
+  --chart-3: oklch(0.75 0.13 60);
+  --chart-4: oklch(0.65 0.13 290);
+  --chart-5: oklch(0.72 0.13 25);
+  --chart-cost: oklch(0.75 0.11 55);
 }
 
 @layer base {
