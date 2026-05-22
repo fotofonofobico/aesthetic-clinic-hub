@@ -80,6 +80,63 @@ function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+/**
+ * Input numerico "amichevole": consente di cancellare/digitare liberamente,
+ * applica clamp e fallback solo su blur o Invio. Evita il bug "8 diventa 18"
+ * causato da clamp aggressivo a ogni keystroke.
+ */
+function NumberInputSedute({
+  value,
+  min,
+  onCommit,
+  className,
+}: {
+  value: number;
+  min: number;
+  onCommit: (n: number) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string>(String(value));
+  // Sincronizza quando il valore esterno cambia (es. cambio voce)
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit() {
+    const n = parseInt(draft, 10);
+    const safeMin = Math.max(1, min);
+    if (!Number.isFinite(n) || n < safeMin) {
+      setDraft(String(safeMin));
+      if (value !== safeMin) onCommit(safeMin);
+      return;
+    }
+    const floored = Math.floor(n);
+    setDraft(String(floored));
+    if (value !== floored) onCommit(floored);
+  }
+
+  return (
+    <Input
+      type="number"
+      inputMode="numeric"
+      min={Math.max(1, min)}
+      step={1}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={className}
+    />
+  );
+}
+
+
 function parseProdotti(value: unknown): ProdottoPrevisto[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -1413,14 +1470,10 @@ export function PianiPanel({
                     <div className="flex flex-wrap items-end gap-3">
                       <div className="w-28">
                         <Label className="text-xs">Sedute</Label>
-                        <Input
-                          type="number"
-                          min={Math.max(1, r.numero_sedute_min)}
-                          step={1}
+                        <NumberInputSedute
                           value={r.numero_sedute}
-                          onChange={(e) =>
-                            setNumeroSedute(r.uid, Number(e.target.value))
-                          }
+                          min={r.numero_sedute_min}
+                          onCommit={(n) => setNumeroSedute(r.uid, n)}
                         />
                         {r.numero_sedute_min > 0 && (
                           <p className="mt-1 text-[10px] text-muted-foreground">
