@@ -305,7 +305,7 @@ function ConsensiObsoletiDialog({
       const { data } = await supabase
         .from("consenso_firmato")
         .select(
-          "id, paziente_id, versione_snapshot, firmato_il, titolo_snapshot, template_id, template:template_id(versione, attivo, titolo), paziente:paziente_id(nome, cognome)"
+          "id, paziente_id, versione_snapshot, firmato_il, titolo_snapshot, template_id, template:template_id(versione, attivo, titolo, richiede_rifirma_su_nuova_versione, motivo_nuova_versione), paziente:paziente_id(nome, cognome)"
         )
         .is("revocato_il", null)
         .eq("rifiutato", false)
@@ -317,6 +317,8 @@ function ConsensiObsoletiDialog({
         const tpl = c.template;
         if (!tpl || !tpl.attivo) return;
         if (tpl.versione === c.versione_snapshot) return;
+        // Solo se il template richiede esplicitamente la rifirma su nuova versione
+        if (tpl.richiede_rifirma_su_nuova_versione !== true) return;
         out.push({
           id: c.id,
           paziente_id: c.paziente_id,
@@ -327,8 +329,10 @@ function ConsensiObsoletiDialog({
           versione_firmata: c.versione_snapshot,
           versione_attuale: tpl.versione,
           firmato_il: c.firmato_il,
+          motivo_nuova_versione: tpl.motivo_nuova_versione ?? null,
         });
       });
+
       if (!cancelled) setRows(out);
     })();
     return () => {
