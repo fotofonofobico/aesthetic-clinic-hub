@@ -550,15 +550,40 @@ export function PianiPanel({
     );
   }
 
+  // ---------- visita selezionata per lo storno (snapshot importo) ----------
+  const stornoVisitaImporto = useMemo(() => {
+    if (!stornoVisitaAttivo || !stornoVisitaSedutaId) return 0;
+    const v = visiteStornabili.find((x) => x.seduta_id === stornoVisitaSedutaId);
+    return v?.importo ?? 0;
+  }, [stornoVisitaAttivo, stornoVisitaSedutaId, visiteStornabili]);
+
   // ---------- totale calcolato live ----------
-  const totaleBase = useMemo(
-    () => calcolaTotaleRighe(righe, trattamenti),
-    [righe, trattamenti],
+  const calcoloPiano = useMemo(
+    () =>
+      calcolaTotalePiano({
+        righe,
+        trattamenti,
+        override: pacchettoOverrideAttivo ? pacchettoOverrideValore : null,
+        scontoTipo,
+        scontoValore,
+        stornoVisita: stornoVisitaImporto,
+      }),
+    [
+      righe,
+      trattamenti,
+      pacchettoOverrideAttivo,
+      pacchettoOverrideValore,
+      scontoTipo,
+      scontoValore,
+      stornoVisitaImporto,
+    ],
   );
-  const { sconto, finale } = useMemo(
-    () => applicaSconto(totaleBase, scontoTipo, scontoValore),
-    [totaleBase, scontoTipo, scontoValore],
-  );
+  const totaleBase = calcoloPiano.base;
+  const subtotaleRighe = calcoloPiano.subtotaleRighe;
+  const sconto = calcoloPiano.sconto;
+  const stornoFinale = calcoloPiano.storno;
+  const finale = calcoloPiano.finale;
+
 
   // ---------- apertura dialog ----------
   function resetDecisione() {
