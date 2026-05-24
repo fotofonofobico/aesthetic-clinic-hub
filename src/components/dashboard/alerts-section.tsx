@@ -372,9 +372,16 @@ function ConsensiObsoletiDialog({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-t">
+                  <tr key={r.id} className="border-t align-top">
                     <td className="px-3 py-2">{r.paziente_nome}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.template_titolo}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      <div>{r.template_titolo}</div>
+                      {r.motivo_nuova_versione && (
+                        <div className="mt-0.5 text-[11px] italic">
+                          {r.motivo_nuova_versione}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2">
                       <span className="rounded bg-warning/15 px-1.5 py-0.5 text-xs">
                         v{r.versione_firmata} → v{r.versione_attuale}
@@ -392,6 +399,7 @@ function ConsensiObsoletiDialog({
                     </td>
                   </tr>
                 ))}
+
               </tbody>
             </table>
           </div>
