@@ -614,35 +614,40 @@ export function PianiPanel({
       const { data, error } = await supabase
         .from("seduta")
         .select(
-          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id, trattamento:trattamento(nome, prezzo_indicativo)",
+          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id",
         )
         .eq("paziente_id", pazienteId)
         .eq("completata", true)
         .order("data_esecuzione_effettiva", { ascending: false })
         .limit(50);
       if (error) throw error;
-      const rows = ((data ?? []) as unknown) as Array<{
-
+      const rows = (data ?? []) as Array<{
         id: string;
         data_seduta: string | null;
         data_esecuzione_effettiva: string | null;
+        trattamento_id: string | null;
         scalata_in_piano_id: string | null;
-        trattamento: { nome: string | null; prezzo_indicativo: number | null } | null;
       }>;
+      const trattamentoById = new Map(trattamenti.map((t) => [t.id, t]));
       const out = rows
-        .filter((s) => isTrattamentoVisita(s.trattamento?.nome))
-        .filter(
-          (s) =>
-            s.scalata_in_piano_id === null ||
-            (pianoCorrenteId !== null && s.scalata_in_piano_id === pianoCorrenteId),
-        )
         .map((s) => ({
-          seduta_id: s.id,
-          data: s.data_esecuzione_effettiva ?? s.data_seduta ?? "",
-          trattamento_nome: s.trattamento?.nome ?? "Visita",
-          importo: Number(s.trattamento?.prezzo_indicativo ?? 0),
+          row: s,
+          tratt: s.trattamento_id ? trattamentoById.get(s.trattamento_id) : undefined,
+        }))
+        .filter((x) => isTrattamentoVisita(x.tratt?.nome))
+        .filter(
+          (x) =>
+            x.row.scalata_in_piano_id === null ||
+            (pianoCorrenteId !== null && x.row.scalata_in_piano_id === pianoCorrenteId),
+        )
+        .map((x) => ({
+          seduta_id: x.row.id,
+          data: x.row.data_esecuzione_effettiva ?? x.row.data_seduta ?? "",
+          trattamento_nome: x.tratt?.nome ?? "Visita",
+          importo: Number(x.tratt?.prezzo_indicativo ?? 0),
         }));
       setVisiteStornabili(out);
+
     } catch {
       setVisiteStornabili([]);
     }
