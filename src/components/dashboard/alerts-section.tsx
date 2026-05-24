@@ -29,7 +29,9 @@ interface ConsensoObsoletoRow {
   versione_firmata: string;
   versione_attuale: string;
   firmato_il: string;
+  motivo_nuova_versione: string | null;
 }
+
 
 export function AlertsSection() {
   const [items, setItems] = useState<AlertItem[] | null>(null);
