@@ -1104,9 +1104,33 @@ export function PianiPanel({
           prezzo_finale: finale,
           sconto_tipo: scontoTipo,
           sconto_valore: scontoValore,
+          prezzo_pacchetto_override: pacchettoOverrideAttivo
+            ? pacchettoOverrideValore
+            : null,
+          storno_visita_seduta_id: stornoVisitaAttivo
+            ? stornoVisitaSedutaId
+            : null,
+          storno_visita_importo: stornoVisitaAttivo ? stornoFinale : 0,
         } as never)
         .eq("id", pianoId);
       if (upErr) throw upErr;
+
+      // Sync flag scalata_in_piano_id sulle sedute-visita coinvolte
+      // 1) libera quelle che prima erano scalate in questo piano ma non lo sono più
+      const { error: relErr } = await supabase
+        .from("seduta")
+        .update({ scalata_in_piano_id: null } as never)
+        .eq("scalata_in_piano_id", pianoId);
+      if (relErr) throw relErr;
+      // 2) marca la nuova selezionata, se attiva
+      if (stornoVisitaAttivo && stornoVisitaSedutaId) {
+        const { error: mkErr } = await supabase
+          .from("seduta")
+          .update({ scalata_in_piano_id: pianoId } as never)
+          .eq("id", stornoVisitaSedutaId);
+        if (mkErr) throw mkErr;
+      }
+
 
       // 2. voci rimosse: cancella voce + sedute non completate
       const idsForm = new Set(righe.map((r) => r.voceId).filter(Boolean) as string[]);
