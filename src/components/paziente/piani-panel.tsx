@@ -1895,11 +1895,64 @@ export function PianiPanel({
 
             {/* Totale + sconto */}
             {righe.length > 0 && (
-              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
+              <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Totale base</span>
-                  <span className="font-medium">{formatEuro(totaleBase)}</span>
+                  <span className="text-muted-foreground">
+                    Somma righe
+                    {pacchettoOverrideAttivo && " (sostituita dal prezzo pacchetto)"}
+                  </span>
+                  <span
+                    className={
+                      pacchettoOverrideAttivo
+                        ? "text-muted-foreground line-through"
+                        : "font-medium"
+                    }
+                  >
+                    {formatEuro(subtotaleRighe)}
+                  </span>
                 </div>
+
+                {/* Prezzo pacchetto fisso */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="pacchetto-override"
+                      checked={pacchettoOverrideAttivo}
+                      onCheckedChange={(c) => {
+                        const v = c === true;
+                        setPacchettoOverrideAttivo(v);
+                        if (v && pacchettoOverrideValore === 0) {
+                          setPacchettoOverrideValore(subtotaleRighe);
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="pacchetto-override"
+                      className="cursor-pointer text-xs uppercase tracking-wide text-muted-foreground"
+                    >
+                      Prezzo pacchetto fisso
+                    </Label>
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="h-8 w-32"
+                    disabled={!pacchettoOverrideAttivo}
+                    value={pacchettoOverrideValore}
+                    onChange={(e) =>
+                      setPacchettoOverrideValore(Number(e.target.value) || 0)
+                    }
+                  />
+                  {pacchettoOverrideAttivo &&
+                    subtotaleRighe > pacchettoOverrideValore && (
+                      <span className="text-xs text-success">
+                        Risparmio {formatEuro(subtotaleRighe - pacchettoOverrideValore)}
+                      </span>
+                    )}
+                </div>
+
+                {/* Sconto globale */}
                 <div className="flex flex-wrap items-center gap-2">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Sconto
@@ -1933,6 +1986,62 @@ export function PianiPanel({
                     </span>
                   )}
                 </div>
+
+                {/* Storno visita pagata */}
+                <div className="space-y-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="storno-visita"
+                      checked={stornoVisitaAttivo}
+                      disabled={visiteStornabili.length === 0}
+                      onCheckedChange={(c) => {
+                        const v = c === true;
+                        setStornoVisitaAttivo(v);
+                        if (!v) setStornoVisitaSedutaId(null);
+                        else if (!stornoVisitaSedutaId && visiteStornabili[0]) {
+                          setStornoVisitaSedutaId(visiteStornabili[0].seduta_id);
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="storno-visita"
+                      className="cursor-pointer text-xs uppercase tracking-wide text-muted-foreground"
+                    >
+                      Scala visita pagata
+                    </Label>
+                    {visiteStornabili.length === 0 && (
+                      <span className="text-[11px] italic text-muted-foreground">
+                        Nessuna visita scalabile disponibile
+                      </span>
+                    )}
+                  </div>
+                  {stornoVisitaAttivo && visiteStornabili.length > 0 && (
+                    <Select
+                      value={stornoVisitaSedutaId ?? ""}
+                      onValueChange={(v) => setStornoVisitaSedutaId(v)}
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue placeholder="Seleziona la visita…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {visiteStornabili.map((v) => (
+                          <SelectItem key={v.seduta_id} value={v.seduta_id}>
+                            {v.trattamento_nome}
+                            {v.data ? ` — ${new Date(v.data).toLocaleDateString("it-IT")}` : ""}
+                            {" · "}
+                            {formatEuro(v.importo)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {stornoFinale > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      − {formatEuro(stornoFinale)} (visita già pagata)
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between border-t border-border pt-2">
                   <span className="font-display text-sm uppercase tracking-wide">
                     Totale finale
@@ -1943,6 +2052,7 @@ export function PianiPanel({
                 </div>
               </div>
             )}
+
           </div>
 
           <DialogFooter>
