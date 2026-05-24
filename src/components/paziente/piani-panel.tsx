@@ -945,6 +945,13 @@ export function PianiPanel({
           prezzo_finale: finale,
           sconto_tipo: scontoTipo,
           sconto_valore: scontoValore,
+          prezzo_pacchetto_override: pacchettoOverrideAttivo
+            ? pacchettoOverrideValore
+            : null,
+          storno_visita_seduta_id: stornoVisitaAttivo
+            ? stornoVisitaSedutaId
+            : null,
+          storno_visita_importo: stornoVisitaAttivo ? stornoFinale : 0,
           stato: "bozza",
           note: null,
           tipo_decisione: "piano",
