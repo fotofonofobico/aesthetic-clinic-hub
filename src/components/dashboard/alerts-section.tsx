@@ -82,49 +82,123 @@ export function AlertsSection() {
         if (basse > 0) out.push({ key: "scorte", label: "Scorte sotto soglia", count: basse, severity: "warning", to: "/magazzino" });
       } catch {}
 
-      // 3) Consensi obsoleti / in scadenza
+      // 3) Consensi: solo OBSOLETI VERI (template opt-in) + IN SCADENZA reale
       try {
         const { data: cf } = await supabase
           .from("consenso_firmato")
-          .select("id, versione_snapshot, valido_fino_a, revocato_il, rifiutato, template_id, template:template_id(versione, attivo)")
+          .select(
+            "id, versione_snapshot, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot, template_id, template:template_id(versione, attivo, richiede_rifirma_su_nuova_versione)",
+          )
           .is("revocato_il", null)
           .eq("rifiutato", false)
           .limit(1000);
-        let obsoleti = 0, inScad = 0;
+        let obsoleti = 0,
+          inScad = 0;
         (cf ?? []).forEach((c: any) => {
           const tpl = c.template;
-          if (tpl && tpl.attivo && tpl.versione !== c.versione_snapshot) obsoleti++;
+          // Considera "obsoleto" solo se:
+          //  - il template è ancora attivo,
+          //  - la versione firmata è diversa dall'attuale,
+          //  - E il template richiede esplicitamente la rifirma su nuova versione.
+          if (
+            tpl &&
+            tpl.attivo &&
+            tpl.richiede_rifirma_su_nuova_versione === true &&
+            tpl.versione !== c.versione_snapshot
+          ) {
+            obsoleti++;
+          }
+          // Scadenza per data (consensi a mesi)
           if (c.valido_fino_a) {
             const d = new Date(c.valido_fino_a);
             if (d > ora && d < tra30) inScad++;
           }
+          // Scadenza per sedute residue ≤ 1
+          if (
+            c.durata_tipo_snapshot === "sedute" &&
+            typeof c.sedute_max_snapshot === "number" &&
+            typeof c.sedute_consumate === "number" &&
+            c.sedute_max_snapshot - c.sedute_consumate === 1
+          ) {
+            inScad++;
+          }
         });
-        if (obsoleti > 0) out.push({ key: "obsoleti", label: "Consensi con versione obsoleta", count: obsoleti, severity: "warning", to: "#", detail: "consensi_obsoleti" });
-        if (inScad > 0) out.push({ key: "cscad", label: "Consensi in scadenza < 30gg", count: inScad, severity: "warning", to: "/consensi" });
+        if (obsoleti > 0) out.push({ key: "obsoleti", label: "Consensi da rifirmare (nuova versione)", count: obsoleti, severity: "warning", to: "#", detail: "consensi_obsoleti" });
+        if (inScad > 0) out.push({ key: "cscad", label: "Consensi in scadenza", count: inScad, severity: "warning", to: "/consensi" });
       } catch {}
 
-      // 4) Consensi mancanti per sedute prossime
+      // 4) Consensi mancanti per sedute prossime — match per trattamento
       try {
         const tra7 = new Date(); tra7.setDate(tra7.getDate() + 7);
         const { data: sedute } = await supabase
           .from("seduta")
-          .select("id, paziente_id, data_seduta")
+          .select("id, paziente_id, trattamento_id, data_seduta")
           .gte("data_seduta", ora.toISOString())
           .lte("data_seduta", tra7.toISOString())
-          .eq("completata", false);
-        const pIds = Array.from(new Set((sedute ?? []).map((s: any) => s.paziente_id).filter(Boolean)));
+          .eq("completata", false)
+          .limit(1000);
+        const sedRows = (sedute ?? []) as Array<{
+          id: string;
+          paziente_id: string;
+          trattamento_id: string | null;
+        }>;
+        // Mappa trattamento_id -> consenso_template_id
+        const trattIds = Array.from(
+          new Set(sedRows.map((s) => s.trattamento_id).filter(Boolean) as string[]),
+        );
+        const trattToTpl = new Map<string, string | null>();
+        if (trattIds.length > 0) {
+          const { data: tratts } = await supabase
+            .from("trattamenti")
+            .select("id, consenso_template_id")
+            .in("id", trattIds);
+          (tratts ?? []).forEach((t: any) =>
+            trattToTpl.set(t.id, t.consenso_template_id ?? null),
+          );
+        }
+        // Pre-carica tutti i consensi attivi dei pazienti coinvolti
+        const pIds = Array.from(new Set(sedRows.map((s) => s.paziente_id).filter(Boolean)));
+        const consensiByPz = new Map<string, Set<string>>(); // paziente -> set di template_id validi
         if (pIds.length > 0) {
-          const { data: consensi } = await supabase
+          const { data: cons } = await supabase
             .from("consenso_firmato")
-            .select("paziente_id")
-            .in("paziente_id", pIds);
-          const conConsenso = new Set((consensi ?? []).map((c: any) => c.paziente_id));
-          const mancanti = pIds.filter((id) => !conConsenso.has(id)).length;
-          if (mancanti > 0) {
-            out.push({ key: "consensi", label: "Consensi mancanti (sedute < 7gg)", count: mancanti, severity: "critical", to: "/consensi" });
-          }
+            .select(
+              "paziente_id, template_id, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot",
+            )
+            .in("paziente_id", pIds)
+            .is("revocato_il", null)
+            .eq("rifiutato", false);
+          (cons ?? []).forEach((c: any) => {
+            if (!c.template_id) return;
+            // valido se non scaduto e non esaurito
+            if (c.valido_fino_a && new Date(c.valido_fino_a) <= ora) return;
+            if (
+              c.durata_tipo_snapshot === "sedute" &&
+              typeof c.sedute_max_snapshot === "number" &&
+              typeof c.sedute_consumate === "number" &&
+              c.sedute_consumate >= c.sedute_max_snapshot
+            ) {
+              return;
+            }
+            const s = consensiByPz.get(c.paziente_id) ?? new Set<string>();
+            s.add(c.template_id);
+            consensiByPz.set(c.paziente_id, s);
+          });
+        }
+        // Conta sedute con consenso pertinente mancante
+        const pazientiMancanti = new Set<string>();
+        sedRows.forEach((s) => {
+          if (!s.trattamento_id) return;
+          const tplId = trattToTpl.get(s.trattamento_id);
+          if (!tplId) return; // trattamento senza consenso richiesto → ignora
+          const valid = consensiByPz.get(s.paziente_id);
+          if (!valid || !valid.has(tplId)) pazientiMancanti.add(s.paziente_id);
+        });
+        if (pazientiMancanti.size > 0) {
+          out.push({ key: "consensi", label: "Consenso specifico mancante (sedute < 7gg)", count: pazientiMancanti.size, severity: "critical", to: "/consensi" });
         }
       } catch {}
+
 
       if (!cancelled) setItems(out);
     })();
