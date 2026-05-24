@@ -1,119 +1,110 @@
-Diviso in due step indipendenti. Lo STEP A è pronto da implementare. Lo STEP B richiede la tua conferma sui dettagli. La "prima visita / visita di controllo" la lasciamo apposta fuori: la affrontiamo dopo in una mini-discussione dedicata (vedi in fondo).
+Ok mi sono spiegato bene, e l'idea della visita dentro il piano è la strada giusta: niente banner, tutto dentro il piano stesso. Propongo questi 3 interventi minimi, tutti reversibili e senza toccare il flow esistente.
 
 ---
 
-## STEP A — Fix UI e bug rapidi
+## 1) Piano combinato: prezzo unico pacchetto + storno visita
 
-### A1. Bug "input Sedute" nel nuovo piano
+Oggi `piano.prezzo_totale` è la somma delle righe e `prezzo_finale` applica uno sconto globale (`euro` / `percento`). Funziona ma non copre i tuoi 2 casi.
 
-Oggi `value={r.numero_sedute}` è un number controllato che ad ogni keystroke fa `Math.max(1, Math.floor(n||1))`. Quando cancelli "1" la stringa diventa vuota, `Number("") = 0`, viene risostituito da `1` e l'8 si attacca dopo → "18".
+**Aggiunte (solo additive, nessuna rottura):**
 
-Fix:
+- **A. "Prezzo pacchetto" sul piano** — nuovo campo `prezzo_pacchetto_override` (numero, opzionale) sul piano.
+  - Se valorizzato → il totale del piano diventa quello (ignora la somma delle righe).
+  - Se vuoto → comportamento attuale (somma righe).
+  - UI: nel form piano, sotto al totale, un toggle "Prezzo pacchetto fisso" con campo €. Quando attivo, mostra "Risparmio rispetto ai singoli: X €" calcolato dalla differenza.
+- **B. Riga "storno visita precedente"** — nuovo flag `storna_se_in_piano` sui trattamenti tipo Visita, + un campo `visita_da_stornare_id` sul piano (FK opzionale a una visita/incontro già pagata di quel paziente).
+  - In fase di creazione piano, se il paziente ha una "Prima visita" o "Visita di controllo" registrata e non ancora stornata, appare un checkbox: *"Scala € 60 della visita del 12/05 già pagata"*.
+  - Lo storno diventa una riga negativa nel piano (visibile e tracciata) → niente magia nascosta, contabilmente pulito.
+  - La visita di origine viene marcata come "stornata in piano X" per non poterla applicare due volte.
 
-- Nuovo componente `NumberInputSedute` (interno a `piani-panel.tsx`) con state stringa locale.
-- Durante digitazione lo state è libero (anche vuoto). Su `onBlur` (o Invio) committa: clamp tra `min` e valore valido, fallback al min se vuoto/non valido.
-- Stesso pattern riusato nei posti in cui c'è `type="number"` con clamp aggressivo (verifica anche `magazzino` e `lotto-form-dialog`, se applicabile).
+**Esempio del tuo caso:**
 
-### A2. Sfarfallio "Something went wrong" durante navigazione
+```
+1× Visita (in piano)            60,00
+1× Criolipolisi                100,00
+4× Onde d'urto                 400,00
+─────────────────────────────────────
+Subtotale righe                560,00
+Prezzo pacchetto fisso         450,00  ← override
+Storno visita 12/05 già pagata −60,00
+─────────────────────────────────────
+Da incassare                   390,00
+```
 
-Il `defaultErrorComponent` in `src/router.tsx` mostra subito il full-screen rosso. Tra una rotta e l'altra capita un breve errore transitorio (es. query cancellata, Suspense che ricarica) → flash.
+(o, se la visita la stai mettendo dentro il piano *prima* di pagarla, semplicemente non aggiungi lo storno e paga 450).
 
-Fix:
-
-- Mostrare la UI di errore solo dopo un delay (es. 250 ms): se nel frattempo arriva un nuovo render (errore sparito) non si vede nulla.
-- Sopprimere completamente errori "innocui": `AbortError`, `CancelledError`, `Failed to fetch dynamically imported module` (già gestito a parte con reload).
-- Aggiungere `key={location.pathname}` al boundary in `__root.tsx` se necessario per resettarlo al cambio rotta.
-
-### A3. Grafici Insights — niente "nero"
-
-In `src/routes/_authenticated/insights.tsx`:
-
-- `BarChart` "Costi magazzino" usa `fill="hsl(var(--muted-foreground))"` → cambio a un accent più morbido (definisco token semantico `--chart-cost` in `src/styles.css` con `oklch` neutro/ambra).
-- Aggiungo nei tokens 2–3 colori chart coerenti (`--chart-1` primary, `--chart-2` teal, `--chart-3` ambra, `--chart-4` viola tenue), riusati in tutti i `Bar/Line/Pie`.
-- Verifico anche tick assi: tengo `muted-foreground` per testo (è grigio non nero).
-
-### A4. Consensi obsoleti — apertura filtrata
-
-- Cambio il link dell'alert dashboard da `/consensi` a `/consensi?filtro=obsoleti`.
-- In `src/routes/_authenticated/consensi.index.tsx` leggo il search param e applico filtro pre-impostato (badge "Obsoleti" attivo). La sezione mostra elenco: paziente · template · versione firmata → versione attuale · azione "Rifirma" già esistente.
-- Nessuna nuova entità.
+**Niente alert / banner**: la visita è una riga normale del piano. Lo "sconto visita" è una tick esplicita nel form. Zero pasticci.
 
 ---
 
-## STEP B — Protocolli e parametri clinici (richiede tua conferma)
+## 2) Badge "Consenso ok" illeggibile
 
-Aderisce esattamente alla tua specifica: **niente nuova entità "Pacchetto"**, le righe del piano restano la base, i "protocolli" sono solo template che generano righe standard.
-
-### B1. Protocolli preimpostati (template righe piano)
-
-Schema:
-
-- `protocollo_template` ( id, nome, descrizione, attivo, created_by, ... )
-- `protocollo_template_riga` ( id, protocollo_id, trattamento_id, numero_sedute, ordine, note )
-
-Nessuna scrittura su `piano_trattamento`: il protocollo serve solo a precompilare il dialog "Nuovo piano".
-
-UI:
-
-- In `piani-panel.tsx`, nel dialog di creazione, in alto un selettore "Applica protocollo…" (combobox). Selezionandolo, vengono aggiunte le righe del template ai dati già presenti (non sostituisce: si appende, con possibilità di rimuovere). Resta tutto modificabile.
-- In "Impostazioni → Trattamenti" nuova tab "Protocolli" per CRUD.
-
-Esempio "Body shaping" = 1 criolipolisi + 8 onde d'urto + 4 carbossi → genera 3 righe piano standard.
-
-### B2. Parametri clinici dinamici per trattamento
-
-Schema:
-
-- `trattamenti` → nuova colonna `schema_parametri jsonb` (array di campi: `{ key, label, tipo: 'number'|'text'|'select'|'bool', unita?, options?, obbligatorio? }`).
-- `seduta` ha già `parametri_tecnici jsonb` — lo usiamo come storage senza modifiche.
-- Storico per paziente: query già fattibile join `seduta.parametri_tecnici` per trattamento (no nuova tabella).
-
-UI:
-
-- In "Impostazioni → Trattamenti" editor schema parametri (lista campi drag-friendly, semplice).
-- Nel dialog di completamento seduta (`sedute-panel.tsx` → completa): se il trattamento ha `schema_parametri`, mostra una mini-form generata; salva in `parametri_tecnici`.
-- Sulla scheda paziente, sotto "Storico parametri" (collapsible) per ciascun trattamento: tabella semplice (data · valori). Niente grafici qui per non gonfiare.
-
-> Importante: peso/altezza/BMI/circonferenze restano dove sono (Anamnesi → Misurazioni). Il sistema di parametri NON li duplica; sono concettualmente dati paziente, non di seduta.
-
-### B3. Sedute combinate nello stesso appuntamento
-
-La struttura attuale già lo consente: più sedute (di righe piano diverse) possono condividere lo stesso `evento_calendario` o avere stesso `data_seduta`. Non servono modifiche di schema.
-
-- Piccolo miglioramento UX: nel calendario raggruppo le sedute con stessa data/ora/paziente in un'unica card con badge "+N trattamenti". Solo presentazione.
+Nel componente `piani-panel.tsx` il badge verde usa testo bianco su sfondo verde chiaro → invisibile. Fix: forzare testo scuro (`text-success-foreground` o `text-foreground`) sul badge "Consenso ok". Modifica di 1 riga.
 
 ---
 
-## Tabella riassuntiva tecnica (per chi conosce il codice)
+## 3) Alert dashboard — riepilogo e proposta "intelligenti"
+
+**Cosa c'è ora** (`alerts-section.tsx`):
 
 
-| Fix                 | File principali                                                                               | Tipo  |
-| ------------------- | --------------------------------------------------------------------------------------------- | ----- |
-| A1 numero sedute    | `src/components/paziente/piani-panel.tsx`                                                     | UI    |
-| A2 flash errore     | `src/router.tsx`, `src/routes/__root.tsx`                                                     | UI    |
-| A3 colori grafici   | `src/routes/_authenticated/insights.tsx`, `src/styles.css`                                    | UI    |
-| A4 filtro consensi  | `src/components/dashboard/alerts-section.tsx`, `src/routes/_authenticated/consensi.index.tsx` | UI    |
-| B1 protocolli       | nuova migration + tab impostazioni + dialog piano                                             | DB+UI |
-| B2 parametri        | migration `trattamenti.schema_parametri` + editor + form seduta                               | DB+UI |
-| B3 sedute combinate | `src/components/calendario/calendario-vista.tsx` (raggruppamento)                             | UI    |
+| #   | Alert                              | Severità | Logica attuale                                                |
+| --- | ---------------------------------- | -------- | ------------------------------------------------------------- |
+| 1   | Anamnesi mancanti o > 12 mesi      | warning  | nessuna anamnesi, o `updated_at` > 12 mesi                    |
+| 2   | Lotti scaduti                      | critical | `data_scadenza < oggi`                                        |
+| 3   | Lotti in scadenza < 30gg           | warning  | `data_scadenza` entro 30 gg                                   |
+| 4   | Scorte sotto soglia                | warning  | `quantita_disponibile ≤ soglia_minima`                        |
+| 5   | **Consensi con versione obsoleta** | warning  | `template.versione ≠ versione_snapshot` (qualunque sia l'età) |
+| 6   | Consensi in scadenza < 30gg        | warning  | `valido_fino_a` entro 30 gg                                   |
+| 7   | Consensi mancanti (sedute < 7gg)   | critical | seduta programmata entro 7gg + paziente senza alcun consenso  |
 
+
+**Problemi che hai segnalato — proposte:**
+
+- **#5 (versione obsoleta) — oggi è "stupido":** segnala anche un consenso firmato 3 anni fa per cui ora esiste una v2 di forma. Proposta: il consenso firmato **resta valido** finché:
+  - non scade (`valido_fino_a`),
+  - non è revocato,
+  - non è esaurito (sedute consumate ≥ sedute max).
+  La versione del template diventa rilevante **solo** se il template ha un flag `richiede_rifirma_su_nuova_versione = true` (default: false). Così tu decidi caso per caso: una correzione tipografica non forza rifirma, un cambio sostanziale di clausole sì.
+  Aggiungo anche un campo opzionale `motivo_nuova_versione` sul template, mostrato nel dialog "Consensi obsoleti".
+- **#7 (mancanti per sedute < 7gg) — oggi è grossolano:** segnala "manca un consenso qualsiasi". Proposta: segnala solo se manca *il consenso pertinente al trattamento di quella seduta* (match per `trattamento_id` → `consenso_template_id`). Niente falsi positivi per pazienti che hanno solo GDPR ma stanno facendo crio senza consenso specifico.
+- **#1 (anamnesi > 12 mesi):** ok così, ma aggiungerei la soglia configurabile in Impostazioni (default 12 mesi).
+- Tutti gli alert restano **non bloccanti** (solo segnalazione cliccabile).
 
 ---
 
-## Prima visita / Visita di controllo — lasciata FUORI dal piano
+## Cosa NON faccio in questo giro
 
-Hai chiesto esplicitamente di ragionarci prima. Riassunto delle opzioni che valuteremo dopo la tua approvazione di A/B:
-
-1. **Prestazione collegata all'appuntamento** (semplice ma slegata da piano e KPI economici).
-2. **Voce nel piano** (coerente con incassi, ma rigida se non c'è piano).
-3. **Entità "incontro" leggera** (anamnesi/visita/controllo) con prezzo, slegata dalle sedute, che alimenta KPI e si può "scontare" su un piano futuro.
-4. **Suggerimento contestuale**: alla creazione del piano si chiede "questo paziente ha fatto una prima visita non ancora scalata? → applica sconto".
-
-La discussione la apro dopo, con pro/contro dettagliati e flussi.
+- Non tocco il flow di firma né i PDF.
+- Non rimuovo il banner baseline criolipolisi (resta come reminder soft).
+- Non introduco nuove entità "Incontro" — la visita resta un trattamento normale dentro il piano, come hai proposto tu.
 
 ---
 
-## Cosa ti chiedo prima di passare in build
+## Ordine di esecuzione suggerito
 
-- Confermi STEP A intero? (lo posso fare subito, basso rischio) sì
-- Confermi STEP B così com'è (protocolli + parametri dinamici + raggruppamento calendario)? Posso anche fare solo B1 prima e B2/B3 in un secondo round se preferisci procedere a piccoli passi. facciamo tutto dopo step by step. magari ci stiamo perdendo la soluzione più semplice
+1. **Fix badge** (1 min, zero rischio).
+2. **Alert consensi intelligenti** (#5 e #7) — solo logica frontend + 1 campo opzionale su template.
+3. **Piano: prezzo pacchetto override + storno visita** — 2 campi nuovi sul piano, UI nel form, aggiornamento calcolo totale.
+
+Confermi l'approccio? In particolare:
+
+- ti va bene che **la rifirma alla nuova versione sia opt-in** (flag sul template) invece che automatica?
+- per lo **storno visita**, ti basta il checkbox "scala la visita XYZ" o vuoi anche poter inserire uno storno manuale a importo libero (es. "−40 per fidelity")?  
+  
+Confermo praticamente tutto l’approccio.
+  Unica modifica che farei: eviterei `visita_da_stornare_id` sul piano.
+  Preferirei mantenere il piano indipendente e segnare invece direttamente sulla visita/prestazione se è già stata usata come storno (`scalata_in_piano_id` nullable).
+  Workflow desiderato:
+  - la visita resta una prestazione/riga normale;
+  - quando creo un nuovo piano il sistema rileva eventuali visite pagate non ancora scalate;
+  - propone checkbox “Scala visita iniziale da 60€”;
+  - se confermo:
+    - aggiunge riga negativa esplicita nel piano;
+    - marca quella visita come già scalata.
+  Così otteniamo:
+  - zero memoria manuale;
+  - niente doppio utilizzo;
+  - auditabilità;
+  - nessuna logica contabile complessa;
+  - nessuna dipendenza forte tra piani.

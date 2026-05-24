@@ -54,9 +54,13 @@ import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
 import {
   applicaSconto,
   calcolaTotaleRighe,
+  calcolaTotalePiano,
   formatEuro,
   prezzoRiga,
 } from "@/lib/piano-prezzo";
+import { isTrattamentoVisita } from "@/lib/trattamenti-speciali";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
@@ -254,7 +258,17 @@ export function PianiPanel({
   const [righe, setRighe] = useState<RigaForm[]>([]);
   const [scontoTipo, setScontoTipo] = useState<ScontoTipo>("nessuno");
   const [scontoValore, setScontoValore] = useState<number>(0);
+  // Prezzo pacchetto fisso (override della somma righe)
+  const [pacchettoOverrideAttivo, setPacchettoOverrideAttivo] = useState(false);
+  const [pacchettoOverrideValore, setPacchettoOverrideValore] = useState<number>(0);
+  // Storno visita già pagata
+  const [stornoVisitaAttivo, setStornoVisitaAttivo] = useState(false);
+  const [stornoVisitaSedutaId, setStornoVisitaSedutaId] = useState<string | null>(null);
+  const [visiteStornabili, setVisiteStornabili] = useState<
+    Array<{ seduta_id: string; data: string; trattamento_nome: string; importo: number }>
+  >([]);
   const [saving, setSaving] = useState(false);
+
 
   // consensi voce (per render piani esistenti)
   const [consensiVoce, setConsensiVoce] = useState<Record<string, ConsensoVoce>>({});
@@ -536,15 +550,40 @@ export function PianiPanel({
     );
   }
 
+  // ---------- visita selezionata per lo storno (snapshot importo) ----------
+  const stornoVisitaImporto = useMemo(() => {
+    if (!stornoVisitaAttivo || !stornoVisitaSedutaId) return 0;
+    const v = visiteStornabili.find((x) => x.seduta_id === stornoVisitaSedutaId);
+    return v?.importo ?? 0;
+  }, [stornoVisitaAttivo, stornoVisitaSedutaId, visiteStornabili]);
+
   // ---------- totale calcolato live ----------
-  const totaleBase = useMemo(
-    () => calcolaTotaleRighe(righe, trattamenti),
-    [righe, trattamenti],
+  const calcoloPiano = useMemo(
+    () =>
+      calcolaTotalePiano({
+        righe,
+        trattamenti,
+        override: pacchettoOverrideAttivo ? pacchettoOverrideValore : null,
+        scontoTipo,
+        scontoValore,
+        stornoVisita: stornoVisitaImporto,
+      }),
+    [
+      righe,
+      trattamenti,
+      pacchettoOverrideAttivo,
+      pacchettoOverrideValore,
+      scontoTipo,
+      scontoValore,
+      stornoVisitaImporto,
+    ],
   );
-  const { sconto, finale } = useMemo(
-    () => applicaSconto(totaleBase, scontoTipo, scontoValore),
-    [totaleBase, scontoTipo, scontoValore],
-  );
+  const totaleBase = calcoloPiano.base;
+  const subtotaleRighe = calcoloPiano.subtotaleRighe;
+  const sconto = calcoloPiano.sconto;
+  const stornoFinale = calcoloPiano.storno;
+  const finale = calcoloPiano.finale;
+
 
   // ---------- apertura dialog ----------
   function resetDecisione() {
@@ -558,12 +597,70 @@ export function PianiPanel({
     setConvertingFrom(null);
   }
 
+  function resetExtraPrezzo() {
+    setPacchettoOverrideAttivo(false);
+    setPacchettoOverrideValore(0);
+    setStornoVisitaAttivo(false);
+    setStornoVisitaSedutaId(null);
+  }
+
+  /**
+   * Carica le visite (sedute completate di trattamenti tipo "Visita") del paziente
+   * che NON sono ancora state scalate in un piano. Filtra anche quelle eventualmente
+   * già scalate nel piano che stiamo modificando, perché possono restare selezionate.
+   */
+  async function caricaVisiteStornabili(pianoCorrenteId: string | null) {
+    try {
+      const { data, error } = await supabase
+        .from("seduta")
+        .select(
+          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id",
+        )
+        .eq("paziente_id", pazienteId)
+        .eq("completata", true)
+        .order("data_esecuzione_effettiva", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        data_seduta: string | null;
+        data_esecuzione_effettiva: string | null;
+        trattamento_id: string | null;
+        scalata_in_piano_id: string | null;
+      }>;
+      const trattamentoById = new Map(trattamenti.map((t) => [t.id, t]));
+      const out = rows
+        .map((s) => ({
+          row: s,
+          tratt: s.trattamento_id ? trattamentoById.get(s.trattamento_id) : undefined,
+        }))
+        .filter((x) => isTrattamentoVisita(x.tratt?.nome))
+        .filter(
+          (x) =>
+            x.row.scalata_in_piano_id === null ||
+            (pianoCorrenteId !== null && x.row.scalata_in_piano_id === pianoCorrenteId),
+        )
+        .map((x) => ({
+          seduta_id: x.row.id,
+          data: x.row.data_esecuzione_effettiva ?? x.row.data_seduta ?? "",
+          trattamento_nome: x.tratt?.nome ?? "Visita",
+          importo: Number(x.tratt?.prezzo_indicativo ?? 0),
+        }));
+      setVisiteStornabili(out);
+
+    } catch {
+      setVisiteStornabili([]);
+    }
+  }
+
   function apriNuovo() {
     setEditingPianoId(null);
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetExtraPrezzo();
     resetDecisione();
+    void caricaVisiteStornabili(null);
     setOpen(true);
   }
 
@@ -572,11 +669,13 @@ export function PianiPanel({
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetExtraPrezzo();
     resetDecisione();
     // pre-compila trattamento richiesto se presente nel piano sorgente
     if (p.trattamento_richiesto_id) setTrattamentoRichiestoId(p.trattamento_richiesto_id);
     setConvertingFrom(p.id);
     setTipoDecisione("piano");
+    void caricaVisiteStornabili(null);
     setOpen(true);
   }
 
@@ -631,11 +730,33 @@ export function PianiPanel({
     setRighe(newRighe);
     setScontoTipo(p.sconto_tipo ?? "nessuno");
     setScontoValore(Number(p.sconto_valore ?? 0));
+    // Ricarica eventuale override pacchetto + storno visita
+    const pExt = p as unknown as {
+      prezzo_pacchetto_override: number | null;
+      storno_visita_seduta_id: string | null;
+      storno_visita_importo: number | null;
+    };
+    if (typeof pExt.prezzo_pacchetto_override === "number") {
+      setPacchettoOverrideAttivo(true);
+      setPacchettoOverrideValore(Number(pExt.prezzo_pacchetto_override));
+    } else {
+      setPacchettoOverrideAttivo(false);
+      setPacchettoOverrideValore(0);
+    }
+    if (pExt.storno_visita_seduta_id) {
+      setStornoVisitaAttivo(true);
+      setStornoVisitaSedutaId(pExt.storno_visita_seduta_id);
+    } else {
+      setStornoVisitaAttivo(false);
+      setStornoVisitaSedutaId(null);
+    }
     setEditingPianoId(p.id);
+    void caricaVisiteStornabili(p.id);
     setOpen(true);
     // valuta consenso per ogni riga
     for (const r of newRighe) void valutaConsenso(r.uid, r.trattamento_id);
   }
+
 
   // ---------- firma consenso da alert piano ----------
   async function avviaFirmaPerVoce(pianoId: string, voceId: string, trattamentoId: string) {
@@ -824,6 +945,13 @@ export function PianiPanel({
           prezzo_finale: finale,
           sconto_tipo: scontoTipo,
           sconto_valore: scontoValore,
+          prezzo_pacchetto_override: pacchettoOverrideAttivo
+            ? pacchettoOverrideValore
+            : null,
+          storno_visita_seduta_id: stornoVisitaAttivo
+            ? stornoVisitaSedutaId
+            : null,
+          storno_visita_importo: stornoVisitaAttivo ? stornoFinale : 0,
           stato: "bozza",
           note: null,
           tipo_decisione: "piano",
@@ -844,6 +972,17 @@ export function PianiPanel({
           .insert({ piano_id: pianoId, ...buildVocePayload(r, i) } as never);
         if (vErr) throw vErr;
       }
+
+      // Marca la seduta-visita come scalata in questo piano (anti doppio storno)
+      if (stornoVisitaAttivo && stornoVisitaSedutaId) {
+        const { error: stErr } = await supabase
+          .from("seduta")
+          .update({ scalata_in_piano_id: pianoId } as never)
+          .eq("id", stornoVisitaSedutaId);
+        if (stErr) throw stErr;
+      }
+
+
 
       toast.success("Proposta creata. Clicca 'Attiva piano' quando il paziente conferma.");
       setOpen(false);
@@ -965,9 +1104,33 @@ export function PianiPanel({
           prezzo_finale: finale,
           sconto_tipo: scontoTipo,
           sconto_valore: scontoValore,
+          prezzo_pacchetto_override: pacchettoOverrideAttivo
+            ? pacchettoOverrideValore
+            : null,
+          storno_visita_seduta_id: stornoVisitaAttivo
+            ? stornoVisitaSedutaId
+            : null,
+          storno_visita_importo: stornoVisitaAttivo ? stornoFinale : 0,
         } as never)
         .eq("id", pianoId);
       if (upErr) throw upErr;
+
+      // Sync flag scalata_in_piano_id sulle sedute-visita coinvolte
+      // 1) libera quelle che prima erano scalate in questo piano ma non lo sono più
+      const { error: relErr } = await supabase
+        .from("seduta")
+        .update({ scalata_in_piano_id: null } as never)
+        .eq("scalata_in_piano_id", pianoId);
+      if (relErr) throw relErr;
+      // 2) marca la nuova selezionata, se attiva
+      if (stornoVisitaAttivo && stornoVisitaSedutaId) {
+        const { error: mkErr } = await supabase
+          .from("seduta")
+          .update({ scalata_in_piano_id: pianoId } as never)
+          .eq("id", stornoVisitaSedutaId);
+        if (mkErr) throw mkErr;
+      }
+
 
       // 2. voci rimosse: cancella voce + sedute non completate
       const idsForm = new Set(righe.map((r) => r.voceId).filter(Boolean) as string[]);
@@ -1774,11 +1937,64 @@ export function PianiPanel({
 
             {/* Totale + sconto */}
             {righe.length > 0 && (
-              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
+              <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Totale base</span>
-                  <span className="font-medium">{formatEuro(totaleBase)}</span>
+                  <span className="text-muted-foreground">
+                    Somma righe
+                    {pacchettoOverrideAttivo && " (sostituita dal prezzo pacchetto)"}
+                  </span>
+                  <span
+                    className={
+                      pacchettoOverrideAttivo
+                        ? "text-muted-foreground line-through"
+                        : "font-medium"
+                    }
+                  >
+                    {formatEuro(subtotaleRighe)}
+                  </span>
                 </div>
+
+                {/* Prezzo pacchetto fisso */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="pacchetto-override"
+                      checked={pacchettoOverrideAttivo}
+                      onCheckedChange={(c) => {
+                        const v = c === true;
+                        setPacchettoOverrideAttivo(v);
+                        if (v && pacchettoOverrideValore === 0) {
+                          setPacchettoOverrideValore(subtotaleRighe);
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="pacchetto-override"
+                      className="cursor-pointer text-xs uppercase tracking-wide text-muted-foreground"
+                    >
+                      Prezzo pacchetto fisso
+                    </Label>
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="h-8 w-32"
+                    disabled={!pacchettoOverrideAttivo}
+                    value={pacchettoOverrideValore}
+                    onChange={(e) =>
+                      setPacchettoOverrideValore(Number(e.target.value) || 0)
+                    }
+                  />
+                  {pacchettoOverrideAttivo &&
+                    subtotaleRighe > pacchettoOverrideValore && (
+                      <span className="text-xs text-success">
+                        Risparmio {formatEuro(subtotaleRighe - pacchettoOverrideValore)}
+                      </span>
+                    )}
+                </div>
+
+                {/* Sconto globale */}
                 <div className="flex flex-wrap items-center gap-2">
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Sconto
@@ -1812,6 +2028,62 @@ export function PianiPanel({
                     </span>
                   )}
                 </div>
+
+                {/* Storno visita pagata */}
+                <div className="space-y-2 border-t border-border pt-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="storno-visita"
+                      checked={stornoVisitaAttivo}
+                      disabled={visiteStornabili.length === 0}
+                      onCheckedChange={(c) => {
+                        const v = c === true;
+                        setStornoVisitaAttivo(v);
+                        if (!v) setStornoVisitaSedutaId(null);
+                        else if (!stornoVisitaSedutaId && visiteStornabili[0]) {
+                          setStornoVisitaSedutaId(visiteStornabili[0].seduta_id);
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="storno-visita"
+                      className="cursor-pointer text-xs uppercase tracking-wide text-muted-foreground"
+                    >
+                      Scala visita pagata
+                    </Label>
+                    {visiteStornabili.length === 0 && (
+                      <span className="text-[11px] italic text-muted-foreground">
+                        Nessuna visita scalabile disponibile
+                      </span>
+                    )}
+                  </div>
+                  {stornoVisitaAttivo && visiteStornabili.length > 0 && (
+                    <Select
+                      value={stornoVisitaSedutaId ?? ""}
+                      onValueChange={(v) => setStornoVisitaSedutaId(v)}
+                    >
+                      <SelectTrigger className="h-8 w-full">
+                        <SelectValue placeholder="Seleziona la visita…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {visiteStornabili.map((v) => (
+                          <SelectItem key={v.seduta_id} value={v.seduta_id}>
+                            {v.trattamento_nome}
+                            {v.data ? ` — ${new Date(v.data).toLocaleDateString("it-IT")}` : ""}
+                            {" · "}
+                            {formatEuro(v.importo)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {stornoFinale > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      − {formatEuro(stornoFinale)} (visita già pagata)
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between border-t border-border pt-2">
                   <span className="font-display text-sm uppercase tracking-wide">
                     Totale finale
@@ -1822,6 +2094,7 @@ export function PianiPanel({
                 </div>
               </div>
             )}
+
           </div>
 
           <DialogFooter>
@@ -2042,14 +2315,15 @@ export function PianiPanel({
                                       <Loader2 className="inline h-3 w-3 animate-spin" />
                                     </span>
                                   ) : cv?.ok === true ? (
-                                    <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] text-success-foreground">
+                                    <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">
                                       🟢 Consenso ok
                                     </span>
                                   ) : cv?.ok === false ? (
-                                    <span className="rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive-foreground">
+                                    <span className="rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-[10px] font-medium text-destructive">
                                       🔴 Consenso mancante
                                     </span>
                                   ) : null}
+
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-medium">
