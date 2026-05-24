@@ -402,7 +402,9 @@ export type Database = {
           durata_sedute: number | null
           durata_tipo: string
           id: string
+          motivo_nuova_versione: string | null
           richiede_firma_medico: boolean
+          richiede_rifirma_su_nuova_versione: boolean
           testo: string
           titolo: string
           trattamento_id: string | null
@@ -420,7 +422,9 @@ export type Database = {
           durata_sedute?: number | null
           durata_tipo?: string
           id?: string
+          motivo_nuova_versione?: string | null
           richiede_firma_medico?: boolean
+          richiede_rifirma_su_nuova_versione?: boolean
           testo: string
           titolo: string
           trattamento_id?: string | null
@@ -438,7 +442,9 @@ export type Database = {
           durata_sedute?: number | null
           durata_tipo?: string
           id?: string
+          motivo_nuova_versione?: string | null
           richiede_firma_medico?: boolean
+          richiede_rifirma_su_nuova_versione?: boolean
           testo?: string
           titolo?: string
           trattamento_id?: string | null
@@ -1128,11 +1134,14 @@ export type Database = {
           numero_sedute_previste: number
           paziente_id: string
           prezzo_finale: number | null
+          prezzo_pacchetto_override: number | null
           prezzo_totale: number | null
           sconto: number
           sconto_tipo: string
           sconto_valore: number
           stato: Database["public"]["Enums"]["piano_stato"]
+          storno_visita_importo: number | null
+          storno_visita_seduta_id: string | null
           tipo_decisione: string
           titolo: string
           trattamento_id: string | null
@@ -1154,11 +1163,14 @@ export type Database = {
           numero_sedute_previste?: number
           paziente_id: string
           prezzo_finale?: number | null
+          prezzo_pacchetto_override?: number | null
           prezzo_totale?: number | null
           sconto?: number
           sconto_tipo?: string
           sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
+          storno_visita_importo?: number | null
+          storno_visita_seduta_id?: string | null
           tipo_decisione?: string
           titolo: string
           trattamento_id?: string | null
@@ -1180,11 +1192,14 @@ export type Database = {
           numero_sedute_previste?: number
           paziente_id?: string
           prezzo_finale?: number | null
+          prezzo_pacchetto_override?: number | null
           prezzo_totale?: number | null
           sconto?: number
           sconto_tipo?: string
           sconto_valore?: number
           stato?: Database["public"]["Enums"]["piano_stato"]
+          storno_visita_importo?: number | null
+          storno_visita_seduta_id?: string | null
           tipo_decisione?: string
           titolo?: string
           trattamento_id?: string | null
@@ -1508,6 +1523,7 @@ export type Database = {
           paziente_id: string
           piano_id: string | null
           prodotti_previsti: Json
+          scalata_in_piano_id: string | null
           trattamento_id: string | null
           updated_at: string
           voce_id: string | null
@@ -1531,6 +1547,7 @@ export type Database = {
           paziente_id: string
           piano_id?: string | null
           prodotti_previsti?: Json
+          scalata_in_piano_id?: string | null
           trattamento_id?: string | null
           updated_at?: string
           voce_id?: string | null
@@ -1554,6 +1571,7 @@ export type Database = {
           paziente_id?: string
           piano_id?: string | null
           prodotti_previsti?: Json
+          scalata_in_piano_id?: string | null
           trattamento_id?: string | null
           updated_at?: string
           voce_id?: string | null
