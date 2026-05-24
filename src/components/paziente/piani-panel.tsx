@@ -597,12 +597,64 @@ export function PianiPanel({
     setConvertingFrom(null);
   }
 
+  function resetExtraPrezzo() {
+    setPacchettoOverrideAttivo(false);
+    setPacchettoOverrideValore(0);
+    setStornoVisitaAttivo(false);
+    setStornoVisitaSedutaId(null);
+  }
+
+  /**
+   * Carica le visite (sedute completate di trattamenti tipo "Visita") del paziente
+   * che NON sono ancora state scalate in un piano. Filtra anche quelle eventualmente
+   * già scalate nel piano che stiamo modificando, perché possono restare selezionate.
+   */
+  async function caricaVisiteStornabili(pianoCorrenteId: string | null) {
+    try {
+      const { data, error } = await supabase
+        .from("seduta")
+        .select(
+          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id, trattamento:trattamento_id(nome, prezzo_indicativo)",
+        )
+        .eq("paziente_id", pazienteId)
+        .eq("completata", true)
+        .order("data_esecuzione_effettiva", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        data_seduta: string | null;
+        data_esecuzione_effettiva: string | null;
+        scalata_in_piano_id: string | null;
+        trattamento: { nome: string | null; prezzo_indicativo: number | null } | null;
+      }>;
+      const out = rows
+        .filter((s) => isTrattamentoVisita(s.trattamento?.nome))
+        .filter(
+          (s) =>
+            s.scalata_in_piano_id === null ||
+            (pianoCorrenteId !== null && s.scalata_in_piano_id === pianoCorrenteId),
+        )
+        .map((s) => ({
+          seduta_id: s.id,
+          data: s.data_esecuzione_effettiva ?? s.data_seduta ?? "",
+          trattamento_nome: s.trattamento?.nome ?? "Visita",
+          importo: Number(s.trattamento?.prezzo_indicativo ?? 0),
+        }));
+      setVisiteStornabili(out);
+    } catch {
+      setVisiteStornabili([]);
+    }
+  }
+
   function apriNuovo() {
     setEditingPianoId(null);
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetExtraPrezzo();
     resetDecisione();
+    void caricaVisiteStornabili(null);
     setOpen(true);
   }
 
@@ -611,11 +663,13 @@ export function PianiPanel({
     setRighe([]);
     setScontoTipo("nessuno");
     setScontoValore(0);
+    resetExtraPrezzo();
     resetDecisione();
     // pre-compila trattamento richiesto se presente nel piano sorgente
     if (p.trattamento_richiesto_id) setTrattamentoRichiestoId(p.trattamento_richiesto_id);
     setConvertingFrom(p.id);
     setTipoDecisione("piano");
+    void caricaVisiteStornabili(null);
     setOpen(true);
   }
 
@@ -670,11 +724,33 @@ export function PianiPanel({
     setRighe(newRighe);
     setScontoTipo(p.sconto_tipo ?? "nessuno");
     setScontoValore(Number(p.sconto_valore ?? 0));
+    // Ricarica eventuale override pacchetto + storno visita
+    const pExt = p as unknown as {
+      prezzo_pacchetto_override: number | null;
+      storno_visita_seduta_id: string | null;
+      storno_visita_importo: number | null;
+    };
+    if (typeof pExt.prezzo_pacchetto_override === "number") {
+      setPacchettoOverrideAttivo(true);
+      setPacchettoOverrideValore(Number(pExt.prezzo_pacchetto_override));
+    } else {
+      setPacchettoOverrideAttivo(false);
+      setPacchettoOverrideValore(0);
+    }
+    if (pExt.storno_visita_seduta_id) {
+      setStornoVisitaAttivo(true);
+      setStornoVisitaSedutaId(pExt.storno_visita_seduta_id);
+    } else {
+      setStornoVisitaAttivo(false);
+      setStornoVisitaSedutaId(null);
+    }
     setEditingPianoId(p.id);
+    void caricaVisiteStornabili(p.id);
     setOpen(true);
     // valuta consenso per ogni riga
     for (const r of newRighe) void valutaConsenso(r.uid, r.trattamento_id);
   }
+
 
   // ---------- firma consenso da alert piano ----------
   async function avviaFirmaPerVoce(pianoId: string, voceId: string, trattamentoId: string) {
