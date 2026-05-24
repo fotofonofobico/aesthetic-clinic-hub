@@ -54,9 +54,13 @@ import { ZONE_PREDEFINITE } from "@/lib/zone-trattamento";
 import {
   applicaSconto,
   calcolaTotaleRighe,
+  calcolaTotalePiano,
   formatEuro,
   prezzoRiga,
 } from "@/lib/piano-prezzo";
+import { isTrattamentoVisita } from "@/lib/trattamenti-speciali";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { buildTrattamentoSession, type SignatureSession } from "@/lib/signature-session";
 import { SignatureSessionDialog } from "@/components/signature-session-dialog";
 import { TabletSessionRunner } from "@/components/firma/tablet-session-runner";
