@@ -344,11 +344,13 @@ function ConsensiObsoletiDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Consensi con versione obsoleta</DialogTitle>
+          <DialogTitle>Consensi da rifirmare</DialogTitle>
           <DialogDescription>
-            Il modello è stato aggiornato dopo la firma. Apri la scheda paziente per rifirmare.
+            Il modello è stato aggiornato in modo sostanziale e richiede una nuova firma.
+            Apri la scheda paziente per procedere.
           </DialogDescription>
         </DialogHeader>
+
         {rows === null ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Caricamento…
