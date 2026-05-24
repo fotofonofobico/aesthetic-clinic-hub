@@ -258,7 +258,17 @@ export function PianiPanel({
   const [righe, setRighe] = useState<RigaForm[]>([]);
   const [scontoTipo, setScontoTipo] = useState<ScontoTipo>("nessuno");
   const [scontoValore, setScontoValore] = useState<number>(0);
+  // Prezzo pacchetto fisso (override della somma righe)
+  const [pacchettoOverrideAttivo, setPacchettoOverrideAttivo] = useState(false);
+  const [pacchettoOverrideValore, setPacchettoOverrideValore] = useState<number>(0);
+  // Storno visita già pagata
+  const [stornoVisitaAttivo, setStornoVisitaAttivo] = useState(false);
+  const [stornoVisitaSedutaId, setStornoVisitaSedutaId] = useState<string | null>(null);
+  const [visiteStornabili, setVisiteStornabili] = useState<
+    Array<{ seduta_id: string; data: string; trattamento_nome: string; importo: number }>
+  >([]);
   const [saving, setSaving] = useState(false);
+
 
   // consensi voce (per render piani esistenti)
   const [consensiVoce, setConsensiVoce] = useState<Record<string, ConsensoVoce>>({});
