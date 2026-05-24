@@ -614,14 +614,15 @@ export function PianiPanel({
       const { data, error } = await supabase
         .from("seduta")
         .select(
-          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id, trattamento:trattamento_id(nome, prezzo_indicativo)",
+          "id, data_seduta, data_esecuzione_effettiva, trattamento_id, scalata_in_piano_id, trattamento:trattamento(nome, prezzo_indicativo)",
         )
         .eq("paziente_id", pazienteId)
         .eq("completata", true)
         .order("data_esecuzione_effettiva", { ascending: false })
         .limit(50);
       if (error) throw error;
-      const rows = (data ?? []) as Array<{
+      const rows = ((data ?? []) as unknown) as Array<{
+
         id: string;
         data_seduta: string | null;
         data_esecuzione_effettiva: string | null;
