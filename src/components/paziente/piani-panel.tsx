@@ -973,6 +973,17 @@ export function PianiPanel({
         if (vErr) throw vErr;
       }
 
+      // Marca la seduta-visita come scalata in questo piano (anti doppio storno)
+      if (stornoVisitaAttivo && stornoVisitaSedutaId) {
+        const { error: stErr } = await supabase
+          .from("seduta")
+          .update({ scalata_in_piano_id: pianoId } as never)
+          .eq("id", stornoVisitaSedutaId);
+        if (stErr) throw stErr;
+      }
+
+
+
       toast.success("Proposta creata. Clicca 'Attiva piano' quando il paziente conferma.");
       setOpen(false);
       void load();
