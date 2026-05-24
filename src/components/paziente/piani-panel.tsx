@@ -2042,14 +2042,15 @@ export function PianiPanel({
                                       <Loader2 className="inline h-3 w-3 animate-spin" />
                                     </span>
                                   ) : cv?.ok === true ? (
-                                    <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] text-success-foreground">
+                                    <span className="rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">
                                       🟢 Consenso ok
                                     </span>
                                   ) : cv?.ok === false ? (
-                                    <span className="rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-[10px] text-destructive-foreground">
+                                    <span className="rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-[10px] font-medium text-destructive">
                                       🔴 Consenso mancante
                                     </span>
                                   ) : null}
+
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-medium">
