@@ -1652,12 +1652,12 @@ export function PianiPanel({
                             Verifica…
                           </span>
                         ) : r.consensoOk === true ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-xs text-success-foreground">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
                             🟢 Consenso valido
                           </span>
                         ) : r.consensoOk === false ? (
                           <span
-                            className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-xs text-destructive-foreground"
+                            className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive"
                             title={r.consensoMotivi.join(" · ")}
                           >
                             🔴 Consenso mancante (firma dopo aver salvato il piano)
@@ -2166,18 +2166,18 @@ export function PianiPanel({
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-display text-base font-semibold">{p.titolo}</h4>
                           <span
-                            className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                               p.stato === "in_attesa"
-                                ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                ? "border-warning/50 bg-warning/20 text-warning"
                                 : p.stato === "non_indicato"
-                                  ? "border-destructive/40 bg-destructive/15 text-destructive-foreground"
+                                  ? "border-destructive/40 bg-destructive/15 text-destructive"
                                   : p.stato === "bozza"
-                                    ? "border-warning/50 bg-warning/20 text-warning-foreground"
+                                    ? "border-warning/50 bg-warning/20 text-warning"
                                     : p.stato === "attivo"
-                                      ? "border-success/40 bg-success/15 text-success-foreground"
+                                      ? "border-success/40 bg-success/15 text-success"
                                       : p.stato === "completato"
                                         ? "border-border bg-muted text-muted-foreground"
-                                        : "border-warning/40 bg-warning/15"
+                                        : "border-warning/40 bg-warning/15 text-warning"
                             }`}
                           >
                             {STATO_LABELS[p.stato]}
