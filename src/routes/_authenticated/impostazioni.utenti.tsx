@@ -206,6 +206,44 @@ function UtentiPage() {
                             }
                           />
                         </td>
+                        <td className="py-3 pr-4 text-right">
+                          {!isMe && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  aria-label={`Elimina ${u.nome} ${u.cognome}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Eliminare {u.nome} {u.cognome}?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    L&apos;account, il profilo e i ruoli verranno rimossi
+                                    definitivamente. Lo storico clinico (pazienti, sedute,
+                                    consensi) resterà invariato a fini di audit, ma l&apos;utente
+                                    non potrà più accedere. Operazione irreversibile.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => eliminaUtente.mutate(u.user_id)}
+                                  >
+                                    Elimina utente
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
