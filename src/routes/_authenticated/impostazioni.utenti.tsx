@@ -14,6 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/impostazioni/utenti")({
@@ -105,6 +117,24 @@ function UtentiPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const eliminaUtente = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sessione scaduta");
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { userId },
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+    },
+    onSuccess: () => {
+      toast.success("Utente eliminato");
+      void qc.invalidateQueries({ queryKey: ["utenti_admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (!hasRole("medico")) {
     return <p className="text-sm text-muted-foreground">Sezione riservata ai medici.</p>;
   }
@@ -134,6 +164,7 @@ function UtentiPage() {
                     <th className="py-2 pr-4">Qualifica</th>
                     <th className="py-2 pr-4">Ruolo</th>
                     <th className="py-2 pr-4">Attivo</th>
+                    <th className="py-2 pr-4 text-right">Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -174,6 +205,44 @@ function UtentiPage() {
                               cambiaAttivo.mutate({ userId: u.user_id, attivo: v })
                             }
                           />
+                        </td>
+                        <td className="py-3 pr-4 text-right">
+                          {!isMe && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  aria-label={`Elimina ${u.nome} ${u.cognome}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Eliminare {u.nome} {u.cognome}?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    L&apos;account, il profilo e i ruoli verranno rimossi
+                                    definitivamente. Lo storico clinico (pazienti, sedute,
+                                    consensi) resterà invariato a fini di audit, ma l&apos;utente
+                                    non potrà più accedere. Operazione irreversibile.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => eliminaUtente.mutate(u.user_id)}
+                                  >
+                                    Elimina utente
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </td>
                       </tr>
                     );
