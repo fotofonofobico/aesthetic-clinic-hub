@@ -14,6 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/impostazioni/utenti")({
@@ -105,6 +117,24 @@ function UtentiPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const eliminaUtente = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sessione scaduta");
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { userId },
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+    },
+    onSuccess: () => {
+      toast.success("Utente eliminato");
+      void qc.invalidateQueries({ queryKey: ["utenti_admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (!hasRole("medico")) {
     return <p className="text-sm text-muted-foreground">Sezione riservata ai medici.</p>;
   }
@@ -134,6 +164,7 @@ function UtentiPage() {
                     <th className="py-2 pr-4">Qualifica</th>
                     <th className="py-2 pr-4">Ruolo</th>
                     <th className="py-2 pr-4">Attivo</th>
+                    <th className="py-2 pr-4 text-right">Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
