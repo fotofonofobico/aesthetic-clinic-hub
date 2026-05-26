@@ -84,38 +84,25 @@ export function AlertsSection() {
         if (basse > 0) out.push({ key: "scorte", label: "Scorte sotto soglia", count: basse, severity: "warning", to: "/magazzino" });
       } catch {}
 
-      // 3) Consensi: solo OBSOLETI VERI (template opt-in) + IN SCADENZA reale
+      // 3) Consensi: solo IN SCADENZA reale.
+      // Nota: le firme dei consensi NON sono retroattive: una nuova versione
+      // del template non invalida quanto già firmato. Quindi nessun alert
+      // "consensi da rifirmare".
       try {
         const { data: cf } = await supabase
           .from("consenso_firmato")
           .select(
-            "id, versione_snapshot, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot, template_id, template:template_id(versione, attivo, richiede_rifirma_su_nuova_versione)",
+            "id, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot",
           )
           .is("revocato_il", null)
           .eq("rifiutato", false)
           .limit(1000);
-        let obsoleti = 0,
-          inScad = 0;
+        let inScad = 0;
         (cf ?? []).forEach((c: any) => {
-          const tpl = c.template;
-          // Considera "obsoleto" solo se:
-          //  - il template è ancora attivo,
-          //  - la versione firmata è diversa dall'attuale,
-          //  - E il template richiede esplicitamente la rifirma su nuova versione.
-          if (
-            tpl &&
-            tpl.attivo &&
-            tpl.richiede_rifirma_su_nuova_versione === true &&
-            tpl.versione !== c.versione_snapshot
-          ) {
-            obsoleti++;
-          }
-          // Scadenza per data (consensi a mesi)
           if (c.valido_fino_a) {
             const d = new Date(c.valido_fino_a);
             if (d > ora && d < tra30) inScad++;
           }
-          // Scadenza per sedute residue ≤ 1
           if (
             c.durata_tipo_snapshot === "sedute" &&
             typeof c.sedute_max_snapshot === "number" &&
@@ -125,7 +112,6 @@ export function AlertsSection() {
             inScad++;
           }
         });
-        if (obsoleti > 0) out.push({ key: "obsoleti", label: "Consensi da rifirmare (nuova versione)", count: obsoleti, severity: "warning", to: "#", detail: "consensi_obsoleti" });
         if (inScad > 0) out.push({ key: "cscad", label: "Consensi in scadenza", count: inScad, severity: "warning", to: "/consensi" });
       } catch {}
 

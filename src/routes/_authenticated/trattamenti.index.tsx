@@ -121,15 +121,18 @@ function TrattamentiPage() {
                 Nuovo trattamento
               </Button>
             </DialogTrigger>
-            <TrattamentoDialog
-              editing={editing}
-              templates={templates}
-              onSaved={() => {
-                setOpen(false);
-                setEditing(null);
-                void load();
-              }}
-            />
+            {open && (
+              <TrattamentoDialog
+                key={editing?.id ?? "new"}
+                editing={editing}
+                templates={templates}
+                onSaved={() => {
+                  setOpen(false);
+                  setEditing(null);
+                  void load();
+                }}
+              />
+            )}
           </Dialog>
         )}
       </header>

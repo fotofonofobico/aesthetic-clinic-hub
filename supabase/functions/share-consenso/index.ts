@@ -20,6 +20,11 @@ Deno.serve(async (req) => {
     if (!token) {
       return json({ error: "Token mancante" }, 400);
     }
+    // Formato atteso: base64url (vedi src/lib/share-link.ts → randomToken).
+    // 256 bit -> 43 caratteri base64url. Accettiamo 40-128 per sicurezza.
+    if (!/^[A-Za-z0-9_-]{40,128}$/.test(token)) {
+      return json({ error: "Token non valido" }, 400);
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
