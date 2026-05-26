@@ -113,7 +113,7 @@ function PazientiListPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Pazienti</h1>
           <p className="text-sm text-muted-foreground">
-            {pazienti.length} {pazienti.length === 1 ? "paziente" : "pazienti"} in archivio
+            {pazienti.length} {pazienti.length === 1 ? "paziente" : "pazienti"} totali
           </p>
         </div>
         <Button onClick={() => navigate({ to: "/pazienti/$id/edit", params: { id: "new" } })}>
@@ -153,7 +153,7 @@ function PazientiListPage() {
               {pazienti.length === 0
                 ? mostraArchiviati
                   ? "Nessun paziente archiviato."
-                  : "Nessun paziente in archivio. Crea il primo con il pulsante in alto."
+                  : "Nessun paziente. Crea il primo con il pulsante in alto."
                 : "Nessun risultato per la ricerca."}
             </p>
           </CardContent>
