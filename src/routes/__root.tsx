@@ -34,16 +34,22 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MedEstetica — Gestionale Studio Medico Estetico" },
+      { title: "Aesthetic Clinic Hub" },
       {
         name: "description",
         content:
           "Gestionale clinico per studi di medicina estetica: pazienti, anamnesi, consensi, piani di trattamento.",
       },
       { name: "author", content: "MedEstetica" },
-      { property: "og:title", content: "MedEstetica" },
-      { property: "og:description", content: "Gestionale clinico per medicina estetica" },
+      { property: "og:title", content: "Aesthetic Clinic Hub" },
+      { property: "og:description", content: "Aesthetic Clinic Hub is a web and mobile application for managing aesthetic medicine practices." },
       { property: "og:type", content: "website" },
+      { name: "twitter:title", content: "Aesthetic Clinic Hub" },
+      { name: "description", content: "Aesthetic Clinic Hub is a web and mobile application for managing aesthetic medicine practices." },
+      { name: "twitter:description", content: "Aesthetic Clinic Hub is a web and mobile application for managing aesthetic medicine practices." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/gH4oDAtr4SYbsT9s5nhXS2sWo672/social-images/social-1781546893827-ChatGPT_Image_15_giu_2026,_20_06_51.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/gH4oDAtr4SYbsT9s5nhXS2sWo672/social-images/social-1781546893827-ChatGPT_Image_15_giu_2026,_20_06_51.webp" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
