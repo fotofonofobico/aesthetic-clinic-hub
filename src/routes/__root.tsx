@@ -40,7 +40,7 @@ export const Route = createRootRoute({
         content:
           "Gestionale clinico per studi di medicina estetica: pazienti, anamnesi, consensi, piani di trattamento.",
       },
-      { name: "author", content: "MedEstetica" },
+      { name: "author", content: "Aesthetic Clinic Hub" },
       { property: "og:title", content: "Aesthetic Clinic Hub" },
       { property: "og:description", content: "Aesthetic Clinic Hub is a web and mobile application for managing aesthetic medicine practices." },
       { property: "og:type", content: "website" },

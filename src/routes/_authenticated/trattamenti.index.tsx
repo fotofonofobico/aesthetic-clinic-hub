@@ -344,12 +344,28 @@ function TrattamentoDialog({
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
       descrizione: null,
     };
-    const { error } = editing
-      ? await supabase.from("trattamenti").update(payload).eq("id", editing.id)
-      : await supabase.from("trattamenti").insert({ ...payload, created_by: user?.id });
+    async function runSave() {
+      return editing
+        ? await supabase.from("trattamenti").update(payload).eq("id", editing.id)
+        : await supabase.from("trattamenti").insert({ ...payload, created_by: user?.id });
+    }
+    let { error } = await runSave();
+    // Retry una volta con refresh sessione se sembra JWT scaduto / RLS
+    if (error && (error.code === "42501" || /row-level security|JWT|expired/i.test(error.message))) {
+      try {
+        await supabase.auth.refreshSession();
+      } catch {
+        /* ignore */
+      }
+      ({ error } = await runSave());
+    }
     setSaving(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(
+        error.code === "42501"
+          ? "Sessione scaduta o permessi insufficienti. Effettua di nuovo l'accesso."
+          : error.message,
+      );
       return;
     }
     toast.success(editing ? "Trattamento aggiornato" : "Trattamento creato");

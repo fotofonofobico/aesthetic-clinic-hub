@@ -27,7 +27,7 @@ function LandingPage() {
               <Stethoscope className="h-5 w-5" />
             </div>
             <span className="font-display text-xl font-semibold tracking-tight">
-              MedEstetica
+              Aesthetic Clinic Hub
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ function LandingPage() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-muted-foreground">
-          © {new Date().getFullYear()} MedEstetica — versione MVP
+          © {new Date().getFullYear()} Aesthetic Clinic Hub — versione MVP
         </div>
       </footer>
     </div>

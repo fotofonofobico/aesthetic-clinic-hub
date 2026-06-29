@@ -953,6 +953,49 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           >
             <InterventiBlock p={p} patch={(obj) => patch("patologica", obj)} />
           </YesNoConditional>
+
+          <YesNoConditional
+            label="Patologie infettive (anamnesi generale)"
+            value={p.infettiva ?? false}
+            onChange={(v) => patch("patologica", { infettiva: v })}
+          >
+            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+              <Label className="text-sm">Seleziona positività</Label>
+              <div className="grid gap-2 md:grid-cols-2">
+                {([
+                  { k: "hbv", l: "HBV (Epatite B)" },
+                  { k: "hcv", l: "HCV (Epatite C)" },
+                  { k: "hiv", l: "HIV" },
+                  { k: "infettiva_altro", l: "Altro" },
+                ] as const).map((it) => (
+                  <label
+                    key={it.k}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card p-2"
+                  >
+                    <Checkbox
+                      checked={!!(p as Record<string, unknown>)[it.k]}
+                      onCheckedChange={(v) =>
+                        patch("patologica", { [it.k]: !!v } as Partial<AnamnesiPatologica>)
+                      }
+                    />
+                    <span className="text-sm">{it.l}</span>
+                  </label>
+                ))}
+              </div>
+              {p.infettiva_altro && (
+                <FieldNote
+                  label="Specifica altra patologia infettiva"
+                  value={p.infettiva_altro_note ?? ""}
+                  onChange={(v) => patch("patologica", { infettiva_altro_note: v })}
+                />
+              )}
+              <FieldNote
+                label="Note (es. data diagnosi, terapia, carica virale)"
+                value={p.infettiva_note ?? ""}
+                onChange={(v) => patch("patologica", { infettiva_note: v })}
+              />
+            </div>
+          </YesNoConditional>
         </CardContent>
       </Card>
 

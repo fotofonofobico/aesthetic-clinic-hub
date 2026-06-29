@@ -57,6 +57,14 @@ export interface AnamnesiPatologica {
   };
   interventi_altro_note?: string;
   interventi_note?: string;
+  // Patologie infettive (anamnesi generale)
+  infettiva?: boolean;
+  hbv?: boolean;
+  hcv?: boolean;
+  hiv?: boolean;
+  infettiva_altro?: boolean;
+  infettiva_altro_note?: string;
+  infettiva_note?: string;
 }
 
 export interface AnamnesiFarmacologica {
