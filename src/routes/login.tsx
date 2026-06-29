@@ -78,16 +78,17 @@ function LoginPage() {
             <Stethoscope className="h-5 w-5" />
           </div>
           <span className="font-display text-xl font-semibold tracking-tight">
-            MedEstetica
+            Aesthetic Clinic Hub
           </span>
         </Link>
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-2xl">Accesso operatore</CardTitle>
+            <CardTitle className="font-display text-2xl">Area riservata</CardTitle>
             <CardDescription>
-              Solo personale autorizzato dello studio. Il primo utente che si
-              registra diventa medico amministratore.
+              Accesso riservato al personale autorizzato dello studio.
+              L'account amministratore viene creato dal medico responsabile in
+              fase di attivazione.
             </CardDescription>
           </CardHeader>
           <CardContent>

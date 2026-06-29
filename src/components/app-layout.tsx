@@ -106,7 +106,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
               <Stethoscope className="h-4 w-4" />
             </div>
-            <span className="font-display text-base font-semibold">MedEstetica</span>
+            <span className="font-display text-base font-semibold">Aesthetic Clinic Hub</span>
           </Link>
           {onNavigate && (
             <button

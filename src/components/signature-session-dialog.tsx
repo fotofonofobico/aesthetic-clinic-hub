@@ -667,7 +667,7 @@ export function SignatureSessionDialog({ open, session, pazienteNome = "", onClo
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 pb-20 sm:pb-2">
           {stato === "compilazione" && isVisita && phase === "anamnesi" && consensoIdxs.length > 0 && (
             <Button variant="ghost" onClick={tornaAiConsensi}>
               <ChevronLeft className="h-4 w-4" />
