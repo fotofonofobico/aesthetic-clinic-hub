@@ -955,7 +955,7 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           </YesNoConditional>
 
           <YesNoConditional
-            label="Patologie infettive (anamnesi generale)"
+            label="Patologie infettive"
             value={p.infettiva ?? false}
             onChange={(v) => patch("patologica", { infettiva: v })}
           >
