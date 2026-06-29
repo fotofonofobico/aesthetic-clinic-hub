@@ -37,7 +37,10 @@ Deno.serve(async (req) => {
       .eq("token", token)
       .maybeSingle();
 
-    if (linkErr) return json({ error: linkErr.message }, 500);
+    if (linkErr) {
+      console.error("share-consenso link lookup error", linkErr);
+      return json({ error: "Errore interno del server" }, 500);
+    }
     if (!link) return json({ error: "Link non valido" }, 404);
     if (link.revoked_at) return json({ error: "Link revocato" }, 410);
     if (new Date(link.expires_at) < new Date()) {
@@ -52,7 +55,10 @@ Deno.serve(async (req) => {
       .eq("id", link.consenso_id)
       .maybeSingle();
 
-    if (cErr) return json({ error: cErr.message }, 500);
+    if (cErr) {
+      console.error("share-consenso consenso lookup error", cErr);
+      return json({ error: "Errore interno del server" }, 500);
+    }
     if (!consenso) return json({ error: "Consenso non trovato" }, 404);
 
     const { data: paz } = await admin
@@ -94,7 +100,8 @@ Deno.serve(async (req) => {
       pdfUrl: pdfSignedUrl,
     });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    console.error("share-consenso unhandled error", e);
+    return json({ error: "Errore interno del server" }, 500);
   }
 });
 
