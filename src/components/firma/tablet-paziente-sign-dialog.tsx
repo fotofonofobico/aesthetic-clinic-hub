@@ -258,7 +258,7 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
           </div>
 
           {/* Footer fisso */}
-          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-card px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-card px-4 py-3 pb-24 sm:px-6 sm:py-4 sm:pb-4">
             <Button
               variant="outline"
               size="default"
