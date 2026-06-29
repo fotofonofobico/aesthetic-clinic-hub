@@ -100,7 +100,8 @@ Deno.serve(async (req) => {
       pdfUrl: pdfSignedUrl,
     });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    console.error("share-consenso unhandled error", e);
+    return json({ error: "Errore interno del server" }, 500);
   }
 });
 
