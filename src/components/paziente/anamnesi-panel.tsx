@@ -216,11 +216,14 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
     if (forkPromiseRef.current) {
       return forkPromiseRef.current;
     }
-    const p = forkFromSigned(data).then((draft) => {
-      if (draft) setData(draft);
-      forkPromiseRef.current = null;
-      return draft;
-    });
+    const p = forkFromSigned(data)
+      .then((draft) => {
+        if (draft) setData(draft);
+        return draft;
+      })
+      .finally(() => {
+        forkPromiseRef.current = null;
+      });
     forkPromiseRef.current = p;
     return p;
   }
