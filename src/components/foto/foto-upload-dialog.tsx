@@ -46,6 +46,15 @@ function todayISO() {
   return iso;
 }
 
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
+}
+
 export function FotoUploadDialog({
   open,
   onOpenChange,
