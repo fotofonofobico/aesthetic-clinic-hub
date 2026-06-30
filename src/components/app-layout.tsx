@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate, useLocation, type useNavigate as UseNavigateType } from "@tanstack/react-router";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
