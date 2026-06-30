@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -11,15 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-
-interface AlertItem {
-  key: string;
-  label: string;
-  count: number;
-  severity: "warning" | "critical";
-  to: string;
-  detail?: "consensi_obsoleti";
-}
+import { useDashboardAlerts, type AlertItem } from "@/hooks/use-dashboard-alerts";
 
 interface ConsensoObsoletoRow {
   id: string;
@@ -32,168 +26,11 @@ interface ConsensoObsoletoRow {
   motivo_nuova_versione: string | null;
 }
 
-
 export function AlertsSection() {
-  const [items, setItems] = useState<AlertItem[] | null>(null);
+  const { data: items, isLoading, isFetching, refetch } = useDashboardAlerts();
   const [openObsoleti, setOpenObsoleti] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const out: AlertItem[] = [];
-      const ora = new Date();
-      const tra30 = new Date(); tra30.setDate(tra30.getDate() + 30);
-      const limite12mesi = new Date(); limite12mesi.setFullYear(limite12mesi.getFullYear() - 1);
-
-      // 1) Anamnesi vecchie / mancanti
-      try {
-        const { data: pazienti } = await supabase
-          .from("pazienti")
-          .select("id, anamnesi(id, updated_at)")
-          .is("deleted_at", null)
-          .limit(1000);
-        const incomplete = (pazienti ?? []).filter((p: any) => {
-          const an = p.anamnesi?.[0];
-          if (!an) return true;
-          return an.updated_at && new Date(an.updated_at) < limite12mesi;
-        }).length;
-        if (incomplete > 0) {
-          out.push({ key: "anamnesi", label: "Anamnesi mancanti o > 12 mesi", count: incomplete, severity: "warning", to: "/pazienti" });
-        }
-      } catch {}
-
-      // 2) Lotti scaduti / in scadenza
-      try {
-        const { data: lotti } = await supabase
-          .from("prodotto_lotto")
-          .select("id, quantita_disponibile, data_scadenza, prodotto:prodotto_id(soglia_minima, modalita_tracking)")
-          .gt("quantita_disponibile", 0);
-        let basse = 0, scaduti = 0, inScadenza = 0;
-        (lotti ?? []).forEach((l: any) => {
-          if (l.prodotto?.modalita_tracking !== "tracciato") return;
-          const soglia = l.prodotto?.soglia_minima ?? 0;
-          if (l.data_scadenza) {
-            const d = new Date(l.data_scadenza);
-            if (d < ora) scaduti++;
-            else if (d < tra30) inScadenza++;
-          }
-          if (soglia && l.quantita_disponibile <= soglia) basse++;
-        });
-        if (scaduti > 0) out.push({ key: "scaduti", label: "Lotti scaduti", count: scaduti, severity: "critical", to: "/magazzino" });
-        if (inScadenza > 0) out.push({ key: "scadenza", label: "Lotti in scadenza < 30gg", count: inScadenza, severity: "warning", to: "/magazzino" });
-        if (basse > 0) out.push({ key: "scorte", label: "Scorte sotto soglia", count: basse, severity: "warning", to: "/magazzino" });
-      } catch {}
-
-      // 3) Consensi: solo IN SCADENZA reale.
-      // Nota: le firme dei consensi NON sono retroattive: una nuova versione
-      // del template non invalida quanto già firmato. Quindi nessun alert
-      // "consensi da rifirmare".
-      try {
-        const { data: cf } = await supabase
-          .from("consenso_firmato")
-          .select(
-            "id, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot",
-          )
-          .is("revocato_il", null)
-          .eq("rifiutato", false)
-          .limit(1000);
-        let inScad = 0;
-        (cf ?? []).forEach((c: any) => {
-          if (c.valido_fino_a) {
-            const d = new Date(c.valido_fino_a);
-            if (d > ora && d < tra30) inScad++;
-          }
-          if (
-            c.durata_tipo_snapshot === "sedute" &&
-            typeof c.sedute_max_snapshot === "number" &&
-            typeof c.sedute_consumate === "number" &&
-            c.sedute_max_snapshot - c.sedute_consumate === 1
-          ) {
-            inScad++;
-          }
-        });
-        if (inScad > 0) out.push({ key: "cscad", label: "Consensi in scadenza", count: inScad, severity: "warning", to: "/consensi" });
-      } catch {}
-
-      // 4) Consensi mancanti per sedute prossime — match per trattamento
-      try {
-        const tra7 = new Date(); tra7.setDate(tra7.getDate() + 7);
-        const { data: sedute } = await supabase
-          .from("seduta")
-          .select("id, paziente_id, trattamento_id, data_seduta")
-          .gte("data_seduta", ora.toISOString())
-          .lte("data_seduta", tra7.toISOString())
-          .eq("completata", false)
-          .limit(1000);
-        const sedRows = (sedute ?? []) as Array<{
-          id: string;
-          paziente_id: string;
-          trattamento_id: string | null;
-        }>;
-        // Mappa trattamento_id -> consenso_template_id
-        const trattIds = Array.from(
-          new Set(sedRows.map((s) => s.trattamento_id).filter(Boolean) as string[]),
-        );
-        const trattToTpl = new Map<string, string | null>();
-        if (trattIds.length > 0) {
-          const { data: tratts } = await supabase
-            .from("trattamenti")
-            .select("id, consenso_template_id")
-            .in("id", trattIds);
-          (tratts ?? []).forEach((t: any) =>
-            trattToTpl.set(t.id, t.consenso_template_id ?? null),
-          );
-        }
-        // Pre-carica tutti i consensi attivi dei pazienti coinvolti
-        const pIds = Array.from(new Set(sedRows.map((s) => s.paziente_id).filter(Boolean)));
-        const consensiByPz = new Map<string, Set<string>>(); // paziente -> set di template_id validi
-        if (pIds.length > 0) {
-          const { data: cons } = await supabase
-            .from("consenso_firmato")
-            .select(
-              "paziente_id, template_id, valido_fino_a, revocato_il, rifiutato, sedute_max_snapshot, sedute_consumate, durata_tipo_snapshot",
-            )
-            .in("paziente_id", pIds)
-            .is("revocato_il", null)
-            .eq("rifiutato", false);
-          (cons ?? []).forEach((c: any) => {
-            if (!c.template_id) return;
-            // valido se non scaduto e non esaurito
-            if (c.valido_fino_a && new Date(c.valido_fino_a) <= ora) return;
-            if (
-              c.durata_tipo_snapshot === "sedute" &&
-              typeof c.sedute_max_snapshot === "number" &&
-              typeof c.sedute_consumate === "number" &&
-              c.sedute_consumate >= c.sedute_max_snapshot
-            ) {
-              return;
-            }
-            const s = consensiByPz.get(c.paziente_id) ?? new Set<string>();
-            s.add(c.template_id);
-            consensiByPz.set(c.paziente_id, s);
-          });
-        }
-        // Conta sedute con consenso pertinente mancante
-        const pazientiMancanti = new Set<string>();
-        sedRows.forEach((s) => {
-          if (!s.trattamento_id) return;
-          const tplId = trattToTpl.get(s.trattamento_id);
-          if (!tplId) return; // trattamento senza consenso richiesto → ignora
-          const valid = consensiByPz.get(s.paziente_id);
-          if (!valid || !valid.has(tplId)) pazientiMancanti.add(s.paziente_id);
-        });
-        if (pazientiMancanti.size > 0) {
-          out.push({ key: "consensi", label: "Consenso specifico mancante (sedute < 7gg)", count: pazientiMancanti.size, severity: "critical", to: "/consensi" });
-        }
-      } catch {}
-
-
-      if (!cancelled) setItems(out);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  function renderItem(a: AlertItem) {
+  function renderItem(a: AlertItem & { detail?: "consensi_obsoleti" }) {
     const content = (
       <>
         <span className="flex items-center gap-2 truncate">
@@ -239,14 +76,26 @@ export function AlertsSection() {
     <>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-4 w-4" /> Alert
+          <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" /> Alert
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              aria-label="Ricarica alert"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1.5">
-          {items === null ? (
+          {isLoading ? (
             <p className="text-xs text-muted-foreground">Caricamento…</p>
-          ) : items.length === 0 ? (
+          ) : !items || items.length === 0 ? (
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-success">
                 <span className="inline-block h-2 w-2 rounded-full bg-success" />
@@ -260,7 +109,7 @@ export function AlertsSection() {
           ) : (
             items.map(renderItem)
           )}
-          {items !== null && items.length > 0 && (
+          {items && items.length > 0 && (
             <div className="pt-1 text-[10px] text-muted-foreground">
               <CheckCircle2 className="mr-1 inline h-3 w-3" />
               Click per aprire la sezione
@@ -273,6 +122,7 @@ export function AlertsSection() {
     </>
   );
 }
+
 
 function ConsensiObsoletiDialog({
   open,
