@@ -187,10 +187,19 @@ export async function salvaSessioneFirme(
     if (insertedConsensi.length > 0) {
       await supabase.from("consenso_firmato").delete().in("id", insertedConsensi);
     }
+    const cleanupErrors: string[] = [];
     for (const p of uploadedPaths) {
-      const [bucket, ...rest] = p.split(":");
-      const path = rest.join(":");
-      await supabase.storage.from(bucket).remove([path]);
+      try {
+        const [bucket, ...rest] = p.split(":");
+        const path = rest.join(":");
+        const { error } = await supabase.storage.from(bucket).remove([path]);
+        if (error) cleanupErrors.push(`${bucket}:${path} — ${error.message}`);
+      } catch (cleanupErr) {
+        cleanupErrors.push(`${p} — ${cleanupErr instanceof Error ? cleanupErr.message : "errore sconosciuto"}`);
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      console.error("[signature-session-save cleanup falliti]", cleanupErrors);
     }
     throw e;
   }
