@@ -28,7 +28,7 @@ import {
 import type { Sesso } from "@/types/clinico";
 import { AnamnesiCronologia } from "./anamnesi-cronologia";
 import { generaPdfAnamnesi } from "@/lib/pdf-anamnesi";
-import { Lock, FileSignature, History, Printer, Upload, FileText } from "lucide-react";
+import { Lock, FileSignature, History, Printer, Upload, FileText, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -638,6 +638,16 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
 
   const isSigned = data.stato === "signed";
 
+  const flagsLive = React.useMemo(() => {
+    if (!data) return [];
+    return computeAutoFlags({
+      generale: data.generale ?? {},
+      patologica: data.patologica ?? {},
+      farmacologica: data.farmacologica ?? {},
+      estetica: data.estetica ?? {},
+    });
+  }, [data?.generale, data?.patologica, data?.farmacologica, data?.estetica]);
+
   return (
     <div className="space-y-4">
       {/* === Stato firma === */}
@@ -759,6 +769,28 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
           onSaved();
         }}
       />
+
+      {/* === Flag di rischio live === */}
+      {flagsLive.length > 0 && (
+        <div className="flex flex-wrap gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3">
+          {flagsLive.map((f) => {
+            const critico = f.severity === "critico";
+            return (
+              <span
+                key={f.codice}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium ${
+                  critico
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-warning/40 bg-warning/10 text-warning-foreground"
+                }`}
+              >
+                <AlertTriangle className="h-3 w-3" />
+                {f.etichetta}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* === 1. GENERALE === */}
       <Card>
