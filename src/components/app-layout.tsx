@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate, useLocation } from "@tanstack/react-router";
+import { Link, useNavigate, useLocation, type useNavigate as UseNavigateType } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile, nomeVisualizzato } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,75 @@ const NAV: NavItem[] = [
   { to: "/firma", label: "Modalità firma", icon: <Tablet className="h-4 w-4" /> },
 ];
 
+const ACTIVE_CLS =
+  "bg-sidebar-primary text-sidebar-primary-foreground";
+const INACTIVE_CLS =
+  "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+
+function SidebarContent({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const impostazioniActive = pathname.startsWith("/impostazioni");
+  return (
+    <>
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
+        <Link to="/dashboard" className="flex items-center gap-2" onClick={onNavigate}>
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+            <Stethoscope className="h-4 w-4" />
+          </div>
+          <span className="font-display text-base font-semibold">Aesthetic Clinic Hub</span>
+        </Link>
+        {onNavigate && (
+          <button
+            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-sidebar-accent md:hidden"
+            onClick={onNavigate}
+            aria-label="Chiudi"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <nav className="flex-1 space-y-1 p-3">
+        {NAV.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+              INACTIVE_CLS,
+            )}
+            activeProps={{ className: cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors", ACTIVE_CLS) }}
+            activeOptions={{ exact: true }}
+          >
+            {item.icon}
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="border-t border-sidebar-border p-3">
+        <Link
+          to="/impostazioni/profilo"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+            impostazioniActive ? ACTIVE_CLS : INACTIVE_CLS,
+          )}
+        >
+          <Settings className="h-4 w-4" />
+          Impostazioni
+        </Link>
+      </div>
+    </>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole, roles } = useAuth();
   const { data: profilo } = useProfile();
@@ -56,7 +125,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar md:flex md:flex-col">
-        <SidebarContent />
+        <SidebarContent pathname={location.pathname} />
       </aside>
 
       {mobileOpen && (
@@ -66,7 +135,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+            <SidebarContent pathname={location.pathname} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
@@ -97,70 +166,4 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
-
-  function SidebarContent({ onNavigate }: { onNavigate?: () => void } = {}) {
-    return (
-      <>
-        <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
-          <Link to="/dashboard" className="flex items-center gap-2" onClick={onNavigate}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Stethoscope className="h-4 w-4" />
-            </div>
-            <span className="font-display text-base font-semibold">Aesthetic Clinic Hub</span>
-          </Link>
-          {onNavigate && (
-            <button
-              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-sidebar-accent md:hidden"
-              onClick={onNavigate}
-              aria-label="Chiudi"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <nav className="flex-1 space-y-1 p-3">
-          {NAV.map((item) => {
-            const active = location.pathname === item.to;
-            return (
-              <div
-                key={item.to}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors cursor-pointer",
-                  active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
-                onClick={() => {
-                  void navigate({ to: item.to });
-                  onNavigate?.();
-                }}
-              >
-                {item.icon}
-                {item.label}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-sidebar-border p-3">
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors cursor-pointer",
-              location.pathname.startsWith("/impostazioni")
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            )}
-            onClick={() => {
-              void navigate({ to: "/impostazioni/profilo" });
-              onNavigate?.();
-            }}
-          >
-            <Settings className="h-4 w-4" />
-            Impostazioni
-          </div>
-        </div>
-      </>
-    );
-  }
 }
