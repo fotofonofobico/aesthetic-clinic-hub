@@ -88,11 +88,19 @@ export async function listFotoByPaziente(paziente_id: string): Promise<FotoClini
   return (data ?? []) as unknown as FotoClinica[];
 }
 
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 export async function getSignedUrl(path: string, expiresIn = 3600): Promise<string> {
+  const now = Date.now();
+  const cached = signedUrlCache.get(path);
+  if (cached && cached.expiresAt > now + 60_000) {
+    return cached.url;
+  }
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(path, expiresIn);
   if (error) throw error;
+  signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 50 * 60 * 1000 });
   return data.signedUrl;
 }
 
