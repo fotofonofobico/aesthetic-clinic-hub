@@ -638,6 +638,16 @@ export function AnamnesiPanel({ pazienteId, pazienteNome = "", sesso, onSaved }:
 
   const isSigned = data.stato === "signed";
 
+  const flagsLive = React.useMemo(() => {
+    if (!data) return [];
+    return computeAutoFlags({
+      generale: data.generale ?? {},
+      patologica: data.patologica ?? {},
+      farmacologica: data.farmacologica ?? {},
+      estetica: data.estetica ?? {},
+    });
+  }, [data?.generale, data?.patologica, data?.farmacologica, data?.estetica]);
+
   return (
     <div className="space-y-4">
       {/* === Stato firma === */}
