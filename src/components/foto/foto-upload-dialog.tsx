@@ -46,6 +46,15 @@ function todayISO() {
   return iso;
 }
 
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
+}
+
 export function FotoUploadDialog({
   open,
   onOpenChange,
@@ -122,7 +131,9 @@ export function FotoUploadDialog({
               id="files"
               type="file"
               accept="image/*"
-              multiple
+              {...(isMobileDevice()
+                ? { capture: "environment" as const }
+                : { multiple: true })}
               onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
             {files.length > 0 && (
