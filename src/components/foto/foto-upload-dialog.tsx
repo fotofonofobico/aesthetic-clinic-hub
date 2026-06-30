@@ -122,7 +122,9 @@ export function FotoUploadDialog({
               id="files"
               type="file"
               accept="image/*"
-              multiple
+              {...(isMobileDevice()
+                ? { capture: "environment" as const }
+                : { multiple: true })}
               onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
             {files.length > 0 && (
