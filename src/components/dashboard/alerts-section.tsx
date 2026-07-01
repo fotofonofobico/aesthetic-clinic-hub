@@ -25,6 +25,23 @@ interface ConsensoObsoletoRow {
   motivo_nuova_versione: string | null;
 }
 
+interface ConsensoRawRow {
+  id: string;
+  paziente_id: string;
+  versione_snapshot: string;
+  firmato_il: string;
+  titolo_snapshot: string | null;
+  template_id: string | null;
+  template: {
+    versione: string;
+    attivo: boolean;
+    titolo: string | null;
+    richiede_rifirma_su_nuova_versione: boolean | null;
+    motivo_nuova_versione: string | null;
+  } | null;
+  paziente: { nome: string | null; cognome: string | null } | null;
+}
+
 export function AlertsSection() {
   const { data: items, isLoading, isFetching, refetch } = useDashboardAlerts();
   const [openObsoleti, setOpenObsoleti] = useState(false);
@@ -148,11 +165,10 @@ function ConsensiObsoletiDialog({
         .limit(500);
 
       const out: ConsensoObsoletoRow[] = [];
-      (data ?? []).forEach((c: any) => {
+      ((data ?? []) as unknown as ConsensoRawRow[]).forEach((c) => {
         const tpl = c.template;
         if (!tpl || !tpl.attivo) return;
         if (tpl.versione === c.versione_snapshot) return;
-        // Solo se il template richiede esplicitamente la rifirma su nuova versione
         if (tpl.richiede_rifirma_su_nuova_versione !== true) return;
         out.push({
           id: c.id,

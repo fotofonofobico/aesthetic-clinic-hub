@@ -126,7 +126,19 @@ export function EventoEditDialog({
     }
     setSaving(true);
     try {
-      const payload: any = {
+      interface EventoPayload {
+        titolo: string;
+        descrizione: string | null;
+        tipo: CalendarioEventoTipo;
+        data_inizio: string;
+        data_fine: string | null;
+        tutto_il_giorno: boolean;
+        paziente_id: string | null;
+        sincronizza_diario: boolean;
+        completato: boolean;
+        created_by?: string;
+      }
+      const payload: EventoPayload = {
         titolo: titolo.trim(),
         descrizione: descrizione.trim() || null,
         tipo,
@@ -189,7 +201,6 @@ export function EventoEditDialog({
           }
         }
       } else if (!sincronizzaDiario && oldNotaId) {
-        // Rimuovi nota collegata
         await supabase.from("paziente_nota").delete().eq("id", oldNotaId).eq("auto_generata", true);
         await supabase
           .from("evento_calendario")
@@ -200,9 +211,9 @@ export function EventoEditDialog({
       toast.success(isEdit ? "Evento aggiornato" : "Evento creato");
       onOpenChange(false);
       onSaved?.();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      toast.error(err.message || "Errore di salvataggio");
+      toast.error(err instanceof Error ? err.message : "Errore di salvataggio");
     } finally {
       setSaving(false);
     }
@@ -230,8 +241,8 @@ export function EventoEditDialog({
       toast.success("Evento eliminato");
       onOpenChange(false);
       onSaved?.();
-    } catch (err: any) {
-      toast.error(err.message || "Errore");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Errore");
     } finally {
       setSaving(false);
     }

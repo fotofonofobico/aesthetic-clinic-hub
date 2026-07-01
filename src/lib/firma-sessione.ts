@@ -52,6 +52,8 @@ export interface FirmaSessioneRow {
   signed_at: string | null;
   consumed_at: string | null;
   consumed_into_id: string | null;
+  paziente_step_corrente?: number;
+  paziente_step_totale?: number;
 }
 
 /** Crea una nuova sessione delegata sul tablet. */

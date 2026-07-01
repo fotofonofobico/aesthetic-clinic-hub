@@ -54,3 +54,46 @@ export function validateCFInput(cf: string | null | undefined): {
   }
   return { ok: true };
 }
+
+export interface DatiDaCF {
+  dataNascita: string; // formato ISO YYYY-MM-DD
+  sesso: "M" | "F";
+}
+
+const MESI_CF: Record<string, number> = {
+  A: 1, B: 2, C: 3, D: 4, E: 5, H: 6,
+  L: 7, M: 8, P: 9, R: 10, S: 11, T: 12,
+};
+
+export function decodeCF(cf: string): DatiDaCF | null {
+  if (!cf || cf.length !== 16) return null;
+  const upper = cf.toUpperCase();
+  try {
+    const annoStr = upper.slice(6, 8);
+    const annoNum = parseInt(annoStr, 10);
+    if (Number.isNaN(annoNum)) return null;
+    // Convenzione: >= 25 → 1900, < 25 → 2000
+    const anno = annoNum >= 25 ? 1900 + annoNum : 2000 + annoNum;
+
+    const meseLetter = upper[8];
+    const mese = MESI_CF[meseLetter];
+    if (!mese) return null;
+
+    const giornoStr = upper.slice(9, 11);
+    const giornoNum = parseInt(giornoStr, 10);
+    if (Number.isNaN(giornoNum)) return null;
+    const sesso: "M" | "F" = giornoNum > 40 ? "F" : "M";
+    const giorno = sesso === "F" ? giornoNum - 40 : giornoNum;
+
+    const mm = String(mese).padStart(2, "0");
+    const dd = String(giorno).padStart(2, "0");
+    const dataNascita = `${anno}-${mm}-${dd}`;
+
+    const d = new Date(dataNascita);
+    if (isNaN(d.getTime())) return null;
+
+    return { dataNascita, sesso };
+  } catch {
+    return null;
+  }
+}

@@ -531,6 +531,8 @@ export type Database = {
           id: string
           payload: Json
           paziente_id: string
+          paziente_step_corrente: number
+          paziente_step_totale: number
           rifiuto_motivo: string | null
           signed_at: string | null
           stato: Database["public"]["Enums"]["firma_sessione_stato"]
@@ -549,6 +551,8 @@ export type Database = {
           id?: string
           payload?: Json
           paziente_id: string
+          paziente_step_corrente?: number
+          paziente_step_totale?: number
           rifiuto_motivo?: string | null
           signed_at?: string | null
           stato?: Database["public"]["Enums"]["firma_sessione_stato"]
@@ -567,6 +571,8 @@ export type Database = {
           id?: string
           payload?: Json
           paziente_id?: string
+          paziente_step_corrente?: number
+          paziente_step_totale?: number
           rifiuto_motivo?: string | null
           signed_at?: string | null
           stato?: Database["public"]["Enums"]["firma_sessione_stato"]

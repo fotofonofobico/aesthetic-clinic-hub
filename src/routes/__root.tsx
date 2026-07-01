@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cleanupFirmaSessioniScadute } from "@/lib/cleanup";
 
 import appCss from "../styles.css?url";
 
@@ -99,6 +100,11 @@ function RootComponent() {
       sub.subscription.unsubscribe();
     };
   }, [queryClient, router]);
+
+  // Pulizia una tantum sessioni firma scadute (silenziosa)
+  useEffect(() => {
+    cleanupFirmaSessioniScadute().catch(() => {});
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
