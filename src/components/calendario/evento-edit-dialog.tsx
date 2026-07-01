@@ -241,8 +241,8 @@ export function EventoEditDialog({
       toast.success("Evento eliminato");
       onOpenChange(false);
       onSaved?.();
-    } catch (err: any) {
-      toast.error(err.message || "Errore");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Errore");
     } finally {
       setSaving(false);
     }
