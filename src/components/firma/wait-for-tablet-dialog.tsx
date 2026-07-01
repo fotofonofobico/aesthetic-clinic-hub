@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, Tablet, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useFirmaSessione, annullaFirmaSessione, type FirmaSessioneRow } from "@/lib/firma-sessione";
 
@@ -70,9 +71,30 @@ export function WaitForTabletDialog({ open, sessionId, pazienteNome, onSigned, o
               <p className="mt-3 text-sm font-medium">
                 Consegna l'iPad a <span className="font-semibold">{pazienteNome}</span>
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Il documento è già visibile sul dispositivo in modalità firma.
-              </p>
+              {(() => {
+                const stepTot = row.paziente_step_totale ?? 0;
+                const stepCur = row.paziente_step_corrente ?? 0;
+                if (stepTot <= 0) {
+                  return (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Il documento è già visibile sul dispositivo in modalità firma.
+                    </p>
+                  );
+                }
+                const label =
+                  stepCur === 0
+                    ? "In attesa che il paziente inizi…"
+                    : stepCur >= stepTot - 1
+                    ? "Il paziente sta apponendo la firma…"
+                    : `Il paziente sta leggendo il documento ${stepCur} di ${stepTot - 1}`;
+                const pct = Math.min(100, Math.round((stepCur / Math.max(1, stepTot)) * 100));
+                return (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <Progress value={pct} className="h-1.5" />
+                  </div>
+                );
+              })()}
             </div>
             <div className="flex items-center justify-center gap-2 text-sm">
               <span className="text-muted-foreground">Sessione valida ancora:</span>

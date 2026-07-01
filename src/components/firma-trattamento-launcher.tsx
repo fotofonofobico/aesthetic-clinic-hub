@@ -27,10 +27,11 @@ interface TrattamentoLite {
 interface Props {
   pazienteId: string;
   pazienteNome?: string;
+  sedutaId?: string;
   onCompleted?: () => void;
 }
 
-export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onCompleted }: Props) {
+export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", sedutaId, onCompleted }: Props) {
   const [openSel, setOpenSel] = useState(false);
   const [trattamenti, setTrattamenti] = useState<TrattamentoLite[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -58,6 +59,25 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
       cancelled = true;
     };
   }, [openSel]);
+
+  // Pre-seleziona il trattamento della seduta quando disponibile
+  useEffect(() => {
+    if (!openSel || !sedutaId) return;
+    let cancelled = false;
+    void supabase
+      .from("seduta")
+      .select("trattamento_id")
+      .eq("id", sedutaId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data?.trattamento_id) {
+          setSelected(new Set([data.trattamento_id]));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openSel, sedutaId]);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -99,6 +119,11 @@ export function FirmaTrattamentoLauncher({ pazienteId, pazienteNome = "", onComp
               Seleziona trattamenti da eseguire
             </DialogTitle>
           </DialogHeader>
+          {sedutaId && selected.size > 0 && (
+            <p className="rounded-md bg-primary/10 px-2 py-1.5 text-xs text-primary">
+              Trattamento della seduta pre-selezionato. Aggiungi altri se necessario.
+            </p>
+          )}
           <div className="space-y-2">
             {trattamenti.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nessun trattamento attivo.</p>

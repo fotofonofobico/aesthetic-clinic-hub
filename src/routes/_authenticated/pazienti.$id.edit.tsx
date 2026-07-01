@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { validateCFInput, normalizeCF } from "@/lib/codice-fiscale";
+import { validateCFInput, normalizeCF, decodeCF } from "@/lib/codice-fiscale";
 import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, Sesso } from "@/types/clinico";
 
@@ -271,10 +271,26 @@ function PazienteEditPage() {
               <Field label="Codice fiscale (opzionale)">
                 <Input
                   value={form.codice_fiscale ?? ""}
-                  onChange={(e) => update("codice_fiscale", e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    const upper = e.target.value.toUpperCase();
+                    setForm((f) => {
+                      const next = { ...f, codice_fiscale: upper };
+                      if (upper.length === 16) {
+                        const decoded = decodeCF(upper);
+                        if (decoded) {
+                          if (!f.data_nascita) next.data_nascita = decoded.dataNascita;
+                          if (!f.sesso) next.sesso = decoded.sesso as Sesso;
+                        }
+                      }
+                      return next;
+                    });
+                  }}
                   maxLength={16}
                   className="font-mono uppercase"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  Data di nascita e sesso vengono compilati automaticamente
+                </p>
               </Field>
             </div>
           </CardContent>

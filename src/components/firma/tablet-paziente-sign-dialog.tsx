@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, FileSignature, Clock, X } from "lucide-react";
 import { SignaturePad, type SignaturePadHandle } from "@/components/signature-pad";
+import { supabase } from "@/integrations/supabase/client";
 import {
   rifiutaFirmaSessione,
   salvaRispostePaziente,
@@ -72,22 +73,39 @@ export function TabletPazienteSignDialog({ open, row, onCompleted }: Props) {
     setScelte((p) => ({ ...p, [localId]: s }));
   }
 
+  function updateProgress(nextStep: number) {
+    if (!row) return;
+    // fire-and-forget: non bloccare l'UI
+    void supabase
+      .from("firma_sessione")
+      .update({ paziente_step_corrente: nextStep, paziente_step_totale: totalSteps } as never)
+      .eq("id", row.id)
+      .then(() => {}, () => {});
+  }
+
   function avanti() {
     if (!docCorrente) return;
     if (!scelte[docCorrente.localId]) {
       toast.error("Seleziona Acconsento o Non acconsento");
       return;
     }
-    // Vincolo GDPR
     if (docCorrente.kind.kind === "gdpr" && scelte[docCorrente.localId] === "non_acconsento") {
       toast.error("Il consenso GDPR/Privacy è obbligatorio per proseguire");
       return;
     }
-    setStep((s) => s + 1);
+    setStep((s) => {
+      const next = s + 1;
+      updateProgress(next);
+      return next;
+    });
   }
 
   function indietro() {
-    setStep((s) => Math.max(0, s - 1));
+    setStep((s) => {
+      const next = Math.max(0, s - 1);
+      updateProgress(next);
+      return next;
+    });
   }
 
   async function conferma() {
