@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { sha256Hex } from "./hash";
+import { generaQrCodeDataUrl } from "./pdf-qr";
 import type { DatiPazientePdf } from "./pdf-consenso";
 import {
   renderFooterPagine,
