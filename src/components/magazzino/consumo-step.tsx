@@ -16,7 +16,9 @@ import {
 import { ProdottoSelectInline } from "./prodotto-select-inline";
 import { ProdottoFormDialog } from "./prodotto-form-dialog";
 import { listLotti, listProdotti } from "@/lib/magazzino";
+import { supabase } from "@/integrations/supabase/client";
 import type { Lotto, ProdottoConDettagli, RigaConsumo } from "@/types/magazzino";
+import type { KitConsumoDefaultRiga } from "@/types/trattamenti";
 
 export interface ConsumoRiga extends RigaConsumo {
   _key: string;
@@ -28,13 +30,15 @@ export interface ConsumoRiga extends RigaConsumo {
 interface Props {
   righe: ConsumoRiga[];
   onChange: (righe: ConsumoRiga[]) => void;
+  /** Se valorizzato, al primo mount precompila le righe con il kit consumo default del trattamento. */
+  trattamentoId?: string | null;
 }
 
 function newKey() {
   return Math.random().toString(36).slice(2);
 }
 
-export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
+export function ConsumoMagazzinoStep({ righe, onChange, trattamentoId }: Props) {
   const [prodotti, setProdotti] = React.useState<ProdottoConDettagli[]>([]);
   const [loadingProdotti, setLoadingProdotti] = React.useState(false);
   const [creaProdottoOpen, setCreaProdottoOpen] = React.useState(false);
