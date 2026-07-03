@@ -350,6 +350,9 @@ function TrattamentoDialog({
     }
 
     setSaving(true);
+    const kitPulito = kit
+      .filter((r) => r.prodotto_id && Number(r.quantita) > 0)
+      .map((r) => ({ prodotto_id: r.prodotto_id, quantita: Number(r.quantita) }));
     const payload = {
       nome: nome.trim(),
       tipo,
@@ -360,6 +363,7 @@ function TrattamentoDialog({
       durata_minuti: durata ? Number(durata) : null,
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
       descrizione: null,
+      kit_consumo_default: kitPulito,
     };
     async function runSave() {
       return editing
