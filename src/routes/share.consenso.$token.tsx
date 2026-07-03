@@ -9,6 +9,7 @@ export const Route = createFileRoute("/share/consenso/$token")({
 });
 
 interface ConsensoData {
+  verifica?: boolean;
   paziente: string | null;
   consenso: {
     id: string;
@@ -32,20 +33,24 @@ function ShareConsensoPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ConsensoData | null>(null);
 
+  // Un hash SHA-256 esadecimale (64 caratteri) indica una richiesta di
+  // verifica autenticità (QR code stampato sul PDF).
+  const isHashVerify = /^[a-f0-9]{64}$/i.test(token);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-        const r = await fetch(
-          `${supabaseUrl}/functions/v1/share-consenso?token=${encodeURIComponent(token)}`,
-          {
-            headers: {
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-            },
+        const qs = isHashVerify
+          ? `hash=${encodeURIComponent(token)}`
+          : `token=${encodeURIComponent(token)}`;
+        const r = await fetch(`${supabaseUrl}/functions/v1/share-consenso?${qs}`, {
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
           },
-        );
+        });
         const body = await r.json();
         if (!r.ok) {
           setError(body.error ?? "Errore");
@@ -59,15 +64,19 @@ function ShareConsensoPage() {
       }
     }
     void load();
-  }, [token]);
+  }, [token, isHashVerify]);
 
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
         <header className="text-center">
-          <h1 className="font-display text-2xl font-semibold">Consenso firmato</h1>
+          <h1 className="font-display text-2xl font-semibold">
+            {isHashVerify ? "Verifica autenticità documento" : "Consenso firmato"}
+          </h1>
           <p className="text-xs text-muted-foreground">
-            Documento condiviso in sola lettura
+            {isHashVerify
+              ? "Verifica basata sull'hash di integrità"
+              : "Documento condiviso in sola lettura"}
           </p>
         </header>
 
@@ -85,14 +94,65 @@ function ShareConsensoPage() {
             <CardContent className="flex items-center gap-3 py-8">
               <ShieldAlert className="h-6 w-6 text-destructive" />
               <div>
-                <div className="font-semibold text-destructive">Link non disponibile</div>
+                <div className="font-semibold text-destructive">
+                  {isHashVerify ? "Documento non trovato o non verificabile" : "Link non disponibile"}
+                </div>
                 <div className="text-sm text-muted-foreground">{error}</div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {data && (
+        {data && isHashVerify && (
+          <Card className="border-success/40 bg-success/5">
+            <CardHeader>
+              <CardTitle className="font-display flex flex-wrap items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-success-foreground" />
+                Documento autentico
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Questo documento corrisponde a un consenso firmato registrato nel sistema.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Titolo: </span>
+                <span className="font-semibold">
+                  {data.consenso.titolo} (v{data.consenso.versione})
+                </span>
+              </div>
+              {data.paziente && (
+                <div>
+                  <span className="text-muted-foreground">Paziente: </span>
+                  {data.paziente}
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Data firma: </span>
+                {new Date(data.consenso.firmatoIl).toLocaleString("it-IT", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Categoria: </span>
+                {data.consenso.categoria}
+              </div>
+              {data.consenso.rifiutato && (
+                <div className="font-semibold text-warning">
+                  Il paziente non ha acconsentito.
+                </div>
+              )}
+              {data.consenso.revocato && (
+                <div className="font-semibold text-warning">
+                  Consenso successivamente revocato.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {data && !isHashVerify && (
           <Card>
             <CardHeader>
               <CardTitle className="font-display flex flex-wrap items-center gap-2">
@@ -155,3 +215,4 @@ function ShareConsensoPage() {
     </div>
   );
 }
+
