@@ -1,0 +1,2 @@
+ALTER TABLE public.trattamenti ADD COLUMN IF NOT EXISTS kit_consumo_default JSONB NOT NULL DEFAULT '[]'::jsonb;
+COMMENT ON COLUMN public.trattamenti.kit_consumo_default IS 'Array di {prodotto_id, quantita} precompilato per lo scarico automatico';

@@ -1746,6 +1746,7 @@ export type Database = {
           durata_ciclo_valore: number | null
           durata_minuti: number | null
           id: string
+          kit_consumo_default: Json
           nome: string
           prezzo_indicativo: number | null
           tipo: string | null
@@ -1763,6 +1764,7 @@ export type Database = {
           durata_ciclo_valore?: number | null
           durata_minuti?: number | null
           id?: string
+          kit_consumo_default?: Json
           nome: string
           prezzo_indicativo?: number | null
           tipo?: string | null
@@ -1780,6 +1782,7 @@ export type Database = {
           durata_ciclo_valore?: number | null
           durata_minuti?: number | null
           id?: string
+          kit_consumo_default?: Json
           nome?: string
           prezzo_indicativo?: number | null
           tipo?: string | null

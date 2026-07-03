@@ -16,7 +16,9 @@ import {
 import { ProdottoSelectInline } from "./prodotto-select-inline";
 import { ProdottoFormDialog } from "./prodotto-form-dialog";
 import { listLotti, listProdotti } from "@/lib/magazzino";
+import { supabase } from "@/integrations/supabase/client";
 import type { Lotto, ProdottoConDettagli, RigaConsumo } from "@/types/magazzino";
+import type { KitConsumoDefaultRiga } from "@/types/trattamenti";
 
 export interface ConsumoRiga extends RigaConsumo {
   _key: string;
@@ -28,13 +30,15 @@ export interface ConsumoRiga extends RigaConsumo {
 interface Props {
   righe: ConsumoRiga[];
   onChange: (righe: ConsumoRiga[]) => void;
+  /** Se valorizzato, al primo mount precompila le righe con il kit consumo default del trattamento. */
+  trattamentoId?: string | null;
 }
 
 function newKey() {
   return Math.random().toString(36).slice(2);
 }
 
-export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
+export function ConsumoMagazzinoStep({ righe, onChange, trattamentoId }: Props) {
   const [prodotti, setProdotti] = React.useState<ProdottoConDettagli[]>([]);
   const [loadingProdotti, setLoadingProdotti] = React.useState(false);
   const [creaProdottoOpen, setCreaProdottoOpen] = React.useState(false);
@@ -56,6 +60,60 @@ export function ConsumoMagazzinoStep({ righe, onChange }: Props) {
   React.useEffect(() => {
     void refreshProdotti();
   }, [refreshProdotti]);
+
+  // Precompila dal kit_consumo_default del trattamento (una sola volta)
+  const kitLoadedRef = React.useRef(false);
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
+  React.useEffect(() => {
+    if (kitLoadedRef.current) return;
+    if (!trattamentoId) return;
+    if (righe.length > 0) {
+      kitLoadedRef.current = true;
+      return;
+    }
+    if (prodotti.length === 0) return; // aspetta il caricamento prodotti
+    kitLoadedRef.current = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("trattamenti")
+        .select("kit_consumo_default")
+        .eq("id", trattamentoId)
+        .maybeSingle();
+      if (error || !data) return;
+      const kit = (data as { kit_consumo_default: KitConsumoDefaultRiga[] | null })
+        .kit_consumo_default;
+      if (!Array.isArray(kit) || kit.length === 0) return;
+      const nuove: ConsumoRiga[] = [];
+      for (const k of kit) {
+        if (!k?.prodotto_id) continue;
+        const p = prodotti.find((x) => x.id === k.prodotto_id) ?? null;
+        let lotti: Lotto[] = [];
+        if (p?.modalita_tracking === "tracciato") {
+          try {
+            lotti = await listLotti({ prodotto_id: k.prodotto_id });
+          } catch {
+            lotti = [];
+          }
+        } else if (p?.modalita_tracking === "solo_uso") {
+          try {
+            lotti = await listLotti({ prodotto_id: k.prodotto_id, includiEsauriti: true });
+          } catch {
+            lotti = [];
+          }
+        }
+        nuove.push({
+          _key: newKey(),
+          prodotto_id: k.prodotto_id,
+          quantita: Number(k.quantita) || 1,
+          lotto_id: null,
+          _prodotto: p,
+          _lotti: lotti,
+        });
+      }
+      if (nuove.length > 0) onChangeRef.current(nuove);
+    })();
+  }, [trattamentoId, prodotti, righe.length]);
 
   function addRiga() {
     onChange([

@@ -98,6 +98,11 @@ export const DURATA_UNITA_LABELS: Record<DurataUnita, string> = {
   sedute: "Sedute",
 };
 
+export interface KitConsumoDefaultRiga {
+  prodotto_id: string;
+  quantita: number;
+}
+
 export interface Trattamento {
   id: string;
   nome: string;
@@ -113,6 +118,7 @@ export interface Trattamento {
   durata_ciclo_valore: number | null;
   durata_ciclo_unita: DurataUnita | null;
   consenso_template_id: string | null;
+  kit_consumo_default?: KitConsumoDefaultRiga[] | null;
 }
 
 export type ConsensoDurataTipo = "mesi" | "sedute";

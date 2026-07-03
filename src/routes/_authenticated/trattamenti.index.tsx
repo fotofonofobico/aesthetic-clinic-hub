@@ -24,16 +24,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Syringe, Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Syringe, Pencil, Archive, ArchiveRestore, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import {
   type Trattamento,
   type TrattamentoTipo,
   type DurataUnita,
   type TrattamentoCategoria,
+  type KitConsumoDefaultRiga,
   TRATTAMENTO_CATEGORIE,
   TRATTAMENTO_CATEGORIA_LABELS,
 } from "@/types/trattamenti";
+import { ProdottoSelectInline } from "@/components/magazzino/prodotto-select-inline";
+import { listProdotti } from "@/lib/magazzino";
+import type { ProdottoConDettagli } from "@/types/magazzino";
 
 export const Route = createFileRoute("/_authenticated/trattamenti/")({
   component: TrattamentiPage,
@@ -284,7 +288,17 @@ function TrattamentoDialog({
   const [consensoId, setConsensoId] = useState<string>(editing?.consenso_template_id ?? "");
   const [durata, setDurata] = useState<string>(editing?.durata_minuti?.toString() ?? "");
   const [prezzo, setPrezzo] = useState<string>(editing?.prezzo_indicativo?.toString() ?? "");
+  const [kit, setKit] = useState<KitConsumoDefaultRiga[]>(
+    Array.isArray(editing?.kit_consumo_default) ? editing!.kit_consumo_default! : [],
+  );
+  const [prodotti, setProdotti] = useState<ProdottoConDettagli[]>([]);
   const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    void listProdotti({ includiStandby: false })
+      .then(setProdotti)
+      .catch(() => setProdotti([]));
+  }, []);
 
   React.useEffect(() => {
     setNome(editing?.nome ?? "");
@@ -294,6 +308,9 @@ function TrattamentoDialog({
     setConsensoId(editing?.consenso_template_id ?? "");
     setDurata(editing?.durata_minuti?.toString() ?? "");
     setPrezzo(editing?.prezzo_indicativo?.toString() ?? "");
+    setKit(
+      Array.isArray(editing?.kit_consumo_default) ? editing!.kit_consumo_default! : [],
+    );
   }, [editing]);
 
   async function save() {
@@ -333,6 +350,9 @@ function TrattamentoDialog({
     }
 
     setSaving(true);
+    const kitPulito = kit
+      .filter((r) => r.prodotto_id && Number(r.quantita) > 0)
+      .map((r) => ({ prodotto_id: r.prodotto_id, quantita: Number(r.quantita) }));
     const payload = {
       nome: nome.trim(),
       tipo,
@@ -343,6 +363,7 @@ function TrattamentoDialog({
       durata_minuti: durata ? Number(durata) : null,
       prezzo_indicativo: prezzo ? Number(prezzo) : null,
       descrizione: null,
+      kit_consumo_default: kitPulito,
     };
     async function runSave() {
       return editing
@@ -481,6 +502,76 @@ function TrattamentoDialog({
             return null;
           })()}
         </div>
+
+        <div className="rounded-md border border-dashed border-border/60 bg-muted/20 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-semibold">Kit consumo default</Label>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setKit((k) => [...k, { prodotto_id: "", quantita: 1 }])
+              }
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" /> Riga
+            </Button>
+          </div>
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Prodotti precompilati nel consumo magazzino di ogni seduta di questo trattamento.
+          </p>
+          {kit.length === 0 && (
+            <p className="rounded-md border border-dashed border-border/60 bg-background/40 p-2 text-center text-xs text-muted-foreground">
+              Nessun prodotto configurato.
+            </p>
+          )}
+          <div className="space-y-2">
+            {kit.map((r, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <ProdottoSelectInline
+                    prodotti={prodotti}
+                    value={r.prodotto_id || null}
+                    onChange={(id) =>
+                      setKit((k) =>
+                        k.map((x, j) => (j === i ? { ...x, prodotto_id: id ?? "" } : x)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="w-20">
+                  <Label className="text-[11px]">Q.tà</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={r.quantita}
+                    onChange={(e) =>
+                      setKit((k) =>
+                        k.map((x, j) =>
+                          j === i ? { ...x, quantita: Number(e.target.value) || 0 } : x,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-destructive"
+                  onClick={() => setKit((k) => k.filter((_, j) => j !== i))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
 
         <div className="grid grid-cols-2 gap-3">
           <div>
