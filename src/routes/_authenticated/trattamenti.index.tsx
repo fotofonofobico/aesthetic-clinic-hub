@@ -288,7 +288,17 @@ function TrattamentoDialog({
   const [consensoId, setConsensoId] = useState<string>(editing?.consenso_template_id ?? "");
   const [durata, setDurata] = useState<string>(editing?.durata_minuti?.toString() ?? "");
   const [prezzo, setPrezzo] = useState<string>(editing?.prezzo_indicativo?.toString() ?? "");
+  const [kit, setKit] = useState<KitConsumoDefaultRiga[]>(
+    Array.isArray(editing?.kit_consumo_default) ? editing!.kit_consumo_default! : [],
+  );
+  const [prodotti, setProdotti] = useState<ProdottoConDettagli[]>([]);
   const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    void listProdotti({ includiStandby: false })
+      .then(setProdotti)
+      .catch(() => setProdotti([]));
+  }, []);
 
   React.useEffect(() => {
     setNome(editing?.nome ?? "");
@@ -298,6 +308,9 @@ function TrattamentoDialog({
     setConsensoId(editing?.consenso_template_id ?? "");
     setDurata(editing?.durata_minuti?.toString() ?? "");
     setPrezzo(editing?.prezzo_indicativo?.toString() ?? "");
+    setKit(
+      Array.isArray(editing?.kit_consumo_default) ? editing!.kit_consumo_default! : [],
+    );
   }, [editing]);
 
   async function save() {
