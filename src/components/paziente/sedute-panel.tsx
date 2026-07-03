@@ -1192,7 +1192,11 @@ function EseguiSedutaDialog({
             </div>
           </div>
 
-          <ConsumoMagazzinoStep righe={consumoRighe} onChange={setConsumoRighe} />
+          <ConsumoMagazzinoStep
+            righe={consumoRighe}
+            onChange={setConsumoRighe}
+            trattamentoId={trattamento?.id ?? null}
+          />
 
           <div>
             <Label>Parametri tecnici (opzionale)</Label>
