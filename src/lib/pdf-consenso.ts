@@ -167,6 +167,26 @@ export async function generaPdfConsenso(
   doc.setPage(totalPages);
   doc.setFontSize(7).setTextColor(120);
   doc.text(`Hash integrità: ${hash}`, margin, pageH - 24);
+
+  // QR code di verifica in basso a destra
+  try {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const verifyUrl = `${origin}/share/consenso/${hash}`;
+    const qrDataUrl = await generaQrCodeDataUrl(verifyUrl);
+    const qrSize = 60;
+    const qrX = pageW - margin - qrSize;
+    const qrY = pageH - margin - qrSize - 10;
+    doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+    doc.setFontSize(7).setTextColor(120);
+    doc.text("Verifica autenticità", qrX + qrSize / 2, qrY + qrSize + 8, {
+      align: "center",
+    });
+    doc.setTextColor(0);
+  } catch {
+    /* QR opzionale: se fallisce, non blocchiamo il PDF */
+  }
+
   renderFooterPagine(doc, `Consenso — ${input.titolo}`, margin);
   const finalBlob = doc.output("blob");
 
