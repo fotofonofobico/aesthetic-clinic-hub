@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { ConsensoCategoria } from "@/types/trattamenti";
 import { sha256Hex } from "./hash";
+import { generaQrCodeDataUrl } from "./pdf-qr";
 import {
   renderFooterPagine,
   renderHeaderPaziente,
