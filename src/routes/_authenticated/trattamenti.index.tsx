@@ -24,16 +24,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Syringe, Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Syringe, Pencil, Archive, ArchiveRestore, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 import {
   type Trattamento,
   type TrattamentoTipo,
   type DurataUnita,
   type TrattamentoCategoria,
+  type KitConsumoDefaultRiga,
   TRATTAMENTO_CATEGORIE,
   TRATTAMENTO_CATEGORIA_LABELS,
 } from "@/types/trattamenti";
+import { ProdottoSelectInline } from "@/components/magazzino/prodotto-select-inline";
+import { listProdotti } from "@/lib/magazzino";
+import type { ProdottoConDettagli } from "@/types/magazzino";
 
 export const Route = createFileRoute("/_authenticated/trattamenti/")({
   component: TrattamentiPage,
