@@ -1,25 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, AlertTriangle, ShieldAlert, Info, ArchiveRestore, MapPin } from "lucide-react";
+import {
+  Plus,
+  Search,
+  AlertTriangle,
+  ShieldAlert,
+  Info,
+  ArchiveRestore,
+  MapPin,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useStudi } from "@/hooks/use-studi";
-import type { Paziente, AlertSeverity } from "@/types/clinico";
+import { usePazientiList, useRestorePaziente } from "@/hooks/use-pazienti";
+import type { AlertSeverity } from "@/types/clinico";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/pazienti/")({
   component: PazientiListPage,
 });
-
-interface PazienteRow extends Paziente {
-  max_severity: AlertSeverity | null;
-}
 
 function PazientiListPage() {
   const { hasRole } = useAuth();
@@ -27,70 +31,33 @@ function PazientiListPage() {
   const { data: studi } = useStudi();
   const mostraStudi = (studi ?? []).length >= 2;
   const studiMap = new Map((studi ?? []).map((s) => [s.id, s]));
-  const [pazienti, setPazienti] = useState<PazienteRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [mostraArchiviati, setMostraArchiviati] = useState(false);
   const navigate = useNavigate();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data: pData, error } = await supabase
-      .from("pazienti")
-      .select("*")
-      .filter("deleted_at", mostraArchiviati ? "not.is" : "is", null)
-      .order("cognome", { ascending: true });
-
-    if (error) {
-      toast.error("Errore caricamento pazienti");
-      setLoading(false);
-      return;
-    }
-
-    // Carica i flag rischio per evidenziare il livello max
-    const ids = (pData ?? []).map((p) => p.id);
-    let flagsByPaziente: Record<string, AlertSeverity[]> = {};
-    if (ids.length > 0) {
-      const { data: flags } = await supabase
-        .from("anamnesi_flag_rischio")
-        .select("paziente_id, severity")
-        .in("paziente_id", ids);
-      flagsByPaziente = (flags ?? []).reduce<Record<string, AlertSeverity[]>>((acc, f) => {
-        (acc[f.paziente_id] ??= []).push(f.severity as AlertSeverity);
-        return acc;
-      }, {});
-    }
-
-    const order: Record<AlertSeverity, number> = { critico: 3, attenzione: 2, info: 1 };
-    const enriched: PazienteRow[] = (pData ?? []).map((p) => {
-      const sev = flagsByPaziente[p.id] ?? [];
-      const max = sev.sort((a, b) => order[b] - order[a])[0] ?? null;
-      return { ...(p as Paziente), max_severity: max };
-    });
-
-    setPazienti(enriched);
-    setLoading(false);
-  }, [mostraArchiviati]);
+  const {
+    data: pazienti = [],
+    isLoading: loading,
+    error: pazientiError,
+  } = usePazientiList(mostraArchiviati);
+  const restoreMutation = useRestorePaziente();
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (pazientiError) toast.error("Errore caricamento pazienti");
+  }, [pazientiError]);
 
   async function ripristinaPaziente(id: string) {
     if (!isMedico) {
       toast.error("Solo i medici possono ripristinare pazienti");
       return;
     }
-    const { error } = await supabase
-      .from("pazienti")
-      .update({ deleted_at: null, deleted_by: null })
-      .eq("id", id);
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
-      return;
+    try {
+      await restoreMutation.mutateAsync(id);
+      toast.success("Paziente ripristinato");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Errore: ${msg}`);
     }
-    toast.success("Paziente ripristinato");
-    void load();
   }
 
   const filtered = useMemo(() => {
@@ -180,7 +147,9 @@ function PazientiListPage() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2 font-medium">
-                      <span>{p.cognome} {p.nome}</span>
+                      <span>
+                        {p.cognome} {p.nome}
+                      </span>
                       {mostraStudi && p.studio_id && studiMap.get(p.studio_id) ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wider text-muted-foreground">
                           <MapPin className="h-2.5 w-2.5" />

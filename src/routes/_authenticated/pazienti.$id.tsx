@@ -1,6 +1,11 @@
-import { createFileRoute, Outlet, useNavigate, useMatches, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  useNavigate,
+  useMatches,
+  useRouter,
+} from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, ArrowLeft, FileText, FileSignature, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  FileText,
+  FileSignature,
+  Pencil,
+  Plus,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { SeverityBadge } from "./pazienti.index";
 import type { Paziente, PazienteAlert, FlagRischio, AlertSeverity } from "@/types/clinico";
@@ -23,13 +37,20 @@ import { PianiPanel } from "@/components/paziente/piani-panel";
 import { DiarioPanel } from "@/components/paziente/diario-panel";
 import { SedutePanel } from "@/components/paziente/sedute-panel";
 import { AnamnesiPanel } from "@/components/paziente/anamnesi-panel";
-import { evaluateAccess, puoEseguireTrattamento, type AccessEvaluation } from "@/lib/access-guard";
+import { evaluateAccess, type AccessEvaluation } from "@/lib/access-guard";
 import { FotoPazienteTab } from "@/components/foto/foto-paziente-tab";
 import { FotoBaselineBanner } from "@/components/foto/foto-baseline-banner";
 import { generaPdfCartellaPaziente } from "@/lib/pdf-cartella-paziente";
 import { PdfBlobDialog } from "@/components/pdf-blob-dialog";
 import { useCriolipolisiBaseline } from "@/hooks/use-criolipolisi-baseline";
 import { useStudi } from "@/hooks/use-studi";
+import {
+  usePazienteDetail,
+  useConsensiPianoMancanti,
+  useAddPazienteAlert,
+  useDeactivatePazienteAlert,
+  useLogPazienteAccess,
+} from "@/hooks/use-pazienti";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id")({
@@ -44,9 +65,7 @@ function PazienteErrorComponent({ error, reset }: { error: Error; reset: () => v
       <h2 className="font-display text-lg font-semibold text-destructive">
         Si è verificato un errore caricando questa scheda
       </h2>
-      <p className="text-sm text-muted-foreground">
-        {error?.message ?? "Errore sconosciuto"}
-      </p>
+      <p className="text-sm text-muted-foreground">{error?.message ?? "Errore sconosciuto"}</p>
       <div className="flex gap-2">
         <Button
           onClick={() => {
@@ -71,18 +90,37 @@ function PazienteDetailPage() {
   const isChildRoute = matches.some(
     (m) => m.routeId !== Route.id && m.routeId.startsWith(Route.id),
   );
+  const idValid = UUID_RE.test(id);
+  const detailEnabled = !isChildRoute && idValid;
 
-  const [paziente, setPaziente] = useState<Paziente | null>(null);
-  const [alerts, setAlerts] = useState<PazienteAlert[]>([]);
-  const [flags, setFlags] = useState<FlagRischio[]>([]);
   const [access, setAccess] = useState<AccessEvaluation | null>(null);
-  const [consensiPianoMancanti, setConsensiPianoMancanti] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<string>("diario");
   const [exportingPdf, setExportingPdf] = useState(false);
   const [cartellaBlob, setCartellaBlob] = useState<Blob | null>(null);
   const [cartellaFilename, setCartellaFilename] = useState<string>("cartella-paziente.pdf");
   const [cartellaOpen, setCartellaOpen] = useState(false);
+
+  const {
+    data: detail,
+    isLoading: detailLoading,
+    error: detailError,
+    dataUpdatedAt,
+    refetch: refetchDetail,
+  } = usePazienteDetail(id, { enabled: detailEnabled });
+  const { data: consensiPianoMancanti = [], refetch: refetchConsensi } = useConsensiPianoMancanti(
+    id,
+    detailEnabled,
+  );
+  const logAccessMutation = useLogPazienteAccess();
+
+  const paziente = detail?.paziente ?? null;
+  const alerts = detail?.alerts ?? [];
+  const flags = detail?.flags ?? [];
+
+  function reloadDetail() {
+    void refetchDetail();
+    void refetchConsensi();
+  }
 
   async function esportaCartella() {
     if (!paziente) return;
@@ -102,116 +140,41 @@ function PazienteDetailPage() {
   }
 
   useEffect(() => {
-    if (isChildRoute) {
-      setLoading(false);
-      return;
-    }
-    if (!UUID_RE.test(id)) {
+    if (isChildRoute) return;
+    if (!idValid) {
       toast.error("Paziente non trovato");
       void navigate({ to: "/pazienti" });
-      return;
     }
-    void load();
-  }, [id, isChildRoute]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isChildRoute, idValid]);
 
-  async function load(opts: { silent?: boolean } = {}) {
-    if (!opts.silent) setLoading(true);
-    const [pRes, aRes, fRes] = await Promise.all([
-      supabase.from("pazienti").select("*").eq("id", id).maybeSingle(),
-      supabase
-        .from("paziente_alert")
-        .select("*")
-        .eq("paziente_id", id)
-        .eq("attivo", true)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("anamnesi_flag_rischio")
-        .select("*")
-        .eq("paziente_id", id)
-        .order("severity", { ascending: false }),
-    ]);
+  useEffect(() => {
+    if (!detailError) return;
+    toast.error("Paziente non trovato");
+    void navigate({ to: "/pazienti" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailError]);
 
-    if (pRes.error || !pRes.data) {
-      toast.error("Paziente non trovato");
-      void navigate({ to: "/pazienti" });
-      return;
-    }
-    setPaziente(pRes.data as Paziente);
-    setAlerts((aRes.data ?? []) as PazienteAlert[]);
-    setFlags((fRes.data ?? []) as FlagRischio[]);
-
+  useEffect(() => {
+    if (!dataUpdatedAt) return;
     // Valuta stato consensi/anamnesi (non bloccante per il rendering)
-    void evaluateAccess(id).then(setAccess).catch(() => setAccess(null));
-
-    // Consensi mancanti per voci di piani non annullati
-    void (async () => {
-      try {
-        const { data: piani } = await supabase
-          .from("piano_trattamento")
-          .select("id, stato")
-          .eq("paziente_id", id)
-          .not("stato", "in", "(annullato,bozza)");
-        const ids = (piani ?? []).map((p) => (p as { id: string }).id);
-        if (ids.length === 0) {
-          setConsensiPianoMancanti([]);
-          return;
-        }
-        const { data: voci } = await supabase
-          .from("piano_trattamento_voce")
-          .select("trattamento_id")
-          .in("piano_id", ids);
-        const trattIds = Array.from(
-          new Set(
-            (voci ?? [])
-              .map((v) => (v as { trattamento_id: string | null }).trattamento_id)
-              .filter((x): x is string => !!x),
-          ),
-        );
-        if (trattIds.length === 0) {
-          setConsensiPianoMancanti([]);
-          return;
-        }
-        const { data: trattRows } = await supabase
-          .from("trattamenti")
-          .select("id, nome")
-          .in("id", trattIds);
-        const nameMap = new Map<string, string>(
-          (trattRows ?? []).map((t) => [
-            (t as { id: string }).id,
-            (t as { nome: string }).nome,
-          ]),
-        );
-        const mancanti: string[] = [];
-        await Promise.all(
-          trattIds.map(async (tid) => {
-            const res = await puoEseguireTrattamento(id, tid);
-            if (!res.ok) mancanti.push(nameMap.get(tid) ?? "Trattamento");
-          }),
-        );
-        setConsensiPianoMancanti(mancanti.sort());
-      } catch {
-        setConsensiPianoMancanti([]);
-      }
-    })();
-
+    void evaluateAccess(id)
+      .then(setAccess)
+      .catch(() => setAccess(null));
     if (user?.id) {
-      void supabase
-        .from("paziente_access_log")
-        .insert({ paziente_id: id, user_id: user.id, azione: "view" });
+      logAccessMutation.mutate({ pazienteId: id, userId: user.id });
     }
-
-    setLoading(false);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt]);
 
   if (isChildRoute) return <Outlet />;
-  if (loading || !paziente) {
+  if (detailLoading || !paziente) {
     return <p className="text-sm text-muted-foreground">Caricamento…</p>;
   }
 
   const eta = paziente.data_nascita
     ? Math.floor(
-        (Date.now() - new Date(paziente.data_nascita).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000),
+        (Date.now() - new Date(paziente.data_nascita).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
       )
     : null;
 
@@ -284,7 +247,10 @@ function PazienteDetailPage() {
             paziente={paziente}
             onEdit={() => navigate({ to: "/pazienti/$id/edit", params: { id } })}
           />
-          <CriolipolisiBaselineBanner paziente={paziente} onVaiAdAnamnesi={() => setTab("anamnesi")} />
+          <CriolipolisiBaselineBanner
+            paziente={paziente}
+            onVaiAdAnamnesi={() => setTab("anamnesi")}
+          />
         </TabsContent>
 
         <TabsContent value="anamnesi">
@@ -292,7 +258,7 @@ function PazienteDetailPage() {
             pazienteId={id}
             pazienteNome={`${paziente.nome} ${paziente.cognome}`}
             sesso={paziente.sesso}
-            onSaved={() => void load({ silent: true })}
+            onSaved={() => reloadDetail()}
           />
         </TabsContent>
 
@@ -300,7 +266,7 @@ function PazienteDetailPage() {
           <PianiPanel
             pazienteId={id}
             pazienteNome={`${paziente.nome} ${paziente.cognome}`}
-            onChanged={() => void load({ silent: true })}
+            onChanged={() => reloadDetail()}
           />
         </TabsContent>
 
@@ -308,7 +274,7 @@ function PazienteDetailPage() {
           <SedutePanel
             pazienteId={id}
             pazienteNome={`${paziente.nome} ${paziente.cognome}`}
-            onChanged={() => void load({ silent: true })}
+            onChanged={() => reloadDetail()}
           />
         </TabsContent>
 
@@ -320,7 +286,7 @@ function PazienteDetailPage() {
           <ConsensiPanel
             pazienteId={id}
             pazienteNome={`${paziente.nome} ${paziente.cognome}`}
-            onChanged={() => void load({ silent: true })}
+            onChanged={() => reloadDetail()}
           />
         </TabsContent>
 
@@ -329,7 +295,7 @@ function PazienteDetailPage() {
             pazienteId={id}
             alerts={alerts}
             flags={flags}
-            onChanged={() => void load({ silent: true })}
+            onChanged={() => reloadDetail()}
           />
         </TabsContent>
       </Tabs>
@@ -364,10 +330,7 @@ function CriticalBanner({
   const haBlocco = !!access && (access.bloccoTotale || access.bloccoTrattamenti);
 
   const showObsoletaWarning =
-    !!access &&
-    access.anamnesiObsoleta &&
-    !access.bloccoTotale &&
-    !access.bloccoTrattamenti;
+    !!access && access.anamnesiObsoleta && !access.bloccoTotale && !access.bloccoTrattamenti;
 
   if (
     critici.length === 0 &&
@@ -404,15 +367,11 @@ function CriticalBanner({
       {blocchi.length > 0 && (
         <div
           className={`flex items-start gap-3 rounded-lg border-2 p-4 text-sm shadow-sm ${
-            haBlocco
-              ? "border-destructive/40 bg-destructive/10"
-              : "border-warning/40 bg-warning/10"
+            haBlocco ? "border-destructive/40 bg-destructive/10" : "border-warning/40 bg-warning/10"
           }`}
         >
           <ShieldAlert
-            className={`mt-0.5 h-5 w-5 shrink-0 ${
-              haBlocco ? "text-destructive" : "text-warning"
-            }`}
+            className={`mt-0.5 h-5 w-5 shrink-0 ${haBlocco ? "text-destructive" : "text-warning"}`}
           />
           <div>
             <div className={`font-semibold ${haBlocco ? "text-destructive" : ""}`}>
@@ -522,15 +481,7 @@ function CriolipolisiBaselineBanner({
   );
 }
 
-function Info({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | null;
-  mono?: boolean;
-}) {
+function Info({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
@@ -553,35 +504,36 @@ function AlertPanel({
   const { user } = useAuth();
   const [testo, setTesto] = useState("");
   const [severity, setSeverity] = useState<AlertSeverity>("attenzione");
+  const addAlertMutation = useAddPazienteAlert();
+  const deactivateAlertMutation = useDeactivatePazienteAlert();
 
   async function add() {
     if (!testo.trim()) return;
-    const { error } = await supabase.from("paziente_alert").insert({
-      paziente_id: pazienteId,
-      testo: testo.trim(),
-      severity,
-      created_by: user?.id,
-    });
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
-      return;
+    try {
+      await addAlertMutation.mutateAsync({
+        pazienteId,
+        testo: testo.trim(),
+        severity,
+        createdBy: user?.id ?? null,
+      });
+      setTesto("");
+      setSeverity("attenzione");
+      toast.success("Alert aggiunto");
+      onChanged();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Errore: ${msg}`);
     }
-    setTesto("");
-    setSeverity("attenzione");
-    toast.success("Alert aggiunto");
-    onChanged();
   }
 
   async function remove(id: string) {
-    const { error } = await supabase
-      .from("paziente_alert")
-      .update({ attivo: false })
-      .eq("id", id);
-    if (error) {
-      toast.error(`Errore: ${error.message}`);
-      return;
+    try {
+      await deactivateAlertMutation.mutateAsync(id);
+      onChanged();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Errore: ${msg}`);
     }
-    onChanged();
   }
 
   return (
