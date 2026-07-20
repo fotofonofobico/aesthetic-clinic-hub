@@ -8,7 +8,6 @@ import type {
   AlertSeverity,
   PazienteConSeverity,
   PazienteDetailData,
-  NuovoAlertInput,
 } from "./patient.types";
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = {
@@ -57,19 +56,6 @@ export async function listPazienti(mostraArchiviati: boolean): Promise<PazienteC
     const max = sev.sort((a, b) => SEVERITY_ORDER[b] - SEVERITY_ORDER[a])[0] ?? null;
     return { ...(p as Paziente), max_severity: max };
   });
-}
-
-/** Ripristina un paziente precedentemente archiviato (soft delete). */
-export async function restorePaziente(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("pazienti")
-    .update({ deleted_at: null, deleted_by: null })
-    .eq("id", id);
-
-  if (error) {
-    logger.error("[patientService.restorePaziente]", error);
-    throw new Error(error.message);
-  }
 }
 
 /** Dati completi per la pagina di dettaglio paziente: anagrafica, alert manuali attivi, flag di rischio. */
@@ -172,35 +158,13 @@ export async function getConsensiPianoMancanti(pazienteId: string): Promise<stri
   }
 }
 
-/** Aggiunge un alert clinico manuale al paziente. */
-export async function addPazienteAlert(input: NuovoAlertInput): Promise<void> {
-  const { error } = await supabase.from("paziente_alert").insert({
-    paziente_id: input.pazienteId,
-    testo: input.testo,
-    severity: input.severity,
-    created_by: input.createdBy,
-  });
-
-  if (error) {
-    logger.error("[patientService.addPazienteAlert]", error);
-    throw new Error(error.message);
-  }
-}
-
-/** Disattiva (soft) un alert clinico manuale. */
-export async function deactivatePazienteAlert(id: string): Promise<void> {
-  const { error } = await supabase.from("paziente_alert").update({ attivo: false }).eq("id", id);
-
-  if (error) {
-    logger.error("[patientService.deactivatePazienteAlert]", error);
-    throw new Error(error.message);
-  }
-}
-
 /**
  * Registra la visualizzazione della scheda paziente ai fini di audit.
- * Non bloccante: eventuali errori vengono solo loggati (comportamento
- * preesistente, mantenuto temporaneamente nel PatientService).
+ * Non bloccante: eventuali errori vengono solo loggati.
+ *
+ * Eccezione infrastrutturale al perimetro read-only di TASK 001 v1.1:
+ * non è una mutation di dominio Pazienti ma logging tecnico di audit,
+ * per questo resta nel Service Layer anche in questa fase.
  */
 export async function logPazienteAccess(pazienteId: string, userId: string): Promise<void> {
   const { error } = await supabase

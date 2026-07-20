@@ -1,23 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as patientService from "@/services/pazienti/patient.service";
-import type { NuovoAlertInput } from "@/services/pazienti/patient.types";
 
 /** Lista pazienti (attivi o archiviati) per la pagina elenco. */
 export function usePazientiList(mostraArchiviati: boolean) {
   return useQuery({
     queryKey: ["pazienti", "list", mostraArchiviati],
     queryFn: () => patientService.listPazienti(mostraArchiviati),
-  });
-}
-
-/** Ripristina un paziente archiviato e invalida la lista pazienti. */
-export function useRestorePaziente() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => patientService.restorePaziente(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["pazienti", "list"] });
-    },
   });
 }
 
@@ -36,20 +24,6 @@ export function useConsensiPianoMancanti(id: string, enabled: boolean) {
     queryKey: ["pazienti", "consensi-piano-mancanti", id],
     queryFn: () => patientService.getConsensiPianoMancanti(id),
     enabled,
-  });
-}
-
-/** Aggiunge un alert clinico manuale al paziente. */
-export function useAddPazienteAlert() {
-  return useMutation({
-    mutationFn: (input: NuovoAlertInput) => patientService.addPazienteAlert(input),
-  });
-}
-
-/** Disattiva un alert clinico manuale del paziente. */
-export function useDeactivatePazienteAlert() {
-  return useMutation({
-    mutationFn: (id: string) => patientService.deactivatePazienteAlert(id),
   });
 }
 

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useStudi } from "@/hooks/use-studi";
-import { usePazientiList, useRestorePaziente } from "@/hooks/use-pazienti";
+import { usePazientiList } from "@/hooks/use-pazienti";
 import type { AlertSeverity } from "@/types/clinico";
 import { cn } from "@/lib/utils";
 
@@ -39,8 +40,8 @@ function PazientiListPage() {
     data: pazienti = [],
     isLoading: loading,
     error: pazientiError,
+    refetch: refetchPazienti,
   } = usePazientiList(mostraArchiviati);
-  const restoreMutation = useRestorePaziente();
 
   useEffect(() => {
     if (pazientiError) toast.error("Errore caricamento pazienti");
@@ -51,13 +52,16 @@ function PazientiListPage() {
       toast.error("Solo i medici possono ripristinare pazienti");
       return;
     }
-    try {
-      await restoreMutation.mutateAsync(id);
-      toast.success("Paziente ripristinato");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Errore: ${msg}`);
+    const { error } = await supabase
+      .from("pazienti")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", id);
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      return;
     }
+    toast.success("Paziente ripristinato");
+    void refetchPazienti();
   }
 
   const filtered = useMemo(() => {

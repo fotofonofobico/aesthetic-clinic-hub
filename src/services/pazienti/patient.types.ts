@@ -11,10 +11,3 @@ export interface PazienteDetailData {
   alerts: PazienteAlert[];
   flags: FlagRischio[];
 }
-
-export interface NuovoAlertInput {
-  pazienteId: string;
-  testo: string;
-  severity: AlertSeverity;
-  createdBy: string | null;
-}

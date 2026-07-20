@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,8 +48,6 @@ import { useStudi } from "@/hooks/use-studi";
 import {
   usePazienteDetail,
   useConsensiPianoMancanti,
-  useAddPazienteAlert,
-  useDeactivatePazienteAlert,
   useLogPazienteAccess,
 } from "@/hooks/use-pazienti";
 import { Badge } from "@/components/ui/badge";
@@ -504,36 +503,32 @@ function AlertPanel({
   const { user } = useAuth();
   const [testo, setTesto] = useState("");
   const [severity, setSeverity] = useState<AlertSeverity>("attenzione");
-  const addAlertMutation = useAddPazienteAlert();
-  const deactivateAlertMutation = useDeactivatePazienteAlert();
 
   async function add() {
     if (!testo.trim()) return;
-    try {
-      await addAlertMutation.mutateAsync({
-        pazienteId,
-        testo: testo.trim(),
-        severity,
-        createdBy: user?.id ?? null,
-      });
-      setTesto("");
-      setSeverity("attenzione");
-      toast.success("Alert aggiunto");
-      onChanged();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Errore: ${msg}`);
+    const { error } = await supabase.from("paziente_alert").insert({
+      paziente_id: pazienteId,
+      testo: testo.trim(),
+      severity,
+      created_by: user?.id,
+    });
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      return;
     }
+    setTesto("");
+    setSeverity("attenzione");
+    toast.success("Alert aggiunto");
+    onChanged();
   }
 
   async function remove(id: string) {
-    try {
-      await deactivateAlertMutation.mutateAsync(id);
-      onChanged();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Errore: ${msg}`);
+    const { error } = await supabase.from("paziente_alert").update({ attivo: false }).eq("id", id);
+    if (error) {
+      toast.error(`Errore: ${error.message}`);
+      return;
     }
+    onChanged();
   }
 
   return (
