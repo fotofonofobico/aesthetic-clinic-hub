@@ -17,6 +17,27 @@ const SEVERITY_ORDER: Record<AlertSeverity, number> = {
 };
 
 /**
+ * Log centralizzato per gli errori del Service Layer Pazienti (TASK 002).
+ * Unico punto di logging per query principali e accessorie: label sintetica
+ * + oggetto errore, mai payload paziente (vedi regola d'uso in lib/logger.ts).
+ */
+function logServiceError(label: string, error: unknown): void {
+  logger.error(label, error);
+}
+
+/**
+ * Verifica l'esito di una query "principale": se in errore, logga e
+ * interrompe l'operazione. Da usare solo per la risorsa il cui fallimento
+ * deve invalidare l'intera lettura (non per query accessorie).
+ */
+function assertNoError(label: string, error: unknown, message: string): void {
+  if (error) {
+    logServiceError(label, error);
+    throw new Error(message);
+  }
+}
+
+/**
  * Lista pazienti (esclusi/archiviati in base a `mostraArchiviati`), arricchita
  * con la severity massima dei flag di rischio anamnesi per riga.
  */
@@ -27,10 +48,7 @@ export async function listPazienti(mostraArchiviati: boolean): Promise<PazienteC
     .filter("deleted_at", mostraArchiviati ? "not.is" : "is", null)
     .order("cognome", { ascending: true });
 
-  if (error) {
-    logger.error("[patientService.listPazienti]", error);
-    throw new Error("Errore caricamento pazienti");
-  }
+  assertNoError("[patientService.listPazienti]", error, "Errore caricamento pazienti");
 
   const ids = (pData ?? []).map((p) => p.id);
   let flagsByPaziente: Record<string, AlertSeverity[]> = {};
@@ -40,9 +58,10 @@ export async function listPazienti(mostraArchiviati: boolean): Promise<PazienteC
       .select("paziente_id, severity")
       .in("paziente_id", ids);
 
+    // Query accessoria: un suo fallimento non deve compromettere la lista
+    // principale, degrada a nessun flag di rischio (comportamento originale).
     if (flagsError) {
-      logger.error("[patientService.listPazienti:flags]", flagsError);
-      throw new Error("Errore caricamento pazienti");
+      logServiceError("[patientService.listPazienti:flags]", flagsError);
     }
 
     flagsByPaziente = (flags ?? []).reduce<Record<string, AlertSeverity[]>>((acc, f) => {
@@ -75,17 +94,19 @@ export async function getPazienteDetail(id: string): Promise<PazienteDetailData>
       .order("severity", { ascending: false }),
   ]);
 
+  // Query principale: solo il suo fallimento interrompe l'operazione.
+  if (pRes.error) logServiceError("[patientService.getPazienteDetail]", pRes.error);
   if (pRes.error || !pRes.data) {
-    if (pRes.error) logger.error("[patientService.getPazienteDetail]", pRes.error);
     throw new Error("Paziente non trovato");
   }
+
+  // Query accessorie: un loro fallimento non deve compromettere il recupero
+  // del paziente, degradano ai valori di default (comportamento originale).
   if (aRes.error) {
-    logger.error("[patientService.getPazienteDetail:alerts]", aRes.error);
-    throw new Error("Errore caricamento alert paziente");
+    logServiceError("[patientService.getPazienteDetail:alerts]", aRes.error);
   }
   if (fRes.error) {
-    logger.error("[patientService.getPazienteDetail:flags]", fRes.error);
-    throw new Error("Errore caricamento flag di rischio paziente");
+    logServiceError("[patientService.getPazienteDetail:flags]", fRes.error);
   }
 
   return {
@@ -153,7 +174,7 @@ export async function getConsensiPianoMancanti(pazienteId: string): Promise<stri
     );
     return mancanti.sort();
   } catch (err) {
-    logger.error("[patientService.getConsensiPianoMancanti]", err);
+    logServiceError("[patientService.getConsensiPianoMancanti]", err);
     return [];
   }
 }
