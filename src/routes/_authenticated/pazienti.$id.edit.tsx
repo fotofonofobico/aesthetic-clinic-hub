@@ -20,6 +20,11 @@ import { toast } from "sonner";
 import { validateCFInput, normalizeCF, decodeCF } from "@/lib/codice-fiscale";
 import { useStudi } from "@/hooks/use-studi";
 import type { Paziente, Sesso } from "@/types/clinico";
+import {
+  pazienteToFormValues,
+  formValuesToPazientePayload,
+  type PazienteFormValues,
+} from "@/services/pazienti/patient.form";
 
 export const Route = createFileRoute("/_authenticated/pazienti/$id/edit")({
   component: PazienteEditPage,
@@ -36,7 +41,7 @@ function PazienteEditPage() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Partial<Paziente>>({
+  const [form, setForm] = useState<PazienteFormValues>({
     nome: "",
     cognome: "",
     sesso: null,
@@ -75,21 +80,17 @@ function PazienteEditPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("pazienti")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    const { data, error } = await supabase.from("pazienti").select("*").eq("id", id).maybeSingle();
     if (error || !data) {
       toast.error("Paziente non trovato");
       void navigate({ to: "/pazienti" });
       return;
     }
-    setForm(data as Paziente);
+    setForm(pazienteToFormValues(data as Paziente));
     setLoading(false);
   }
 
-  function update<K extends keyof Paziente>(key: K, value: Paziente[K]) {
+  function update<K extends keyof PazienteFormValues>(key: K, value: PazienteFormValues[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -112,24 +113,10 @@ function PazienteEditPage() {
     }
 
     setSaving(true);
-    const payload = {
-      nome: form.nome.trim(),
-      cognome: form.cognome.trim(),
-      sesso: form.sesso ?? null,
-      data_nascita: form.data_nascita || null,
-      luogo_nascita: form.luogo_nascita?.trim() || null,
-      codice_fiscale: cf,
-      email: form.email?.trim() || null,
-      telefono: form.telefono?.trim() || null,
-      indirizzo: form.indirizzo?.trim() || null,
-      citta: form.citta?.trim() || null,
-      cap: form.cap?.trim() || null,
-      provincia: form.provincia?.trim().toUpperCase() || null,
-      professione: form.professione?.trim() || null,
-      note: form.note?.trim() || null,
-      studio_id: form.studio_id ?? null,
-      // peso_kg/altezza_cm gestiti esclusivamente dalla card Misurazioni in Anamnesi (sync via trigger DB)
-    };
+    // Il codice fiscale validato/normalizzato sopra sostituisce sempre quello
+    // grezzo del form: il mapper non contiene logica di validazione del CF.
+    // peso_kg/altezza_cm gestiti esclusivamente dalla card Misurazioni in Anamnesi (sync via trigger DB)
+    const payload = { ...formValuesToPazientePayload(form), codice_fiscale: cf };
 
     if (isNew) {
       const { data, error } = await supabase
@@ -323,10 +310,7 @@ function PazienteEditPage() {
                 />
               </Field>
               <Field label="Città">
-                <Input
-                  value={form.citta ?? ""}
-                  onChange={(e) => update("citta", e.target.value)}
-                />
+                <Input value={form.citta ?? ""} onChange={(e) => update("citta", e.target.value)} />
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="CAP">
